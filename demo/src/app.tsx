@@ -45,7 +45,7 @@ const initialSelection: SelectionState = {
   mode: 'both',
   hop: 1,
 };
-const CANVAS_WORKSPACE_HEIGHT = 820;
+const MIN_CANVAS_WORKSPACE_HEIGHT = 640;
 
 function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
@@ -93,6 +93,12 @@ export function App() {
     () => readStoredViewState()?.selectedFlowEdge ?? null
   );
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window === 'undefined' ? 1440 : window.innerWidth
+  );
+  const [viewportHeight, setViewportHeight] = useState<number>(() =>
+    typeof window === 'undefined' ? 980 : window.innerHeight
+  );
 
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
@@ -118,6 +124,9 @@ export function App() {
       .filter((node): node is SymbolNode => node.kind === 'symbol')
       .map((symbol) => [symbol.id, formatSymbolLabel(symbol)])
   );
+  const isCompactCanvas = viewportWidth < 1280;
+  const isMobileCanvas = viewportWidth < 920;
+  const workspaceHeight = Math.max(MIN_CANVAS_WORKSPACE_HEIGHT, viewportHeight - 170);
 
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -171,6 +180,20 @@ export function App() {
       globalThis.fetch = originalFetch;
       demoCollector.reset();
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    function handleResize(): void {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -325,7 +348,8 @@ export function App() {
       style={{
         maxWidth: '100%',
         margin: '0 auto',
-        padding: '1.25rem 1.25rem 2rem',
+        minHeight: '100vh',
+        padding: isMobileCanvas ? '0.75rem' : '1rem',
         display: 'grid',
         gap: '1rem',
         fontFamily:
@@ -412,7 +436,7 @@ export function App() {
         <section
           style={{
             position: 'relative',
-            minHeight: CANVAS_WORKSPACE_HEIGHT,
+            minHeight: workspaceHeight,
             borderRadius: '1.35rem',
             overflow: 'hidden',
             border: '1px solid #cbd5e1',
@@ -422,7 +446,7 @@ export function App() {
         >
           <GoriReactFlowCanvas
             graph={reactFlowGraph}
-            height={CANVAS_WORKSPACE_HEIGHT}
+            height={workspaceHeight}
             showChrome={false}
             selectedSymbolIds={selection.selectedSymbolIds}
             {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
@@ -437,7 +461,7 @@ export function App() {
               position: 'absolute',
               top: '1rem',
               left: '1rem',
-              width: 'min(360px, calc(100% - 2rem))',
+              width: isMobileCanvas ? 'calc(100% - 2rem)' : 'min(360px, 30vw)',
               display: 'grid',
               gap: '0.75rem',
               zIndex: 10,
@@ -652,10 +676,21 @@ export function App() {
           <section
             style={{
               position: 'absolute',
-              top: '1rem',
-              right: '1rem',
-              width: 'min(420px, calc(100% - 2rem))',
-              maxHeight: `calc(${CANVAS_WORKSPACE_HEIGHT}px - 2rem)`,
+              ...(isCompactCanvas
+                ? {
+                    left: '1rem',
+                    right: '1rem',
+                    bottom: '1rem',
+                    top: 'auto',
+                  }
+                : {
+                    top: '1rem',
+                    right: '1rem',
+                  }),
+              width: isCompactCanvas ? 'calc(100% - 2rem)' : 'min(420px, 32vw)',
+              maxHeight: isCompactCanvas
+                ? 'min(40vh, 360px)'
+                : `calc(${workspaceHeight}px - 2rem)`,
               zIndex: 10,
             }}
           >
