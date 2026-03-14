@@ -30,11 +30,14 @@ pnpm demo:preview
 
 ## Current Demo Scope
 
-The current demo wires the request-only runtime path end-to-end:
+The current demo wires the minimal runtime path end-to-end:
 
+- `render tracing`
+- `use tracing`
+- `call tracing`
 - `fetch interceptor`
 - `RuntimeCollector`
 - `buildGraph(...)`
 - `projectToFileLevelView(...)`
 
-It is not yet the full Gori runtime. `render`, `use`, and `call` are still modeled in core types and tests, but only `request` is collected live in the demo.
+It is not yet the full Gori runtime. The demo currently records a curated live flow so the end-to-end pipeline can be inspected while broader automatic instrumentation is still being designed.

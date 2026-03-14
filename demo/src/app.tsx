@@ -96,10 +96,10 @@ export function App() {
         >
           Gori Phase 0
         </p>
-        <h1 style={{ margin: 0 }}>Request Collector Demo</h1>
+        <h1 style={{ margin: 0 }}>Runtime Collector Demo</h1>
         <p style={{ maxWidth: 720, color: '#334155' }}>
-          This demo wires the request-only runtime collector into the app so the fetch interceptor,
-          graph builder, and file-level projection can be inspected end-to-end.
+          This demo wires render, use, call, and request tracing into the app so the runtime
+          collector, graph builder, and file-level projection can be inspected end-to-end.
         </p>
       </header>
 

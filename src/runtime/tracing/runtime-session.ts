@@ -1,5 +1,6 @@
 import { createFunctionCallEvent } from '../events/create-function-call-event.js';
 import { createHookUsageEvent } from '../events/create-hook-usage-event.js';
+import { createRenderEvent } from '../events/create-render-event.js';
 import type { RuntimeCollector } from '../collector/collector.js';
 
 export type RuntimeContext = {
@@ -10,13 +11,13 @@ export type RuntimeContext = {
 
 type RuntimeSessionOptions = {
   getTimestamp?: () => number;
-  createEventId?: (kind: 'use' | 'call' | 'request') => string;
+  createEventId?: (kind: 'render' | 'use' | 'call' | 'request') => string;
 };
 
 export class RuntimeSession {
   private readonly collector: RuntimeCollector;
   private readonly getTimestamp: () => number;
-  private readonly createEventId: (kind: 'use' | 'call' | 'request') => string;
+  private readonly createEventId: (kind: 'render' | 'use' | 'call' | 'request') => string;
   private readonly contextStack: RuntimeContext[] = [{}];
 
   constructor(collector: RuntimeCollector, options: RuntimeSessionOptions = {}) {
@@ -67,6 +68,22 @@ export class RuntimeSession {
         timestamp: this.getTimestamp(),
         sourceSymbolId,
         targetSymbolId,
+        ...(context.traceId !== undefined ? { traceId: context.traceId } : {}),
+        ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
+      })
+    );
+  }
+
+  recordRender(sourceSymbolId: string | undefined, targetSymbolId: string, fileId: string): void {
+    const context = this.getContext();
+
+    this.collector.record(
+      createRenderEvent({
+        id: this.createEventId('render'),
+        timestamp: this.getTimestamp(),
+        targetSymbolId,
+        fileId,
+        ...(sourceSymbolId !== undefined ? { sourceSymbolId } : {}),
         ...(context.traceId !== undefined ? { traceId: context.traceId } : {}),
         ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
       })

@@ -24,6 +24,21 @@ describe('buildGraph', () => {
         exported: false,
       },
       {
+        id: 'file:src/components/user-card.tsx',
+        kind: 'file',
+        path: 'src/components/user-card.tsx',
+        name: 'user-card.tsx',
+        exports: [],
+      },
+      {
+        id: 'symbol:src/components/user-card.tsx#UserCard',
+        kind: 'symbol',
+        fileId: 'file:src/components/user-card.tsx',
+        name: 'UserCard',
+        symbolType: 'component',
+        exported: false,
+      },
+      {
         id: 'file:src/hooks/use-user.ts',
         kind: 'file',
         path: 'src/hooks/use-user.ts',
@@ -70,6 +85,18 @@ describe('buildGraph', () => {
         target: 'symbol:src/pages/user-page.tsx#UserPage',
       },
       {
+        id: 'contains:file:src/components/user-card.tsx->symbol:src/components/user-card.tsx#UserCard',
+        kind: 'contains',
+        source: 'file:src/components/user-card.tsx',
+        target: 'symbol:src/components/user-card.tsx#UserCard',
+      },
+      {
+        id: 'render:symbol:src/pages/user-page.tsx#UserPage->symbol:src/components/user-card.tsx#UserCard',
+        kind: 'render',
+        source: 'symbol:src/pages/user-page.tsx#UserPage',
+        target: 'symbol:src/components/user-card.tsx#UserCard',
+      },
+      {
         id: 'contains:file:src/hooks/use-user.ts->symbol:src/hooks/use-user.ts#useUser',
         kind: 'contains',
         source: 'file:src/hooks/use-user.ts',
@@ -105,7 +132,7 @@ describe('buildGraph', () => {
   it('deduplicates repeated runtime observations into a stable graph shape', () => {
     const graph = buildGraph([...requestUserFlowEvents, ...requestUserFlowEvents]);
 
-    expect(graph.nodes).toHaveLength(7);
-    expect(graph.edges).toHaveLength(6);
+    expect(graph.nodes).toHaveLength(9);
+    expect(graph.edges).toHaveLength(8);
   });
 });
