@@ -21,6 +21,9 @@ export function GoriCanvas({
   symbolAccentsById = {},
   edgeLabelsById = {},
 }: GoriCanvasProps) {
+  const fileLabelsById = Object.fromEntries(view.fileNodes.map((fileNode) => [fileNode.id, fileNode.name]));
+  const apiLabelsById = Object.fromEntries(view.apiNodes.map((apiNode) => [apiNode.id, apiNode.label]));
+
   return (
     <section
       style={{
@@ -138,15 +141,51 @@ export function GoriCanvas({
         ))}
       </div>
 
+      {view.apiNodes.length ? (
+        <section>
+          <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>API Nodes</h3>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1rem',
+            }}
+          >
+            {view.apiNodes.map((apiNode) => (
+              <article
+                key={apiNode.id}
+                style={{
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '0.75rem',
+                  background: '#eff6ff',
+                  padding: '0.875rem',
+                }}
+              >
+                <strong style={{ display: 'block' }}>{apiNode.label}</strong>
+                <small style={{ color: '#1d4ed8' }}>{apiNode.path}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section>
         <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>File Edges</h3>
         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
           {view.fileEdges.map((edge) => {
             const labels = edgeLabelsById[edge.id] ?? [];
+            const sourceLabel =
+              fileLabelsById[edge.sourceFileId] ??
+              apiLabelsById[edge.sourceFileId] ??
+              edge.sourceFileId;
+            const targetLabel =
+              fileLabelsById[edge.targetFileId] ??
+              apiLabelsById[edge.targetFileId] ??
+              edge.targetFileId;
 
             return (
               <li key={edge.id}>
-                {edge.sourceFileId} -&gt; {edge.targetFileId} [{edge.relationTypes.join(', ')}]
+                {sourceLabel} -&gt; {targetLabel} [{edge.relationTypes.join(', ')}]
                 {labels.length ? (
                   <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
                     {labels.map((label) => (
