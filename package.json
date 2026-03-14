@@ -8,9 +8,11 @@
     "node": ">=22.22.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm demo:dev",
+    "demo:dev": "vite --mode demo",
     "build": "pnpm typecheck && vite build --mode library",
     "build:demo": "pnpm typecheck && vite build --mode demo",
+    "demo:preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",

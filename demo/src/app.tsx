@@ -1,92 +1,78 @@
-import type { FileLevelView } from '../../src/core/types/projection';
+import { useEffect, useRef, useState } from 'react';
 
+import { buildGraph } from '../../src/core/graph/graph-builder';
+import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
+import type { RuntimeEvent } from '../../src/core/types/runtime-events';
+import type { FileLevelView } from '../../src/core/types/projection';
+import { RuntimeCollector } from '../../src/runtime/collector/collector';
+import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
 import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
 import { UserPage } from './pages/user-page';
+import { getRuntimeContext } from './runtime-context';
 
-const demoView: FileLevelView = {
-  fileNodes: [
-    {
-      id: 'file:demo/src/pages/user-page.tsx',
-      kind: 'file',
-      path: 'demo/src/pages/user-page.tsx',
-      name: 'user-page.tsx',
-      exports: [
-        {
-          symbolId: 'symbol:demo/src/pages/user-page.tsx#UserPage',
-          name: 'UserPage',
-          symbolType: 'component',
-          exported: true,
-        },
-      ],
-    },
-    {
-      id: 'file:demo/src/hooks/use-user.ts',
-      kind: 'file',
-      path: 'demo/src/hooks/use-user.ts',
-      name: 'use-user.ts',
-      exports: [
-        {
-          symbolId: 'symbol:demo/src/hooks/use-user.ts#useUser',
-          name: 'useUser',
-          symbolType: 'hook',
-          exported: true,
-        },
-      ],
-    },
-    {
-      id: 'file:demo/src/api/user.ts',
-      kind: 'file',
-      path: 'demo/src/api/user.ts',
-      name: 'user.ts',
-      exports: [
-        {
-          symbolId: 'symbol:demo/src/api/user.ts#fetchUser',
-          name: 'fetchUser',
-          symbolType: 'function',
-          exported: true,
-        },
-      ],
-    },
-  ],
-  apiNodes: [
-    {
-      id: 'api:GET:/api/user',
-      kind: 'api',
-      method: 'GET',
-      path: '/api/user',
-      label: 'GET /api/user',
-    },
-  ],
-  fileEdges: [
-    {
-      id: 'file-edge:file:demo/src/pages/user-page.tsx->file:demo/src/hooks/use-user.ts',
-      sourceFileId: 'file:demo/src/pages/user-page.tsx',
-      targetFileId: 'file:demo/src/hooks/use-user.ts',
-      relationTypes: ['use'],
-      supportingEdges: [
-        'use:symbol:demo/src/pages/user-page.tsx#UserPage->symbol:demo/src/hooks/use-user.ts#useUser',
-      ],
-    },
-    {
-      id: 'file-edge:file:demo/src/hooks/use-user.ts->file:demo/src/api/user.ts',
-      sourceFileId: 'file:demo/src/hooks/use-user.ts',
-      targetFileId: 'file:demo/src/api/user.ts',
-      relationTypes: ['call'],
-      supportingEdges: [
-        'call:symbol:demo/src/hooks/use-user.ts#useUser->symbol:demo/src/api/user.ts#fetchUser',
-      ],
-    },
-    {
-      id: 'file-edge:file:demo/src/api/user.ts->api:GET:/api/user',
-      sourceFileId: 'file:demo/src/api/user.ts',
-      targetFileId: 'api:GET:/api/user',
-      relationTypes: ['request'],
-      supportingEdges: ['request:symbol:demo/src/api/user.ts#fetchUser->api:GET:/api/user'],
-    },
-  ],
+const emptyView: FileLevelView = {
+  fileNodes: [],
+  apiNodes: [],
+  fileEdges: [],
 };
 
 export function App() {
+  const collectorRef = useRef(new RuntimeCollector());
+  const [events, setEvents] = useState<RuntimeEvent[]>([]);
+  const [view, setView] = useState<FileLevelView>(emptyView);
+
+  useEffect(() => {
+    const collector = collectorRef.current;
+    const originalFetch = globalThis.fetch;
+    let sequence = 0;
+
+    const demoFetch: typeof fetch = async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? new URL(input, 'http://localhost')
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+
+      if (url.pathname === '/api/user') {
+        return new Response(
+          JSON.stringify({
+            id: '1',
+            name: 'Jin',
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
+
+      return originalFetch(input, init);
+    };
+
+    globalThis.fetch = demoFetch;
+
+    const detachInterceptor = attachFetchInterceptor({
+      collector,
+      getContext: getRuntimeContext,
+      createEventId: () => `evt-request-${++sequence}`,
+    });
+
+    const unsubscribe = collector.subscribe((nextEvents) => {
+      setEvents(nextEvents);
+      setView(projectToFileLevelView(buildGraph(nextEvents)));
+    });
+
+    return () => {
+      unsubscribe();
+      detachInterceptor();
+      globalThis.fetch = originalFetch;
+      collector.reset();
+    };
+  }, []);
+
   return (
     <main
       style={{
@@ -114,15 +100,36 @@ export function App() {
         >
           Gori Phase 0
         </p>
-        <h1 style={{ margin: 0 }}>Runtime Graph Bootstrap</h1>
+        <h1 style={{ margin: 0 }}>Request Collector Demo</h1>
         <p style={{ maxWidth: 720, color: '#334155' }}>
-          This demo keeps the initial repository alive while the collector, builder, and projection
-          layers are still being implemented.
+          This demo wires the request-only runtime collector into the app so the fetch interceptor,
+          graph builder, and file-level projection can be inspected end-to-end.
         </p>
       </header>
 
       <UserPage />
-      <GoriCanvas view={demoView} />
+      <GoriCanvas view={view} />
+
+      <section
+        style={{
+          padding: '1rem',
+          borderRadius: '1rem',
+          background: '#0f172a',
+          color: '#e2e8f0',
+        }}
+      >
+        <h2 style={{ marginTop: 0, fontSize: '1rem' }}>Collected Runtime Events</h2>
+        <pre
+          style={{
+            marginBottom: 0,
+            overflowX: 'auto',
+            fontSize: '0.875rem',
+            lineHeight: 1.5,
+          }}
+        >
+          {JSON.stringify(events, null, 2)}
+        </pre>
+      </section>
     </main>
   );
 }

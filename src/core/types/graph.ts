@@ -71,6 +71,8 @@ export type GoriEdge =
   | CallEdge
   | RequestEdge;
 
+export type RuntimeEdge = Exclude<GoriEdge, ContainsEdge>;
+
 export type GoriGraph = {
   nodes: GoriNode[];
   edges: GoriEdge[];
