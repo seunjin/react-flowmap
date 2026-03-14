@@ -6,8 +6,10 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  type EdgeMouseHandler,
   type Edge,
   type Node,
+  type NodeMouseHandler,
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -17,6 +19,8 @@ import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './pro
 type GoriReactFlowCanvasProps = {
   graph: ReactFlowGraph;
   height?: number;
+  onNodeClick?: (node: ReactFlowGraph['nodes'][number]) => void;
+  onEdgeClick?: (edge: ReactFlowGraph['edges'][number]) => void;
 };
 
 function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
@@ -114,9 +118,29 @@ function toFlowEdges(graph: ReactFlowGraph): Edge<ReactFlowEdgeData>[] {
 export function GoriReactFlowCanvas({
   graph,
   height = 520,
+  onNodeClick,
+  onEdgeClick,
 }: GoriReactFlowCanvasProps) {
   const nodes = toFlowNodes(graph);
   const edges = toFlowEdges(graph);
+  const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node] as const));
+  const graphEdgeById = new Map(graph.edges.map((edge) => [edge.id, edge] as const));
+
+  const handleNodeClick: NodeMouseHandler<Node<ReactFlowNodeData>> = (_event, node) => {
+    const nextNode = graphNodeById.get(node.id);
+
+    if (nextNode && onNodeClick) {
+      onNodeClick(nextNode);
+    }
+  };
+
+  const handleEdgeClick: EdgeMouseHandler<Edge<ReactFlowEdgeData>> = (_event, edge) => {
+    const nextEdge = graphEdgeById.get(edge.id);
+
+    if (nextEdge && onEdgeClick) {
+      onEdgeClick(nextEdge);
+    }
+  };
 
   return (
     <section
@@ -144,7 +168,15 @@ export function GoriReactFlowCanvas({
             'radial-gradient(circle at top left, rgba(191,219,254,0.25), transparent 30%), #f8fafc',
         }}
       >
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView nodesDraggable={false}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          fitView
+          nodesDraggable={false}
+          onNodeClick={handleNodeClick}
+          onEdgeClick={handleEdgeClick}
+        >
           <Background gap={20} size={1} color="#cbd5e1" />
           <MiniMap
             pannable

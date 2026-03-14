@@ -9,6 +9,8 @@ export type ReactFlowNodeData = {
   kind: 'file' | 'api';
   label: string;
   subtitle: string;
+  fileId?: string;
+  symbolIds?: string[];
   exportCount?: number;
 };
 
@@ -138,6 +140,8 @@ export function projectToReactFlow(
         kind: 'file' as const,
         label: node.name,
         subtitle: node.path,
+        fileId: node.id,
+        symbolIds: node.exports.map((item) => item.symbolId),
         exportCount: node.exports.length,
       },
     })),

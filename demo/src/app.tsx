@@ -38,6 +38,10 @@ const initialSelection: SelectionState = {
 };
 
 type DemoTab = 'canvas' | 'inspector' | 'events';
+type FlowEdgeSelection = {
+  edgeId: string;
+  labels: string[];
+};
 
 function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
@@ -74,6 +78,7 @@ export function App() {
   const [selection, setSelection] = useState<SelectionState>(initialSelection);
   const [activeTab, setActiveTab] = useState<DemoTab>('canvas');
   const [runtimeReady, setRuntimeReady] = useState(false);
+  const [selectedFlowEdge, setSelectedFlowEdge] = useState<FlowEdgeSelection | null>(null);
 
   const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
   const inspector = buildInspectorPayload(graph, selection);
@@ -194,6 +199,33 @@ export function App() {
 
   function resetSelection(): void {
     setSelection(initialSelection);
+    setSelectedFlowEdge(null);
+  }
+
+  function handleFlowNodeClick(node: typeof reactFlowGraph.nodes[number]): void {
+    if (node.data.kind !== 'file' || !node.data.symbolIds?.length) {
+      return;
+    }
+
+    setSelection((current) => ({
+      ...current,
+      ...(node.data.fileId ? { selectedFileId: node.data.fileId } : {}),
+      selectedSymbolIds: node.data.symbolIds ?? [],
+    }));
+    setActiveTab('inspector');
+  }
+
+  function handleFlowEdgeClick(edge: typeof reactFlowGraph.edges[number]): void {
+    const labels = edge.data.supportingEdges.flatMap((edgeId) => {
+      const presentation = getEdgePresentation(graphStore, edgeId);
+      return presentation ? [presentation.label] : [];
+    });
+
+    setSelectedFlowEdge({
+      edgeId: edge.id,
+      labels,
+    });
+    setActiveTab('inspector');
   }
 
   return (
@@ -433,7 +465,36 @@ export function App() {
 
       {activeTab === 'canvas' ? (
         <section style={{ display: 'grid', gap: '1rem' }}>
-          <GoriReactFlowCanvas graph={reactFlowGraph} />
+          <GoriReactFlowCanvas
+            graph={reactFlowGraph}
+            onNodeClick={handleFlowNodeClick}
+            onEdgeClick={handleFlowEdgeClick}
+          />
+          {selectedFlowEdge ? (
+            <section
+              style={{
+                padding: '0.9rem 1rem',
+                borderRadius: '1rem',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Selected edge: {selectedFlowEdge.edgeId}
+              </strong>
+              {selectedFlowEdge.labels.length ? (
+                <ul style={{ margin: 0, paddingLeft: '1rem', color: '#334155' }}>
+                  {selectedFlowEdge.labels.map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ margin: 0, color: '#64748b' }}>
+                  No supporting runtime edge labels resolved for this file edge.
+                </p>
+              )}
+            </section>
+          ) : null}
           <GoriCanvas
             view={view}
             edgeLayers={edgeLayers}
@@ -466,6 +527,35 @@ export function App() {
               Explain why the current file edges exist for the selected symbols.
             </p>
           </header>
+
+          {selectedFlowEdge ? (
+            <section
+              style={{
+                padding: '0.85rem 0.95rem',
+                borderRadius: '0.85rem',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: '0.4rem' }}>
+                Selected file edge
+              </strong>
+              <small style={{ display: 'block', color: '#64748b', marginBottom: '0.5rem' }}>
+                {selectedFlowEdge.edgeId}
+              </small>
+              {selectedFlowEdge.labels.length ? (
+                <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                  {selectedFlowEdge.labels.map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ margin: 0, color: '#64748b' }}>
+                  No supporting runtime labels resolved for this edge.
+                </p>
+              )}
+            </section>
+          ) : null}
 
           {inspector.file ? (
             <section>
