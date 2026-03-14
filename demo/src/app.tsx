@@ -73,6 +73,7 @@ export function App() {
   const [view, setView] = useState<FileLevelView>(emptyView);
   const [selection, setSelection] = useState<SelectionState>(initialSelection);
   const [activeTab, setActiveTab] = useState<DemoTab>('canvas');
+  const [runtimeReady, setRuntimeReady] = useState(false);
 
   const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
   const inspector = buildInspectorPayload(graph, selection);
@@ -140,7 +141,10 @@ export function App() {
       setGraph(nextGraph);
     });
 
+    setRuntimeReady(true);
+
     return () => {
+      setRuntimeReady(false);
       unsubscribe();
       detachInterceptor();
       globalThis.fetch = originalFetch;
@@ -226,7 +230,21 @@ export function App() {
         </p>
       </header>
 
-      <UserPage />
+      {runtimeReady ? (
+        <UserPage />
+      ) : (
+        <section
+          style={{
+            padding: '1rem',
+            borderRadius: '1rem',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            color: '#475569',
+          }}
+        >
+          Preparing runtime collector...
+        </section>
+      )}
       <section
         style={{
           padding: '1rem',
