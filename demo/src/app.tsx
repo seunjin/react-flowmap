@@ -158,6 +158,13 @@ export function App() {
     }));
   }
 
+  function setHop(hop: number): void {
+    setSelection((current) => ({
+      ...current,
+      hop,
+    }));
+  }
+
   function resetSelection(): void {
     setSelection(initialSelection);
   }
@@ -265,8 +272,30 @@ export function App() {
             </button>
           </div>
 
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <strong style={{ fontSize: '0.875rem' }}>hop</strong>
+            {[1, 2, 3].map((hop) => (
+              <button
+                key={hop}
+                type="button"
+                onClick={() => setHop(hop)}
+                style={{
+                  padding: '0.45rem 0.7rem',
+                  borderRadius: '999px',
+                  border: selection.hop === hop ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                  background: selection.hop === hop ? '#0f172a' : '#ffffff',
+                  color: selection.hop === hop ? '#f8fafc' : '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                {hop}-hop
+              </button>
+            ))}
+          </div>
+
           <p style={{ margin: 0, color: '#64748b' }}>
-            Observed symbols: <strong>{observedSymbols.length}</strong>
+            Observed symbols: <strong>{observedSymbols.length}</strong> · current hop:{' '}
+            <strong>{selection.hop}</strong>
           </p>
           {selection.selectedSymbolIds.length ? (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
