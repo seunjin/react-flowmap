@@ -445,6 +445,38 @@ export function App() {
                     </ul>
                   </div>
                 ) : null}
+                {relation?.outgoingLayers.length ? (
+                  <div>
+                    <small style={{ color: '#64748b', fontWeight: 600 }}>Outgoing Path</small>
+                    <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
+                      {relation.outgoingLayers.map((layer) => (
+                        <section
+                          key={`outgoing-${layer.hop}`}
+                          style={{
+                            padding: '0.65rem 0.75rem',
+                            borderRadius: '0.75rem',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <small style={{ color: '#64748b', fontWeight: 700 }}>
+                            hop {layer.hop}
+                          </small>
+                          <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1rem' }}>
+                            {layer.edges.map((edge) => (
+                              <li
+                                key={edge.edgeId}
+                                style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
+                              >
+                                {edge.label}
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {relation?.incomingEdges.length ? (
                   <div>
                     <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming</small>
@@ -458,6 +490,38 @@ export function App() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                ) : null}
+                {relation?.incomingLayers.length ? (
+                  <div>
+                    <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming Path</small>
+                    <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
+                      {relation.incomingLayers.map((layer) => (
+                        <section
+                          key={`incoming-${layer.hop}`}
+                          style={{
+                            padding: '0.65rem 0.75rem',
+                            borderRadius: '0.75rem',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <small style={{ color: '#64748b', fontWeight: 700 }}>
+                            hop {layer.hop}
+                          </small>
+                          <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1rem' }}>
+                            {layer.edges.map((edge) => (
+                              <li
+                                key={edge.edgeId}
+                                style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
+                              >
+                                {edge.label}
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 {relation?.requestEdges.length ? (

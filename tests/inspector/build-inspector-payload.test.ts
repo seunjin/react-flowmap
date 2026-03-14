@@ -53,6 +53,28 @@ describe('buildInspectorPayload', () => {
           },
         ],
         requestEdges: [],
+        outgoingLayers: [
+          {
+            hop: 1,
+            edges: [
+              {
+                edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+                label: 'useUser --call--> fetchUser',
+              },
+            ],
+          },
+        ],
+        incomingLayers: [
+          {
+            hop: 1,
+            edges: [
+              {
+                edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+                label: 'UserPage --use--> useUser',
+              },
+            ],
+          },
+        ],
       },
     ]);
   });
@@ -90,6 +112,18 @@ describe('buildInspectorPayload', () => {
             label: 'fetchUser --request--> GET /api/user',
           },
         ],
+        outgoingLayers: [
+          {
+            hop: 1,
+            edges: [
+              {
+                edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+                label: 'fetchUser --request--> GET /api/user',
+              },
+            ],
+          },
+        ],
+        incomingLayers: [],
       },
     ]);
   });
@@ -120,6 +154,18 @@ describe('buildInspectorPayload', () => {
           },
         ],
         requestEdges: [],
+        outgoingLayers: [],
+        incomingLayers: [
+          {
+            hop: 1,
+            edges: [
+              {
+                edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+                label: 'UserPage --use--> useUser',
+              },
+            ],
+          },
+        ],
       },
     ]);
   });
@@ -165,6 +211,36 @@ describe('buildInspectorPayload', () => {
             label: 'fetchUser --request--> GET /api/user',
           },
         ],
+        outgoingLayers: [
+          {
+            hop: 1,
+            edges: [
+              {
+                edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+                label: 'UserPage --use--> useUser',
+              },
+            ],
+          },
+          {
+            hop: 2,
+            edges: [
+              {
+                edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+                label: 'useUser --call--> fetchUser',
+              },
+            ],
+          },
+          {
+            hop: 3,
+            edges: [
+              {
+                edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+                label: 'fetchUser --request--> GET /api/user',
+              },
+            ],
+          },
+        ],
+        incomingLayers: [],
       },
     ]);
   });

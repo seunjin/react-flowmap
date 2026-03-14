@@ -30,5 +30,7 @@ export function summarizeSymbolRelations(
       const label = describeRuntimeEdge(store, edge);
       return label ? [{ edgeId: edge.id, label }] : [];
     }),
+    outgoingLayers: [],
+    incomingLayers: [],
   };
 }

@@ -6,6 +6,11 @@ export type EdgeDescription = {
   label: string;
 };
 
+export type EdgeLayer = {
+  hop: number;
+  edges: EdgeDescription[];
+};
+
 export type SymbolRelationSummary = {
   symbolId: string;
   outgoingEdgeIds: string[];
@@ -14,6 +19,8 @@ export type SymbolRelationSummary = {
   outgoingEdges: EdgeDescription[];
   incomingEdges: EdgeDescription[];
   requestEdges: EdgeDescription[];
+  outgoingLayers: EdgeLayer[];
+  incomingLayers: EdgeLayer[];
 };
 
 export type InspectorPayload = {

@@ -13,6 +13,26 @@ function toEdgeDescriptions(store: InMemoryGraphStore, edges: RuntimeEdge[]) {
   });
 }
 
+function toEdgeLayers(
+  store: InMemoryGraphStore,
+  layers: RuntimeEdge[][]
+): SymbolRelationSummary['outgoingLayers'] {
+  return layers.flatMap((layer, index) => {
+    const descriptions = toEdgeDescriptions(store, layer);
+
+    if (descriptions.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        hop: index + 1,
+        edges: descriptions,
+      },
+    ];
+  });
+}
+
 function buildRelationSummary(
   store: InMemoryGraphStore,
   symbolId: string,
@@ -22,6 +42,8 @@ function buildRelationSummary(
   const outgoingEdges = selectedEdges.outgoingEdges;
   const incomingEdges = selectedEdges.incomingEdges;
   const requestEdges = outgoingEdges.filter((edge) => edge.kind === 'request');
+  const outgoingLayers = toEdgeLayers(store, selectedEdges.outgoingLayers);
+  const incomingLayers = toEdgeLayers(store, selectedEdges.incomingLayers);
 
   switch (selection.mode) {
     case 'outgoing':
@@ -33,6 +55,8 @@ function buildRelationSummary(
         outgoingEdges: toEdgeDescriptions(store, outgoingEdges),
         incomingEdges: [],
         requestEdges: toEdgeDescriptions(store, requestEdges),
+        outgoingLayers,
+        incomingLayers: [],
       };
     case 'incoming':
       return {
@@ -43,6 +67,8 @@ function buildRelationSummary(
         outgoingEdges: [],
         incomingEdges: toEdgeDescriptions(store, incomingEdges),
         requestEdges: [],
+        outgoingLayers: [],
+        incomingLayers,
       };
     default:
       return {
@@ -53,6 +79,8 @@ function buildRelationSummary(
         outgoingEdges: toEdgeDescriptions(store, outgoingEdges),
         incomingEdges: toEdgeDescriptions(store, incomingEdges),
         requestEdges: toEdgeDescriptions(store, requestEdges),
+        outgoingLayers,
+        incomingLayers,
       };
   }
 }

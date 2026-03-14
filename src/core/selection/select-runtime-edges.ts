@@ -18,17 +18,18 @@ function normalizeEdgeKinds(selection?: SelectionState): Set<RuntimeEdgeKind> {
   return new Set(selection.selectedEdgeKinds);
 }
 
-function collectOutgoingEdges(
+function collectOutgoingEdgeLayers(
   store: InMemoryGraphStore,
   selectedSymbolIds: string[],
   hop: number
-): RuntimeEdge[] {
-  const collected = new Map<string, RuntimeEdge>();
+): RuntimeEdge[][] {
+  const layers: RuntimeEdge[][] = [];
   let frontier = new Set(selectedSymbolIds);
   const visitedSymbols = new Set(selectedSymbolIds);
 
   for (let depth = 0; depth < hop; depth += 1) {
     const nextFrontier = new Set<string>();
+    const layer = new Map<string, RuntimeEdge>();
 
     for (const symbolId of frontier) {
       for (const edge of store.getOutgoingEdges(symbolId)) {
@@ -36,7 +37,7 @@ function collectOutgoingEdges(
           continue;
         }
 
-        collected.set(edge.id, edge);
+        layer.set(edge.id, edge);
 
         const targetNode = store.getNode(edge.target);
         if (targetNode?.kind === 'symbol' && !visitedSymbols.has(targetNode.id)) {
@@ -46,26 +47,29 @@ function collectOutgoingEdges(
       }
     }
 
+    layers.push([...layer.values()]);
+
     frontier = nextFrontier;
     if (frontier.size === 0) {
       break;
     }
   }
 
-  return [...collected.values()];
+  return layers;
 }
 
-function collectIncomingEdges(
+function collectIncomingEdgeLayers(
   store: InMemoryGraphStore,
   selectedSymbolIds: string[],
   hop: number
-): RuntimeEdge[] {
-  const collected = new Map<string, RuntimeEdge>();
+): RuntimeEdge[][] {
+  const layers: RuntimeEdge[][] = [];
   let frontier = new Set(selectedSymbolIds);
   const visitedSymbols = new Set(selectedSymbolIds);
 
   for (let depth = 0; depth < hop; depth += 1) {
     const nextFrontier = new Set<string>();
+    const layer = new Map<string, RuntimeEdge>();
 
     for (const symbolId of frontier) {
       for (const edge of store.getIncomingEdges(symbolId)) {
@@ -73,7 +77,7 @@ function collectIncomingEdges(
           continue;
         }
 
-        collected.set(edge.id, edge);
+        layer.set(edge.id, edge);
 
         const sourceNode = store.getNode(edge.source);
         if (sourceNode?.kind === 'symbol' && !visitedSymbols.has(sourceNode.id)) {
@@ -83,13 +87,15 @@ function collectIncomingEdges(
       }
     }
 
+    layers.push([...layer.values()]);
+
     frontier = nextFrontier;
     if (frontier.size === 0) {
       break;
     }
   }
 
-  return [...collected.values()];
+  return layers;
 }
 
 function filterAllowed(
@@ -106,13 +112,19 @@ export function selectRuntimeEdgesForSymbol(
 ): {
   outgoingEdges: RuntimeEdge[];
   incomingEdges: RuntimeEdge[];
+  outgoingLayers: RuntimeEdge[][];
+  incomingLayers: RuntimeEdge[][];
 } {
   const allowedEdgeKinds = normalizeEdgeKinds(selection);
   const hop = normalizeHop(selection);
+  const outgoingLayers = collectOutgoingEdgeLayers(store, [symbolId], hop);
+  const incomingLayers = collectIncomingEdgeLayers(store, [symbolId], hop);
 
   return {
-    outgoingEdges: filterAllowed(collectOutgoingEdges(store, [symbolId], hop), allowedEdgeKinds),
-    incomingEdges: filterAllowed(collectIncomingEdges(store, [symbolId], hop), allowedEdgeKinds),
+    outgoingEdges: filterAllowed(outgoingLayers.flat(), allowedEdgeKinds),
+    incomingEdges: filterAllowed(incomingLayers.flat(), allowedEdgeKinds),
+    outgoingLayers: outgoingLayers.map((layer) => filterAllowed(layer, allowedEdgeKinds)),
+    incomingLayers: incomingLayers.map((layer) => filterAllowed(layer, allowedEdgeKinds)),
   };
 }
 
