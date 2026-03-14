@@ -33,6 +33,7 @@ type GoriReactFlowCanvasProps = {
 
 function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
   const isApi = data.kind === 'api';
+  const isFolder = data.kind === 'folder';
   const selectedSymbolIds = data.selectedSymbolIds ?? [];
   const [query, setQuery] = useState('');
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -49,6 +50,29 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
       }),
     [data.exports, query, selectedOnly, selectedSymbolIds]
   );
+
+  if (isFolder) {
+    return (
+      <div
+        style={{
+          width: data.width ?? 320,
+          height: data.height ?? 220,
+          borderRadius: '1.15rem',
+          border: '1px solid rgba(148, 163, 184, 0.35)',
+          background: 'rgba(226, 232, 240, 0.22)',
+          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.65)',
+          padding: '0.9rem 1rem',
+          display: 'grid',
+          alignContent: 'start',
+          gap: '0.25rem',
+          pointerEvents: 'none',
+        }}
+      >
+        <strong style={{ color: '#334155', fontSize: '0.95rem' }}>{data.label}</strong>
+        <small style={{ color: '#64748b' }}>{data.subtitle}</small>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -223,6 +247,7 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
 }
 
 const nodeTypes = {
+  folder: GoriFlowNode,
   file: GoriFlowNode,
   api: GoriFlowNode,
 };
@@ -252,12 +277,17 @@ function toFlowNodes(
           }),
     },
     draggable: false,
+    selectable: node.data.kind !== 'folder',
+    connectable: node.data.kind !== 'folder',
+    focusable: node.data.kind !== 'folder',
     zIndex:
-      node.data.kind === 'file' &&
-      (node.data.fileId === selectedFileId ||
-        (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)))
-        ? 2
-        : 1,
+      node.data.kind === 'folder'
+        ? 0
+        : node.data.kind === 'file' &&
+            (node.data.fileId === selectedFileId ||
+              (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)))
+          ? 2
+          : 1,
   }));
 }
 
@@ -354,12 +384,16 @@ export function GoriReactFlowCanvas({
         onEdgeClick={handleEdgeClick}
       >
         <Background gap={20} size={1} color="#cbd5e1" />
-        <MiniMap
-          pannable
-          zoomable
-          nodeStrokeColor={(node) => (node.type === 'api' ? '#0369a1' : '#334155')}
-          nodeColor={(node) => (node.type === 'api' ? '#bfdbfe' : '#e2e8f0')}
-        />
+          <MiniMap
+            pannable
+            zoomable
+            nodeStrokeColor={(node) =>
+              node.type === 'folder' ? '#94a3b8' : node.type === 'api' ? '#0369a1' : '#334155'
+            }
+            nodeColor={(node) =>
+              node.type === 'folder' ? '#e2e8f0' : node.type === 'api' ? '#bfdbfe' : '#e2e8f0'
+            }
+          />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>

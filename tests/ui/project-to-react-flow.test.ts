@@ -21,14 +21,54 @@ describe('projectToReactFlow', () => {
 
     expect(graph.nodes).toEqual([
       {
+        id: 'folder:src/api',
+        type: 'folder',
+        position: { x: 622, y: 12 },
+        data: {
+          kind: 'folder',
+          label: 'api',
+          subtitle: 'src/api',
+          folderPath: 'src/api',
+          width: 356,
+          height: 266,
+        },
+      },
+      {
+        id: 'folder:src/hooks',
+        type: 'folder',
+        position: { x: 302, y: 12 },
+        data: {
+          kind: 'folder',
+          label: 'hooks',
+          subtitle: 'src/hooks',
+          folderPath: 'src/hooks',
+          width: 356,
+          height: 266,
+        },
+      },
+      {
+        id: 'folder:src/pages',
+        type: 'folder',
+        position: { x: -18, y: 12 },
+        data: {
+          kind: 'folder',
+          label: 'pages',
+          subtitle: 'src/pages',
+          folderPath: 'src/pages',
+          width: 356,
+          height: 266,
+        },
+      },
+      {
         id: 'file:src/pages/user-page.tsx',
         type: 'file',
-        position: { x: 0, y: 0 },
+        position: { x: 0, y: 64 },
         data: {
           kind: 'file',
           label: 'user-page.tsx',
           subtitle: 'src/pages/user-page.tsx',
           fileId: 'file:src/pages/user-page.tsx',
+          folderPath: 'src/pages',
           symbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
           exports: [
             {
@@ -44,12 +84,13 @@ describe('projectToReactFlow', () => {
       {
         id: 'file:src/hooks/use-user.ts',
         type: 'file',
-        position: { x: 320, y: 0 },
+        position: { x: 320, y: 64 },
         data: {
           kind: 'file',
           label: 'use-user.ts',
           subtitle: 'src/hooks/use-user.ts',
           fileId: 'file:src/hooks/use-user.ts',
+          folderPath: 'src/hooks',
           symbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
           exports: [
             {
@@ -65,12 +106,13 @@ describe('projectToReactFlow', () => {
       {
         id: 'file:src/api/user.ts',
         type: 'file',
-        position: { x: 640, y: 0 },
+        position: { x: 640, y: 64 },
         data: {
           kind: 'file',
           label: 'user.ts',
           subtitle: 'src/api/user.ts',
           fileId: 'file:src/api/user.ts',
+          folderPath: 'src/api',
           symbolIds: ['symbol:src/api/user.ts#fetchUser'],
           exports: [
             {
@@ -86,7 +128,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'api:GET:/api/user',
         type: 'api',
-        position: { x: 960, y: 0 },
+        position: { x: 960, y: 64 },
         data: {
           kind: 'api',
           label: 'GET /api/user',
@@ -185,10 +227,24 @@ describe('projectToReactFlow', () => {
     };
 
     const graph = projectToReactFlow(view);
+    const folderNode = graph.nodes.find((node) => node.id === 'folder:src/files');
     const firstNode = graph.nodes.find((node) => node.id === 'file:src/files/a.ts');
     const secondNode = graph.nodes.find((node) => node.id === 'file:src/files/b.ts');
 
-    expect(firstNode?.position).toEqual({ x: 0, y: 0 });
-    expect(secondNode?.position).toEqual({ x: 0, y: 340 });
+    expect(folderNode).toEqual({
+      id: 'folder:src/files',
+      type: 'folder',
+      position: { x: -18, y: 12 },
+      data: {
+        kind: 'folder',
+        label: 'files',
+        subtitle: 'src/files',
+        folderPath: 'src/files',
+        width: 356,
+        height: 606,
+      },
+    });
+    expect(firstNode?.position).toEqual({ x: 0, y: 64 });
+    expect(secondNode?.position).toEqual({ x: 0, y: 404 });
   });
 });

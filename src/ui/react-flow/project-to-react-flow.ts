@@ -7,21 +7,24 @@ export type ReactFlowPosition = {
 };
 
 export type ReactFlowNodeData = {
-  kind: 'file' | 'api';
+  kind: 'file' | 'api' | 'folder';
   label: string;
   subtitle: string;
   fileId?: string;
+  folderPath?: string;
   symbolIds?: string[];
   exports?: ExportRef[];
   selectedSymbolIds?: string[];
   isSelected?: boolean;
   onToggleSymbol?: (symbolId: string) => void;
   exportCount?: number;
+  width?: number;
+  height?: number;
 };
 
 export type ReactFlowNode = {
   id: string;
-  type: 'file' | 'api';
+  type: 'file' | 'api' | 'folder';
   position: ReactFlowPosition;
   data: ReactFlowNodeData;
 };
@@ -55,7 +58,21 @@ const DEFAULT_ROW_GAP = 56;
 const FILE_NODE_BASE_HEIGHT = 112;
 const FILE_NODE_EXPORT_SECTION_HEIGHT = 40;
 const FILE_NODE_EXPORT_ROW_HEIGHT = 44;
+const FILE_NODE_WIDTH = 320;
 const API_NODE_HEIGHT = 96;
+const FOLDER_NODE_PADDING = 18;
+const FOLDER_NODE_HEADER_HEIGHT = 34;
+const INITIAL_LAYER_TOP = 64;
+
+function getFolderPath(filePath: string): string {
+  const segments = filePath.split('/');
+  return segments.slice(0, -1).join('/') || '.';
+}
+
+function getFolderLabel(folderPath: string): string {
+  const segments = folderPath.split('/');
+  return segments.at(-1) ?? folderPath;
+}
 
 function assignLayerMap(view: FileLevelView, edgeLayers: FileEdgeLayer[]): Map<string, number> {
   const layerByNodeId = new Map<string, number>();
@@ -122,7 +139,7 @@ function buildPositionMap(
   [...groupedByLayer.entries()]
     .sort((left, right) => left[0] - right[0])
     .forEach(([layer, layerNodes]) => {
-      let currentY = 0;
+      let currentY = INITIAL_LAYER_TOP;
 
       layerNodes.forEach((node) => {
         positionById.set(node.id, {
@@ -153,14 +170,76 @@ function estimateNodeHeight(node: FileLevelView['fileNodes'][number] | FileLevel
   );
 }
 
+function buildFolderNodes(
+  view: FileLevelView,
+  positionById: Map<string, ReactFlowPosition>
+): ReactFlowNode[] {
+  const filesByFolder = new Map<string, FileLevelView['fileNodes']>();
+
+  view.fileNodes.forEach((node) => {
+    const folderPath = getFolderPath(node.path);
+    filesByFolder.set(folderPath, [...(filesByFolder.get(folderPath) ?? []), node]);
+  });
+
+  return [...filesByFolder.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .map(([folderPath, folderFiles]) => {
+      const bounds = folderFiles.reduce(
+        (current, fileNode) => {
+          const position = positionById.get(fileNode.id) ?? { x: 0, y: 0 };
+          const nextMinX = Math.min(current.minX, position.x);
+          const nextMinY = Math.min(current.minY, position.y);
+          const nextMaxX = Math.max(current.maxX, position.x + FILE_NODE_WIDTH);
+          const nextMaxY = Math.max(current.maxY, position.y + estimateNodeHeight(fileNode));
+
+          return {
+            minX: nextMinX,
+            minY: nextMinY,
+            maxX: nextMaxX,
+            maxY: nextMaxY,
+          };
+        },
+        {
+          minX: Number.POSITIVE_INFINITY,
+          minY: Number.POSITIVE_INFINITY,
+          maxX: Number.NEGATIVE_INFINITY,
+          maxY: Number.NEGATIVE_INFINITY,
+        }
+      );
+
+      const width = bounds.maxX - bounds.minX + FOLDER_NODE_PADDING * 2;
+      const height =
+        bounds.maxY - bounds.minY + FOLDER_NODE_PADDING * 2 + FOLDER_NODE_HEADER_HEIGHT;
+
+      return {
+        id: `folder:${folderPath}`,
+        type: 'folder' as const,
+        position: {
+          x: bounds.minX - FOLDER_NODE_PADDING,
+          y: Math.max(bounds.minY - FOLDER_NODE_HEADER_HEIGHT - FOLDER_NODE_PADDING, 0),
+        },
+        data: {
+          kind: 'folder' as const,
+          label: getFolderLabel(folderPath),
+          subtitle: folderPath,
+          folderPath,
+          width,
+          height,
+        },
+      };
+    });
+}
+
 export function projectToReactFlow(
   view: FileLevelView,
   edgeLayers: FileEdgeLayer[] = [],
   options?: ReactFlowProjectionOptions
 ): ReactFlowGraph {
   const positionById = buildPositionMap(view, edgeLayers, options);
+  const folderNodes = buildFolderNodes(view, positionById);
 
   const nodes: ReactFlowNode[] = [
+    ...folderNodes,
     ...view.fileNodes.map((node) => ({
       id: node.id,
       type: 'file' as const,
@@ -170,6 +249,7 @@ export function projectToReactFlow(
         label: node.name,
         subtitle: node.path,
         fileId: node.id,
+        folderPath: getFolderPath(node.path),
         symbolIds: node.exports.map((item) => item.symbolId),
         exports: node.exports,
         exportCount: node.exports.length,
