@@ -14,6 +14,8 @@ import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interc
 import { getSymbolAccent } from '../../src/ui/colors/get-symbol-accent';
 import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
 import { buildRuntimeTimeline } from '../../src/ui/events/build-runtime-timeline';
+import { GoriReactFlowCanvas } from '../../src/ui/react-flow/gori-react-flow-canvas';
+import { projectToReactFlow } from '../../src/ui/react-flow/project-to-react-flow';
 import { UserPage } from './pages/user-page';
 import { demoCollector, demoRuntimeSession } from './gori-runtime';
 
@@ -77,6 +79,7 @@ export function App() {
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
   const edgeLayers = projectToFileEdgeLayers(graph, selection);
+  const reactFlowGraph = projectToReactFlow(view, edgeLayers);
   const timeline = buildRuntimeTimeline(graph, events);
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
@@ -411,18 +414,21 @@ export function App() {
       </section>
 
       {activeTab === 'canvas' ? (
-        <GoriCanvas
-          view={view}
-          edgeLayers={edgeLayers}
-          selectedSymbolIds={selection.selectedSymbolIds}
-          selectionMode={selection.mode}
-          selectionHop={selection.hop}
-          activeEdgeKinds={selection.selectedEdgeKinds}
-          selectedSymbolLabelsById={selectedSymbolLabelsById}
-          onToggleSymbol={toggleSymbol}
-          symbolAccentsById={symbolAccentsById}
-          edgeLabelsById={edgeLabelsById}
-        />
+        <section style={{ display: 'grid', gap: '1rem' }}>
+          <GoriReactFlowCanvas graph={reactFlowGraph} />
+          <GoriCanvas
+            view={view}
+            edgeLayers={edgeLayers}
+            selectedSymbolIds={selection.selectedSymbolIds}
+            selectionMode={selection.mode}
+            selectionHop={selection.hop}
+            activeEdgeKinds={selection.selectedEdgeKinds}
+            selectedSymbolLabelsById={selectedSymbolLabelsById}
+            onToggleSymbol={toggleSymbol}
+            symbolAccentsById={symbolAccentsById}
+            edgeLabelsById={edgeLabelsById}
+          />
+        </section>
       ) : null}
 
       {activeTab === 'inspector' ? (

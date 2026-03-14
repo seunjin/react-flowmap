@@ -1,3 +1,4 @@
+export { GoriReactFlowCanvas } from './gori-react-flow-canvas.js';
 export { projectToReactFlow } from './project-to-react-flow.js';
 export type {
   ReactFlowEdge,
