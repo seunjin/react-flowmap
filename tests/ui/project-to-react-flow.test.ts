@@ -23,7 +23,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'folder:src/api',
         type: 'folder',
-        position: { x: 622, y: 12 },
+        position: { x: 838, y: 12 },
         data: {
           kind: 'folder',
           label: 'api',
@@ -36,7 +36,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'folder:src/hooks',
         type: 'folder',
-        position: { x: 302, y: 12 },
+        position: { x: 410, y: 12 },
         data: {
           kind: 'folder',
           label: 'hooks',
@@ -84,7 +84,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'file:src/hooks/use-user.ts',
         type: 'file',
-        position: { x: 320, y: 64 },
+        position: { x: 428, y: 64 },
         data: {
           kind: 'file',
           label: 'use-user.ts',
@@ -106,7 +106,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'file:src/api/user.ts',
         type: 'file',
-        position: { x: 640, y: 64 },
+        position: { x: 856, y: 64 },
         data: {
           kind: 'file',
           label: 'user.ts',
@@ -128,7 +128,7 @@ describe('projectToReactFlow', () => {
       {
         id: 'api:GET:/api/user',
         type: 'api',
-        position: { x: 960, y: 64 },
+        position: { x: 1284, y: 64 },
         data: {
           kind: 'api',
           label: 'GET /api/user',

@@ -53,13 +53,14 @@ export type ReactFlowProjectionOptions = {
   rowGap?: number;
 };
 
-const DEFAULT_COLUMN_GAP = 320;
+const DEFAULT_COLUMN_GAP = 72;
 const DEFAULT_ROW_GAP = 56;
 const FILE_NODE_BASE_HEIGHT = 112;
 const FILE_NODE_EXPORT_SECTION_HEIGHT = 40;
 const FILE_NODE_EXPORT_ROW_HEIGHT = 44;
 const FILE_NODE_WIDTH = 320;
 const API_NODE_HEIGHT = 96;
+const API_NODE_WIDTH = 320;
 const FOLDER_NODE_PADDING = 18;
 const FOLDER_NODE_HEADER_HEIGHT = 34;
 const INITIAL_LAYER_TOP = 64;
@@ -135,20 +136,23 @@ function buildPositionMap(
     });
 
   const positionById = new Map<string, ReactFlowPosition>();
+  let currentX = 0;
 
   [...groupedByLayer.entries()]
     .sort((left, right) => left[0] - right[0])
-    .forEach(([layer, layerNodes]) => {
+    .forEach(([, layerNodes]) => {
       let currentY = INITIAL_LAYER_TOP;
 
       layerNodes.forEach((node) => {
         positionById.set(node.id, {
-          x: layer * columnGap,
+          x: currentX,
           y: currentY,
         });
 
         currentY += estimateNodeHeight(node) + rowGap;
       });
+
+      currentX += estimateLayerWidth(layerNodes) + columnGap;
     });
 
   return positionById;
@@ -168,6 +172,20 @@ function estimateNodeHeight(node: FileLevelView['fileNodes'][number] | FileLevel
     FILE_NODE_EXPORT_SECTION_HEIGHT +
     node.exports.length * FILE_NODE_EXPORT_ROW_HEIGHT
   );
+}
+
+function estimateNodeWidth(node: FileLevelView['fileNodes'][number] | FileLevelView['apiNodes'][number]): number {
+  if (node.kind === 'api') {
+    return API_NODE_WIDTH;
+  }
+
+  return FILE_NODE_WIDTH + FOLDER_NODE_PADDING * 2;
+}
+
+function estimateLayerWidth(
+  layerNodes: Array<FileLevelView['fileNodes'][number] | FileLevelView['apiNodes'][number]>
+): number {
+  return Math.max(...layerNodes.map((node) => estimateNodeWidth(node)));
 }
 
 function buildFolderNodes(
