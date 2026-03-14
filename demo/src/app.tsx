@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { buildGraph } from '../../src/core/graph/graph-builder';
+import { createRuntimeEdgeIdFromEvent } from '../../src/core/graph/create-runtime-edge-id-from-event';
+import { focusGraphByRuntimeEdges } from '../../src/core/graph/focus-graph-by-runtime-edges';
 import { buildInspectorPayload } from '../../src/core/inspector/build-inspector-payload';
 import { describeRuntimeEdge } from '../../src/core/inspector/describe-runtime-edge';
 import { InMemoryGraphStore } from '../../src/core/graph/in-memory-graph-store';
@@ -41,6 +43,7 @@ type DemoTab = 'canvas' | 'inspector' | 'events';
 type FlowEdgeSelection = {
   edgeId: string;
   labels: string[];
+  supportingEdgeIds: string[];
 };
 
 function formatSymbolLabel(symbol: SymbolNode): string {
@@ -80,13 +83,22 @@ export function App() {
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [selectedFlowEdge, setSelectedFlowEdge] = useState<FlowEdgeSelection | null>(null);
 
-  const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
-  const inspector = buildInspectorPayload(graph, selection);
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
-  const edgeLayers = projectToFileEdgeLayers(graph, selection);
-  const reactFlowGraph = projectToReactFlow(view, edgeLayers);
-  const timeline = buildRuntimeTimeline(graph, events);
+  const focusedGraph = selectedFlowEdge
+    ? focusGraphByRuntimeEdges(graph, selectedFlowEdge.supportingEdgeIds)
+    : graph;
+  const focusedEvents = selectedFlowEdge
+    ? events.filter((event) =>
+        selectedFlowEdge.supportingEdgeIds.includes(createRuntimeEdgeIdFromEvent(event))
+      )
+    : events;
+  const observedSymbols = focusedGraph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
+  const displayView = selectedFlowEdge ? projectToFileLevelView(focusedGraph, selection) : view;
+  const inspector = buildInspectorPayload(focusedGraph, selection);
+  const edgeLayers = projectToFileEdgeLayers(focusedGraph, selection);
+  const reactFlowGraph = projectToReactFlow(displayView, edgeLayers);
+  const timeline = buildRuntimeTimeline(focusedGraph, focusedEvents);
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
   );
@@ -94,7 +106,7 @@ export function App() {
     observedSymbols.map((symbol) => [symbol.id, symbol.name])
   );
   const edgeLabelsById = Object.fromEntries(
-    view.fileEdges.map((edge) => [
+    displayView.fileEdges.map((edge) => [
       edge.id,
       edge.supportingEdges.flatMap((edgeId) => {
         const presentation = getEdgePresentation(graphStore, edgeId);
@@ -221,14 +233,41 @@ export function App() {
   }
 
   function handleFlowEdgeClick(edge: typeof reactFlowGraph.edges[number]): void {
+    const supportingRuntimeEdges = graphStore
+      .getRuntimeEdges()
+      .filter((runtimeEdge) => edge.data.supportingEdges.includes(runtimeEdge.id));
+    const relatedSymbolIds = [
+      ...new Set(
+        supportingRuntimeEdges.flatMap((runtimeEdge) => {
+          const ids = [runtimeEdge.source];
+          const targetNode = graphStore.getNode(runtimeEdge.target);
+
+          if (targetNode?.kind === 'symbol') {
+            ids.push(targetNode.id);
+          }
+
+          return ids;
+        })
+      ),
+    ];
     const labels = edge.data.supportingEdges.flatMap((edgeId) => {
       const presentation = getEdgePresentation(graphStore, edgeId);
       return presentation ? [presentation.label] : [];
     });
 
+    const firstSymbolNode = relatedSymbolIds
+      .map((symbolId) => graphStore.getNode(symbolId))
+      .find((node): node is SymbolNode => node?.kind === 'symbol');
+
+    setSelection((current) => ({
+      ...current,
+      ...(firstSymbolNode ? { selectedFileId: firstSymbolNode.fileId } : {}),
+      selectedSymbolIds: relatedSymbolIds,
+    }));
     setSelectedFlowEdge({
       edgeId: edge.id,
       labels,
+      supportingEdgeIds: edge.data.supportingEdges,
     });
     setActiveTab('inspector');
   }
@@ -301,6 +340,12 @@ export function App() {
               Toggle symbols inside each file node and use the mode controls here to re-project the
               graph.
             </p>
+            {selectedFlowEdge ? (
+              <p style={{ margin: '0.5rem 0 0', color: '#0369a1', fontWeight: 600 }}>
+                Edge focus active. Canvas, Inspector, and Events are narrowed to the selected file
+                edge.
+              </p>
+            ) : null}
           </header>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -505,7 +550,7 @@ export function App() {
             </section>
           ) : null}
           <GoriCanvas
-            view={view}
+            view={displayView}
             edgeLayers={edgeLayers}
             selectedSymbolIds={selection.selectedSymbolIds}
             selectionMode={selection.mode}

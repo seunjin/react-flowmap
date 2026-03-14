@@ -2,6 +2,7 @@ import { createApiId } from '../ids/create-api-id.js';
 import { createFileId } from '../ids/create-file-id.js';
 import { parseFileId } from '../ids/parse-file-id.js';
 import { parseSymbolId } from '../ids/parse-symbol-id.js';
+import { createRuntimeEdgeIdFromEvent } from './create-runtime-edge-id-from-event.js';
 import type {
   ApiNode,
   FileNode,
@@ -172,7 +173,7 @@ export function buildGraph(events: RuntimeEvent[]): GoriGraph {
 
           if (source && target) {
             addRuntimeEdge(state, {
-              id: `render:${source.id}->${target.id}`,
+              id: createRuntimeEdgeIdFromEvent(event),
               kind: 'render',
               source: source.id,
               target: target.id,
@@ -187,7 +188,7 @@ export function buildGraph(events: RuntimeEvent[]): GoriGraph {
 
         if (source && target) {
           addRuntimeEdge(state, {
-            id: `use:${source.id}->${target.id}`,
+            id: createRuntimeEdgeIdFromEvent(event),
             kind: 'use',
             source: source.id,
             target: target.id,
@@ -201,7 +202,7 @@ export function buildGraph(events: RuntimeEvent[]): GoriGraph {
 
         if (source && target) {
           addRuntimeEdge(state, {
-            id: `call:${source.id}->${target.id}`,
+            id: createRuntimeEdgeIdFromEvent(event),
             kind: 'call',
             source: source.id,
             target: target.id,
@@ -215,7 +216,7 @@ export function buildGraph(events: RuntimeEvent[]): GoriGraph {
 
         if (source) {
           addRuntimeEdge(state, {
-            id: `request:${source.id}->${api.id}`,
+            id: createRuntimeEdgeIdFromEvent(event),
             kind: 'request',
             source: source.id,
             target: api.id,
