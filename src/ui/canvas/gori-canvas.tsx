@@ -10,6 +10,10 @@ type GoriCanvasProps = {
   view: FileLevelView;
   edgeLayers?: FileEdgeLayer[];
   selectedSymbolIds?: string[];
+  selectionMode?: string;
+  selectionHop?: number;
+  activeEdgeKinds?: string[];
+  selectedSymbolLabelsById?: Record<string, string>;
   onToggleSymbol?: (symbolId: string) => void;
   symbolAccentsById?: Record<string, SymbolAccent>;
   edgeLabelsById?: Record<string, EdgeLabel[]>;
@@ -19,6 +23,10 @@ export function GoriCanvas({
   view,
   edgeLayers = [],
   selectedSymbolIds = [],
+  selectionMode,
+  selectionHop,
+  activeEdgeKinds = [],
+  selectedSymbolLabelsById = {},
   onToggleSymbol,
   symbolAccentsById = {},
   edgeLabelsById = {},
@@ -79,6 +87,66 @@ export function GoriCanvas({
         <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
           Phase 0 scaffold: file-first nodes with file-level edges.
         </p>
+        {selectionMode && selectionHop ? (
+          <div
+            style={{
+              display: 'grid',
+              gap: '0.6rem',
+              marginTop: '0.9rem',
+              padding: '0.85rem',
+              borderRadius: '0.85rem',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', color: '#334155' }}>
+              <strong>mode:</strong> <span>{selectionMode}</span>
+              <strong>hop:</strong> <span>{selectionHop}</span>
+              <strong>edges:</strong>{' '}
+              <span>{activeEdgeKinds.length ? activeEdgeKinds.join(', ') : 'none'}</span>
+            </div>
+            {selectedSymbolIds.length ? (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {selectedSymbolIds.map((symbolId) => {
+                  const accent = symbolAccentsById[symbolId];
+
+                  return (
+                    <span
+                      key={symbolId}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.3rem 0.55rem',
+                        borderRadius: '999px',
+                        background: accent?.soft ?? '#f8fafc',
+                        border: `1px solid ${accent?.border ?? '#cbd5e1'}`,
+                        color: accent?.solid ?? '#0f172a',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: '0.5rem',
+                          height: '0.5rem',
+                          borderRadius: '999px',
+                          background: accent?.border ?? '#94a3b8',
+                        }}
+                      />
+                      {selectedSymbolLabelsById[symbolId] ?? symbolId}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <small style={{ color: '#64748b' }}>
+                No symbols selected. Showing the full file-level graph.
+              </small>
+            )}
+          </div>
+        ) : null}
       </header>
 
       <div

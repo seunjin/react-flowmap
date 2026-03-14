@@ -76,6 +76,9 @@ export function App() {
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
   );
+  const selectedSymbolLabelsById = Object.fromEntries(
+    observedSymbols.map((symbol) => [symbol.id, symbol.name])
+  );
   const edgeLabelsById = Object.fromEntries(
     view.fileEdges.map((edge) => [
       edge.id,
@@ -220,6 +223,10 @@ export function App() {
         view={view}
         edgeLayers={edgeLayers}
         selectedSymbolIds={selection.selectedSymbolIds}
+        selectionMode={selection.mode}
+        selectionHop={selection.hop}
+        activeEdgeKinds={selection.selectedEdgeKinds}
+        selectedSymbolLabelsById={selectedSymbolLabelsById}
         onToggleSymbol={toggleSymbol}
         symbolAccentsById={symbolAccentsById}
         edgeLabelsById={edgeLabelsById}
