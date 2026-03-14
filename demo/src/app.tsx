@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 
 import { buildGraph } from '../../src/core/graph/graph-builder';
+import { buildInspectorPayload } from '../../src/core/inspector/build-inspector-payload';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
+import type { GoriGraph, SymbolNode } from '../../src/core/types/graph';
+import type { SelectionMode, SelectionState } from '../../src/core/types/selection';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import type { FileLevelView } from '../../src/core/types/projection';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
@@ -15,9 +18,29 @@ const emptyView: FileLevelView = {
   fileEdges: [],
 };
 
+const emptyGraph: GoriGraph = {
+  nodes: [],
+  edges: [],
+};
+
+const initialSelection: SelectionState = {
+  selectedSymbolIds: [],
+  mode: 'both',
+  hop: 1,
+};
+
+function formatSymbolLabel(symbol: SymbolNode): string {
+  return `${symbol.name} (${symbol.symbolType})`;
+}
+
 export function App() {
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
+  const [graph, setGraph] = useState<GoriGraph>(emptyGraph);
   const [view, setView] = useState<FileLevelView>(emptyView);
+  const [selection, setSelection] = useState<SelectionState>(initialSelection);
+
+  const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
+  const inspector = buildInspectorPayload(graph, selection);
 
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -57,8 +80,9 @@ export function App() {
     });
 
     const unsubscribe = demoCollector.subscribe((nextEvents) => {
+      const nextGraph = buildGraph(nextEvents);
       setEvents(nextEvents);
-      setView(projectToFileLevelView(buildGraph(nextEvents)));
+      setGraph(nextGraph);
     });
 
     return () => {
@@ -68,6 +92,34 @@ export function App() {
       demoCollector.reset();
     };
   }, []);
+
+  useEffect(() => {
+    setView(projectToFileLevelView(graph, selection));
+  }, [graph, selection]);
+
+  function toggleSymbol(symbolId: string): void {
+    setSelection((current) => {
+      const selected = current.selectedSymbolIds.includes(symbolId)
+        ? current.selectedSymbolIds.filter((value) => value !== symbolId)
+        : [...current.selectedSymbolIds, symbolId];
+
+      return {
+        ...current,
+        selectedSymbolIds: selected,
+      };
+    });
+  }
+
+  function setMode(mode: SelectionMode): void {
+    setSelection((current) => ({
+      ...current,
+      mode,
+    }));
+  }
+
+  function resetSelection(): void {
+    setSelection(initialSelection);
+  }
 
   return (
     <main
@@ -105,6 +157,172 @@ export function App() {
 
       <UserPage />
       <GoriCanvas view={view} />
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+          gap: '1rem',
+        }}
+      >
+        <section
+          style={{
+            padding: '1rem',
+            borderRadius: '1rem',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            display: 'grid',
+            gap: '1rem',
+          }}
+        >
+          <header>
+            <h2 style={{ margin: 0, fontSize: '1rem' }}>Selection Controls</h2>
+            <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
+              Select observed symbols to re-project the file graph using the current selection mode.
+            </p>
+          </header>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {(['both', 'outgoing', 'incoming'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setMode(mode)}
+                style={{
+                  padding: '0.55rem 0.8rem',
+                  borderRadius: '999px',
+                  border: selection.mode === mode ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                  background: selection.mode === mode ? '#0f172a' : '#ffffff',
+                  color: selection.mode === mode ? '#f8fafc' : '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                {mode}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={resetSelection}
+              style={{
+                padding: '0.55rem 0.8rem',
+                borderRadius: '999px',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+                color: '#0f172a',
+                cursor: 'pointer',
+              }}
+            >
+              reset
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '0.75rem',
+            }}
+          >
+            {observedSymbols.map((symbol) => {
+              const checked = selection.selectedSymbolIds.includes(symbol.id);
+
+              return (
+                <label
+                  key={symbol.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.75rem',
+                    borderRadius: '0.75rem',
+                    border: checked ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                    background: checked ? '#f8fafc' : '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSymbol(symbol.id)}
+                  />
+                  <span>
+                    <strong>{formatSymbolLabel(symbol)}</strong>
+                    <small style={{ display: 'block', color: '#64748b' }}>{symbol.fileId}</small>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside
+          style={{
+            padding: '1rem',
+            borderRadius: '1rem',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            display: 'grid',
+            gap: '1rem',
+            alignSelf: 'start',
+          }}
+        >
+          <header>
+            <h2 style={{ margin: 0, fontSize: '1rem' }}>Inspector</h2>
+            <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
+              Explain why the current file edges exist for the selected symbols.
+            </p>
+          </header>
+
+          {inspector.file ? (
+            <section>
+              <strong>{inspector.file.name}</strong>
+              <small style={{ display: 'block', color: '#64748b' }}>{inspector.file.path}</small>
+            </section>
+          ) : (
+            <p style={{ margin: 0, color: '#64748b' }}>
+              Select a symbol to inspect its file and supporting edges.
+            </p>
+          )}
+
+          {inspector.selectedSymbols.map((symbol) => {
+            const relation = inspector.relations.find((item) => item.symbolId === symbol.id);
+
+            return (
+              <section
+                key={symbol.id}
+                style={{
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid #e2e8f0',
+                }}
+              >
+                <strong>{formatSymbolLabel(symbol)}</strong>
+                <small style={{ display: 'block', color: '#64748b', marginTop: '0.25rem' }}>
+                  {symbol.id}
+                </small>
+                <ul style={{ margin: '0.75rem 0 0', paddingLeft: '1rem', color: '#334155' }}>
+                  <li>outgoing: {relation?.outgoingEdgeIds.length ?? 0}</li>
+                  <li>incoming: {relation?.incomingEdgeIds.length ?? 0}</li>
+                  <li>request: {relation?.requestEdgeIds.length ?? 0}</li>
+                </ul>
+                <pre
+                  style={{
+                    marginBottom: 0,
+                    overflowX: 'auto',
+                    fontSize: '0.75rem',
+                    lineHeight: 1.5,
+                    background: '#f8fafc',
+                    padding: '0.75rem',
+                    borderRadius: '0.75rem',
+                  }}
+                >
+                  {JSON.stringify(relation, null, 2)}
+                </pre>
+              </section>
+            );
+          })}
+        </aside>
+      </section>
 
       <section
         style={{
