@@ -10,6 +10,11 @@ export type FileEdge = {
   supportingEdges: string[];
 };
 
+export type FileEdgeLayer = {
+  hop: number;
+  edges: FileEdge[];
+};
+
 export type FileLevelView = {
   fileNodes: FileNode[];
   apiNodes: ApiNode[];

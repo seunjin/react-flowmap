@@ -1,4 +1,4 @@
-import type { FileLevelView } from '../../core/types/projection.js';
+import type { FileEdge, FileEdgeLayer, FileLevelView } from '../../core/types/projection.js';
 import type { SymbolAccent } from '../colors/get-symbol-accent.js';
 
 type EdgeLabel = {
@@ -8,6 +8,7 @@ type EdgeLabel = {
 
 type GoriCanvasProps = {
   view: FileLevelView;
+  edgeLayers?: FileEdgeLayer[];
   selectedSymbolIds?: string[];
   onToggleSymbol?: (symbolId: string) => void;
   symbolAccentsById?: Record<string, SymbolAccent>;
@@ -16,6 +17,7 @@ type GoriCanvasProps = {
 
 export function GoriCanvas({
   view,
+  edgeLayers = [],
   selectedSymbolIds = [],
   onToggleSymbol,
   symbolAccentsById = {},
@@ -23,6 +25,43 @@ export function GoriCanvas({
 }: GoriCanvasProps) {
   const fileLabelsById = Object.fromEntries(view.fileNodes.map((fileNode) => [fileNode.id, fileNode.name]));
   const apiLabelsById = Object.fromEntries(view.apiNodes.map((apiNode) => [apiNode.id, apiNode.label]));
+
+  function renderEdgeList(edges: FileEdge[]) {
+    return (
+      <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+        {edges.map((edge) => {
+          const labels = edgeLabelsById[edge.id] ?? [];
+          const sourceLabel =
+            fileLabelsById[edge.sourceFileId] ?? apiLabelsById[edge.sourceFileId] ?? edge.sourceFileId;
+          const targetLabel =
+            fileLabelsById[edge.targetFileId] ?? apiLabelsById[edge.targetFileId] ?? edge.targetFileId;
+
+          return (
+            <li key={edge.id}>
+              {sourceLabel} -&gt; {targetLabel} [{edge.relationTypes.join(', ')}]
+              {labels.length ? (
+                <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
+                  {labels.map((label) => (
+                    <li
+                      key={`${edge.id}:${label.label}`}
+                      style={{
+                        color: label.color,
+                        paddingLeft: '0.25rem',
+                        borderLeft: `3px solid ${label.color}`,
+                        marginBottom: '0.25rem',
+                      }}
+                    >
+                      {label.label}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
     <section
@@ -169,45 +208,32 @@ export function GoriCanvas({
         </section>
       ) : null}
 
+      {edgeLayers.length ? (
+        <section>
+          <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>File Edge Layers</h3>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            {edgeLayers.map((layer) => (
+              <article
+                key={layer.hop}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '0.85rem',
+                  border: '1px solid #dbe4ee',
+                  background: '#ffffff',
+                }}
+              >
+                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>hop {layer.hop}</strong>
+                {renderEdgeList(layer.edges)}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section>
         <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>File Edges</h3>
         {view.fileEdges.length ? (
-          <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-            {view.fileEdges.map((edge) => {
-              const labels = edgeLabelsById[edge.id] ?? [];
-              const sourceLabel =
-                fileLabelsById[edge.sourceFileId] ??
-                apiLabelsById[edge.sourceFileId] ??
-                edge.sourceFileId;
-              const targetLabel =
-                fileLabelsById[edge.targetFileId] ??
-                apiLabelsById[edge.targetFileId] ??
-                edge.targetFileId;
-
-              return (
-                <li key={edge.id}>
-                  {sourceLabel} -&gt; {targetLabel} [{edge.relationTypes.join(', ')}]
-                  {labels.length ? (
-                    <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
-                      {labels.map((label) => (
-                        <li
-                          key={label.label}
-                          style={{
-                            color: label.color,
-                            paddingLeft: '0.25rem',
-                            borderLeft: `3px solid ${label.color}`,
-                            marginBottom: '0.25rem',
-                          }}
-                        >
-                          {label.label}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          renderEdgeList(view.fileEdges)
         ) : (
           <p style={{ margin: 0, color: '#64748b' }}>
             No projected file edges match the current symbol, hop, and edge filters.

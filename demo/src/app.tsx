@@ -4,6 +4,7 @@ import { buildGraph } from '../../src/core/graph/graph-builder';
 import { buildInspectorPayload } from '../../src/core/inspector/build-inspector-payload';
 import { describeRuntimeEdge } from '../../src/core/inspector/describe-runtime-edge';
 import { InMemoryGraphStore } from '../../src/core/graph/in-memory-graph-store';
+import { projectToFileEdgeLayers } from '../../src/core/projection/project-to-file-edge-layers';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
 import type { GoriGraph, SymbolNode } from '../../src/core/types/graph';
 import type { RuntimeEdgeKind, SelectionMode, SelectionState } from '../../src/core/types/selection';
@@ -71,6 +72,7 @@ export function App() {
   const inspector = buildInspectorPayload(graph, selection);
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
+  const edgeLayers = projectToFileEdgeLayers(graph, selection);
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
   );
@@ -216,6 +218,7 @@ export function App() {
       <UserPage />
       <GoriCanvas
         view={view}
+        edgeLayers={edgeLayers}
         selectedSymbolIds={selection.selectedSymbolIds}
         onToggleSymbol={toggleSymbol}
         symbolAccentsById={symbolAccentsById}
