@@ -12,6 +12,7 @@ type InspectorPanelProps = {
   getEdgeColor: (edgeId: string) => string | undefined;
   formatSymbolLabel: (symbolId: string) => string;
   onCloseEdgeFocus: () => void;
+  embedded?: boolean;
 };
 
 function SummaryCard({
@@ -48,6 +49,7 @@ export function InspectorPanel({
   getEdgeColor,
   formatSymbolLabel,
   onCloseEdgeFocus,
+  embedded = false,
 }: InspectorPanelProps) {
   const totalOutgoing = inspector.relations.reduce((sum, relation) => sum + relation.outgoingEdgeIds.length, 0);
   const totalIncoming = inspector.relations.reduce((sum, relation) => sum + relation.incomingEdgeIds.length, 0);
@@ -59,12 +61,16 @@ export function InspectorPanel({
         padding: '1rem',
         borderRadius: '1rem',
         border: '1px solid #cbd5e1',
-        background: '#ffffff',
+        background: embedded ? 'rgba(255, 255, 255, 0.96)' : '#ffffff',
+        backdropFilter: embedded ? 'blur(14px)' : undefined,
         display: 'grid',
         gap: '1rem',
         alignSelf: 'start',
-        position: 'sticky',
-        top: '1rem',
+        position: embedded ? 'relative' : 'sticky',
+        top: embedded ? undefined : '1rem',
+        boxShadow: embedded ? '0 18px 48px rgba(15, 23, 42, 0.16)' : undefined,
+        maxHeight: embedded ? '100%' : undefined,
+        overflow: embedded ? 'hidden' : undefined,
       }}
     >
       <header style={{ display: 'grid', gap: '0.45rem' }}>
@@ -188,7 +194,15 @@ export function InspectorPanel({
         </section>
       ) : null}
 
-      <section style={{ display: 'grid', gap: '0.85rem', maxHeight: '68vh', overflowY: 'auto', paddingRight: '0.25rem' }}>
+      <section
+        style={{
+          display: 'grid',
+          gap: '0.85rem',
+          maxHeight: embedded ? 'calc(100vh - 21rem)' : '68vh',
+          overflowY: 'auto',
+          paddingRight: '0.25rem',
+        }}
+      >
         {inspector.selectedSymbols.length === 0 ? (
           <section
             style={{

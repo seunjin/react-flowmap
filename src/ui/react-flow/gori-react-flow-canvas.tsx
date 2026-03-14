@@ -22,6 +22,7 @@ import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './pro
 type GoriReactFlowCanvasProps = {
   graph: ReactFlowGraph;
   height?: number;
+  showChrome?: boolean;
   selectedFileId?: string;
   selectedSymbolIds?: string[];
   selectedEdgeId?: string;
@@ -302,6 +303,7 @@ function toFlowEdges(graph: ReactFlowGraph, selectedEdgeId?: string): Edge<React
 export function GoriReactFlowCanvas({
   graph,
   height = 520,
+  showChrome = true,
   selectedFileId,
   selectedSymbolIds = [],
   selectedEdgeId,
@@ -330,6 +332,43 @@ export function GoriReactFlowCanvas({
     }
   };
 
+  const canvas = (
+    <div
+      style={{
+        height,
+        borderRadius: showChrome ? '0.9rem' : '1.2rem',
+        overflow: 'hidden',
+        border: showChrome ? '1px solid #e2e8f0' : 'none',
+        background:
+          'radial-gradient(circle at top left, rgba(191,219,254,0.25), transparent 30%), #f8fafc',
+      }}
+    >
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.18 }}
+        nodesDraggable={false}
+        onNodeClick={handleNodeClick}
+        onEdgeClick={handleEdgeClick}
+      >
+        <Background gap={20} size={1} color="#cbd5e1" />
+        <MiniMap
+          pannable
+          zoomable
+          nodeStrokeColor={(node) => (node.type === 'api' ? '#0369a1' : '#334155')}
+          nodeColor={(node) => (node.type === 'api' ? '#bfdbfe' : '#e2e8f0')}
+        />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </div>
+  );
+
+  if (!showChrome) {
+    return canvas;
+  }
+
   return (
     <section
       style={{
@@ -345,37 +384,7 @@ export function GoriReactFlowCanvas({
           Adapter-backed diagram view for the current file graph projection.
         </p>
       </header>
-
-      <div
-        style={{
-          height,
-          borderRadius: '0.9rem',
-          overflow: 'hidden',
-          border: '1px solid #e2e8f0',
-          background:
-            'radial-gradient(circle at top left, rgba(191,219,254,0.25), transparent 30%), #f8fafc',
-        }}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
-          nodesDraggable={false}
-          onNodeClick={handleNodeClick}
-          onEdgeClick={handleEdgeClick}
-        >
-          <Background gap={20} size={1} color="#cbd5e1" />
-          <MiniMap
-            pannable
-            zoomable
-            nodeStrokeColor={(node) => (node.type === 'api' ? '#0369a1' : '#334155')}
-            nodeColor={(node) => (node.type === 'api' ? '#bfdbfe' : '#e2e8f0')}
-          />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </div>
+      {canvas}
     </section>
   );
 }

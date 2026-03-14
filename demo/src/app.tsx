@@ -14,7 +14,6 @@ import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import type { FileLevelView } from '../../src/core/types/projection';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
 import { getSymbolAccent } from '../../src/ui/colors/get-symbol-accent';
-import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
 import { buildRuntimeTimeline } from '../../src/ui/events/build-runtime-timeline';
 import { GoriReactFlowCanvas } from '../../src/ui/react-flow/gori-react-flow-canvas';
 import { projectToReactFlow } from '../../src/ui/react-flow/project-to-react-flow';
@@ -46,6 +45,7 @@ const initialSelection: SelectionState = {
   mode: 'both',
   hop: 1,
 };
+const CANVAS_WORKSPACE_HEIGHT = 820;
 
 function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
@@ -112,18 +112,6 @@ export function App() {
   const timeline = buildRuntimeTimeline(focusedGraph, focusedEvents);
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
-  );
-  const selectedSymbolLabelsById = Object.fromEntries(
-    observedSymbols.map((symbol) => [symbol.id, symbol.name])
-  );
-  const edgeLabelsById = Object.fromEntries(
-    displayView.fileEdges.map((edge) => [
-      edge.id,
-      edge.supportingEdges.flatMap((edgeId) => {
-        const presentation = getEdgePresentation(graphStore, edgeId);
-        return presentation ? [presentation] : [];
-      }),
-    ])
   );
   const symbolLabelsById = Object.fromEntries(
     focusedGraph.nodes
@@ -335,11 +323,11 @@ export function App() {
   return (
     <main
       style={{
-        maxWidth: 1080,
+        maxWidth: '100%',
         margin: '0 auto',
-        padding: '2rem 1rem 4rem',
+        padding: '1.25rem 1.25rem 2rem',
         display: 'grid',
-        gap: '1.5rem',
+        gap: '1rem',
         fontFamily:
           'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         color: '#0f172a',
@@ -347,7 +335,16 @@ export function App() {
           'radial-gradient(circle at top left, rgba(191,219,254,0.35), transparent 40%)',
       }}
     >
-      <header>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          alignItems: 'end',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
         <p
           style={{
             marginBottom: '0.5rem',
@@ -364,286 +361,315 @@ export function App() {
           This demo wires render, use, call, and request tracing into the app so the runtime
           collector, graph builder, and file-level projection can be inspected end-to-end.
         </p>
-      </header>
-
-      {runtimeReady ? (
-        <UserPage />
-      ) : (
+        </div>
         <section
           style={{
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid #cbd5e1',
-            background: '#ffffff',
-            color: '#475569',
+            display: 'flex',
+            gap: '0.5rem',
+            flexWrap: 'wrap',
           }}
         >
-          Preparing runtime collector...
+          {([
+            { id: 'canvas', label: 'Canvas' },
+            { id: 'events', label: 'Events' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.6rem 0.9rem',
+                borderRadius: '999px',
+                border: activeTab === tab.id ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                background: activeTab === tab.id ? '#0f172a' : '#ffffff',
+                color: activeTab === tab.id ? '#f8fafc' : '#0f172a',
+                cursor: 'pointer',
+                fontWeight: 700,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </section>
-      )}
+      </header>
+
       <section
         style={{
-          padding: '1rem',
+          padding: '0.85rem 1rem',
           borderRadius: '1rem',
           border: '1px solid #cbd5e1',
           background: '#ffffff',
-          display: 'grid',
-          gap: '1rem',
         }}
       >
-        <section
-          style={{ display: 'grid', gap: '1rem' }}
-        >
-          <header>
-            <h2 style={{ margin: 0, fontSize: '1rem' }}>Selection Controls</h2>
-            <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
-              Toggle symbols inside each file node and use the mode controls here to re-project the
-              graph.
-            </p>
-            {selectedFlowEdge ? (
-              <p style={{ margin: '0.5rem 0 0', color: '#0369a1', fontWeight: 600 }}>
-                Edge focus active. Canvas, Inspector, and Events are narrowed to the selected file
-                edge.
-              </p>
-            ) : null}
-          </header>
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {(['both', 'outgoing', 'incoming'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setMode(mode)}
-                style={{
-                  padding: '0.55rem 0.8rem',
-                  borderRadius: '999px',
-                  border: selection.mode === mode ? '1px solid #0f172a' : '1px solid #cbd5e1',
-                  background: selection.mode === mode ? '#0f172a' : '#ffffff',
-                  color: selection.mode === mode ? '#f8fafc' : '#0f172a',
-                  cursor: 'pointer',
-                }}
-              >
-                {mode}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={resetSelection}
-              style={{
-                padding: '0.55rem 0.8rem',
-                borderRadius: '999px',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-                color: '#0f172a',
-                cursor: 'pointer',
-              }}
-            >
-              reset
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void copyViewLink();
-              }}
-              style={{
-                padding: '0.55rem 0.8rem',
-                borderRadius: '999px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                cursor: 'pointer',
-              }}
-            >
-              copy view link
-            </button>
-            <button
-              type="button"
-              onClick={clearSavedViewState}
-              style={{
-                padding: '0.55rem 0.8rem',
-                borderRadius: '999px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                cursor: 'pointer',
-              }}
-            >
-              clear saved view
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ fontSize: '0.875rem' }}>hop</strong>
-            {[1, 2, 3].map((hop) => (
-              <button
-                key={hop}
-                type="button"
-                onClick={() => setHop(hop)}
-                style={{
-                  padding: '0.45rem 0.7rem',
-                  borderRadius: '999px',
-                  border: selection.hop === hop ? '1px solid #0f172a' : '1px solid #cbd5e1',
-                  background: selection.hop === hop ? '#0f172a' : '#ffffff',
-                  color: selection.hop === hop ? '#f8fafc' : '#0f172a',
-                  cursor: 'pointer',
-                }}
-              >
-                {hop}-hop
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ fontSize: '0.875rem' }}>edges</strong>
-            {(['render', 'use', 'call', 'request'] as const).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => toggleEdgeKind(kind)}
-                style={{
-                  padding: '0.45rem 0.7rem',
-                  borderRadius: '999px',
-                  border: selection.selectedEdgeKinds.includes(kind)
-                    ? '1px solid #0f172a'
-                    : '1px solid #cbd5e1',
-                  background: selection.selectedEdgeKinds.includes(kind) ? '#0f172a' : '#ffffff',
-                  color: selection.selectedEdgeKinds.includes(kind) ? '#f8fafc' : '#0f172a',
-                  cursor: 'pointer',
-                }}
-              >
-                {kind}
-              </button>
-            ))}
-          </div>
-
-          <p style={{ margin: 0, color: '#64748b' }}>
-            Observed symbols: <strong>{observedSymbols.length}</strong> · current hop:{' '}
-            <strong>{selection.hop}</strong> · active edges:{' '}
-            <strong>{selection.selectedEdgeKinds.length}</strong>
-          </p>
-          {shareStatus ? <p style={{ margin: 0, color: '#0369a1' }}>{shareStatus}</p> : null}
-          {selection.selectedEdgeKinds.length === 0 ? (
-            <p style={{ margin: 0, color: '#b45309' }}>
-              All runtime edge kinds are disabled. Re-enable at least one kind to project file
-              edges.
-            </p>
-          ) : null}
-          {selection.selectedSymbolIds.length ? (
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {selection.selectedSymbolIds.map((symbolId) => {
-                const symbol = observedSymbols.find((item) => item.id === symbolId);
-                const accent = symbolAccentsById[symbolId];
-
-                if (!symbol || !accent) {
-                  return null;
-                }
-
-                return (
-                  <span
-                    key={symbolId}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      padding: '0.35rem 0.6rem',
-                      borderRadius: '999px',
-                      background: accent.soft,
-                      border: `1px solid ${accent.border}`,
-                      color: accent.solid,
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: '0.55rem',
-                        height: '0.55rem',
-                        borderRadius: '999px',
-                        background: accent.border,
-                      }}
-                    />
-                    {symbol.name}
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
-        </section>
-      </section>
-
-      <section
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        {([
-          { id: 'canvas', label: 'Canvas' },
-          { id: 'events', label: 'Events' },
-        ] as const).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '0.6rem 0.9rem',
-              borderRadius: '999px',
-              border: activeTab === tab.id ? '1px solid #0f172a' : '1px solid #cbd5e1',
-              background: activeTab === tab.id ? '#0f172a' : '#ffffff',
-              color: activeTab === tab.id ? '#f8fafc' : '#0f172a',
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {runtimeReady ? (
+          <UserPage />
+        ) : (
+          <p style={{ margin: 0, color: '#475569' }}>Preparing runtime collector...</p>
+        )}
       </section>
 
       {activeTab === 'canvas' ? (
         <section
           style={{
-            display: 'grid',
-            gap: '1rem',
-            alignItems: 'start',
-            gridTemplateColumns: 'minmax(0, 1.7fr) minmax(320px, 0.9fr)',
+            position: 'relative',
+            minHeight: CANVAS_WORKSPACE_HEIGHT,
+            borderRadius: '1.35rem',
+            overflow: 'hidden',
+            border: '1px solid #cbd5e1',
+            background:
+              'radial-gradient(circle at top left, rgba(191,219,254,0.3), transparent 34%), #f8fafc',
           }}
         >
-          <section style={{ display: 'grid', gap: '1rem', minWidth: 0 }}>
-            <GoriReactFlowCanvas
-              graph={reactFlowGraph}
-              selectedSymbolIds={selection.selectedSymbolIds}
-              {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
-              {...(selectedFlowEdge ? { selectedEdgeId: selectedFlowEdge.edgeId } : {})}
-              onToggleSymbol={toggleSymbol}
-              onNodeClick={handleFlowNodeClick}
-              onEdgeClick={handleFlowEdgeClick}
-            />
-            <GoriCanvas
-              view={displayView}
-              edgeLayers={edgeLayers}
-              selectedSymbolIds={selection.selectedSymbolIds}
-              selectionMode={selection.mode}
-              selectionHop={selection.hop}
-              activeEdgeKinds={selection.selectedEdgeKinds}
-              selectedSymbolLabelsById={selectedSymbolLabelsById}
-              onToggleSymbol={toggleSymbol}
+          <GoriReactFlowCanvas
+            graph={reactFlowGraph}
+            height={CANVAS_WORKSPACE_HEIGHT}
+            showChrome={false}
+            selectedSymbolIds={selection.selectedSymbolIds}
+            {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
+            {...(selectedFlowEdge ? { selectedEdgeId: selectedFlowEdge.edgeId } : {})}
+            onToggleSymbol={toggleSymbol}
+            onNodeClick={handleFlowNodeClick}
+            onEdgeClick={handleFlowEdgeClick}
+          />
+
+          <section
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              left: '1rem',
+              width: 'min(360px, calc(100% - 2rem))',
+              display: 'grid',
+              gap: '0.75rem',
+              zIndex: 10,
+            }}
+          >
+            <section
+              style={{
+                padding: '0.95rem 1rem',
+                borderRadius: '1rem',
+                border: '1px solid rgba(203, 213, 225, 0.9)',
+                background: 'rgba(255, 255, 255, 0.94)',
+                backdropFilter: 'blur(14px)',
+                boxShadow: '0 20px 48px rgba(15, 23, 42, 0.12)',
+                display: 'grid',
+                gap: '0.8rem',
+              }}
+            >
+              <header>
+                <h2 style={{ margin: 0, fontSize: '1rem' }}>Canvas Controls</h2>
+                <p style={{ margin: '0.45rem 0 0', color: '#475569', fontSize: '0.9rem' }}>
+                  Explore the graph without leaving this workspace.
+                </p>
+                {selectedFlowEdge ? (
+                  <p style={{ margin: '0.45rem 0 0', color: '#0369a1', fontWeight: 600 }}>
+                    Edge focus active.
+                  </p>
+                ) : null}
+              </header>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {(['both', 'outgoing', 'incoming'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setMode(mode)}
+                    style={{
+                      padding: '0.55rem 0.8rem',
+                      borderRadius: '999px',
+                      border: selection.mode === mode ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                      background: selection.mode === mode ? '#0f172a' : '#ffffff',
+                      color: selection.mode === mode ? '#f8fafc' : '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <strong style={{ fontSize: '0.875rem' }}>hop</strong>
+                {[1, 2, 3].map((hop) => (
+                  <button
+                    key={hop}
+                    type="button"
+                    onClick={() => setHop(hop)}
+                    style={{
+                      padding: '0.45rem 0.7rem',
+                      borderRadius: '999px',
+                      border: selection.hop === hop ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                      background: selection.hop === hop ? '#0f172a' : '#ffffff',
+                      color: selection.hop === hop ? '#f8fafc' : '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {hop}-hop
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <strong style={{ fontSize: '0.875rem' }}>edges</strong>
+                {(['render', 'use', 'call', 'request'] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => toggleEdgeKind(kind)}
+                    style={{
+                      padding: '0.45rem 0.7rem',
+                      borderRadius: '999px',
+                      border: selection.selectedEdgeKinds.includes(kind)
+                        ? '1px solid #0f172a'
+                        : '1px solid #cbd5e1',
+                      background: selection.selectedEdgeKinds.includes(kind) ? '#0f172a' : '#ffffff',
+                      color: selection.selectedEdgeKinds.includes(kind) ? '#f8fafc' : '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {kind}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={resetSelection}
+                  style={{
+                    padding: '0.55rem 0.8rem',
+                    borderRadius: '999px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                  }}
+                >
+                  reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyViewLink();
+                  }}
+                  style={{
+                    padding: '0.55rem 0.8rem',
+                    borderRadius: '999px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                  }}
+                >
+                  copy view link
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSavedViewState}
+                  style={{
+                    padding: '0.55rem 0.8rem',
+                    borderRadius: '999px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                  }}
+                >
+                  clear saved
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '0.35rem', color: '#475569', fontSize: '0.9rem' }}>
+                <span>
+                  Observed symbols <strong>{observedSymbols.length}</strong>
+                </span>
+                <span>
+                  Active edges <strong>{selection.selectedEdgeKinds.length}</strong>
+                </span>
+              </div>
+              {shareStatus ? <p style={{ margin: 0, color: '#0369a1' }}>{shareStatus}</p> : null}
+              {selection.selectedEdgeKinds.length === 0 ? (
+                <p style={{ margin: 0, color: '#b45309' }}>
+                  Re-enable at least one edge kind to project file edges.
+                </p>
+              ) : null}
+            </section>
+
+            {selection.selectedSymbolIds.length ? (
+              <section
+                style={{
+                  padding: '0.8rem 0.9rem',
+                  borderRadius: '1rem',
+                  border: '1px solid rgba(203, 213, 225, 0.9)',
+                  background: 'rgba(255, 255, 255, 0.94)',
+                  backdropFilter: 'blur(14px)',
+                  boxShadow: '0 18px 44px rgba(15, 23, 42, 0.1)',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                {selection.selectedSymbolIds.map((symbolId) => {
+                  const symbol = observedSymbols.find((item) => item.id === symbolId);
+                  const accent = symbolAccentsById[symbolId];
+
+                  if (!symbol || !accent) {
+                    return null;
+                  }
+
+                  return (
+                    <span
+                      key={symbolId}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        padding: '0.35rem 0.6rem',
+                        borderRadius: '999px',
+                        background: accent.soft,
+                        border: `1px solid ${accent.border}`,
+                        color: accent.solid,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: '0.55rem',
+                          height: '0.55rem',
+                          borderRadius: '999px',
+                          background: accent.border,
+                        }}
+                      />
+                      {symbol.name}
+                    </span>
+                  );
+                })}
+              </section>
+            ) : null}
+          </section>
+
+          <section
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              width: 'min(420px, calc(100% - 2rem))',
+              maxHeight: `calc(${CANVAS_WORKSPACE_HEIGHT}px - 2rem)`,
+              zIndex: 10,
+            }}
+          >
+            <InspectorPanel
+              embedded
+              inspector={inspector}
+              selection={selection}
+              selectedFlowEdge={selectedFlowEdge}
               symbolAccentsById={symbolAccentsById}
-              edgeLabelsById={edgeLabelsById}
+              getEdgeColor={(edgeId) => getEdgePresentation(graphStore, edgeId)?.color}
+              formatSymbolLabel={(symbolId) => symbolLabelsById[symbolId] ?? symbolId}
+              onCloseEdgeFocus={clearEdgeFocus}
             />
           </section>
-          <InspectorPanel
-            inspector={inspector}
-            selection={selection}
-            selectedFlowEdge={selectedFlowEdge}
-            symbolAccentsById={symbolAccentsById}
-            getEdgeColor={(edgeId) => getEdgePresentation(graphStore, edgeId)?.color}
-            formatSymbolLabel={(symbolId) => symbolLabelsById[symbolId] ?? symbolId}
-            onCloseEdgeFocus={clearEdgeFocus}
-          />
         </section>
       ) : null}
 
