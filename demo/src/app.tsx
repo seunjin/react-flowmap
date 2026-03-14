@@ -20,6 +20,13 @@ import { GoriReactFlowCanvas } from '../../src/ui/react-flow/gori-react-flow-can
 import { projectToReactFlow } from '../../src/ui/react-flow/project-to-react-flow';
 import { UserPage } from './pages/user-page';
 import { demoCollector, demoRuntimeSession } from './gori-runtime';
+import {
+  clearPersistedViewState,
+  persistViewState,
+  readStoredViewState,
+  type DemoTab,
+  type PersistedFlowEdgeSelection,
+} from './view-state';
 
 const emptyView: FileLevelView = {
   fileNodes: [],
@@ -37,13 +44,6 @@ const initialSelection: SelectionState = {
   selectedEdgeKinds: ['render', 'use', 'call', 'request'],
   mode: 'both',
   hop: 1,
-};
-
-type DemoTab = 'canvas' | 'inspector' | 'events';
-type FlowEdgeSelection = {
-  edgeId: string;
-  labels: string[];
-  supportingEdgeIds: string[];
 };
 
 function formatSymbolLabel(symbol: SymbolNode): string {
@@ -78,10 +78,17 @@ export function App() {
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   const [graph, setGraph] = useState<GoriGraph>(emptyGraph);
   const [view, setView] = useState<FileLevelView>(emptyView);
-  const [selection, setSelection] = useState<SelectionState>(initialSelection);
-  const [activeTab, setActiveTab] = useState<DemoTab>('canvas');
+  const [selection, setSelection] = useState<SelectionState>(
+    () => readStoredViewState()?.selection ?? initialSelection
+  );
+  const [activeTab, setActiveTab] = useState<DemoTab>(
+    () => readStoredViewState()?.activeTab ?? 'canvas'
+  );
   const [runtimeReady, setRuntimeReady] = useState(false);
-  const [selectedFlowEdge, setSelectedFlowEdge] = useState<FlowEdgeSelection | null>(null);
+  const [selectedFlowEdge, setSelectedFlowEdge] = useState<PersistedFlowEdgeSelection | null>(
+    () => readStoredViewState()?.selectedFlowEdge ?? null
+  );
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
@@ -173,6 +180,26 @@ export function App() {
     setView(projectToFileLevelView(graph, selection));
   }, [graph, selection]);
 
+  useEffect(() => {
+    persistViewState({
+      activeTab,
+      selection,
+      selectedFlowEdge,
+    });
+  }, [activeTab, selection, selectedFlowEdge]);
+
+  useEffect(() => {
+    if (shareStatus === null) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setShareStatus(null);
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [shareStatus]);
+
   function toggleSymbol(symbolId: string): void {
     setSelectedFlowEdge(null);
     setSelection((current) => {
@@ -215,7 +242,27 @@ export function App() {
 
   function resetSelection(): void {
     setSelection(initialSelection);
+    setActiveTab('canvas');
     setSelectedFlowEdge(null);
+  }
+
+  async function copyViewLink(): Promise<void> {
+    if (typeof window === 'undefined' || !navigator.clipboard) {
+      setShareStatus('Clipboard not available');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareStatus('View link copied');
+    } catch {
+      setShareStatus('Failed to copy link');
+    }
+  }
+
+  function clearSavedViewState(): void {
+    clearPersistedViewState();
+    setShareStatus('Saved view cleared');
   }
 
   function handleFlowNodeClick(node: typeof reactFlowGraph.nodes[number]): void {
@@ -381,6 +428,36 @@ export function App() {
             >
               reset
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                void copyViewLink();
+              }}
+              style={{
+                padding: '0.55rem 0.8rem',
+                borderRadius: '999px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#0f172a',
+                cursor: 'pointer',
+              }}
+            >
+              copy view link
+            </button>
+            <button
+              type="button"
+              onClick={clearSavedViewState}
+              style={{
+                padding: '0.55rem 0.8rem',
+                borderRadius: '999px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#0f172a',
+                cursor: 'pointer',
+              }}
+            >
+              clear saved view
+            </button>
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -432,6 +509,7 @@ export function App() {
             <strong>{selection.hop}</strong> · active edges:{' '}
             <strong>{selection.selectedEdgeKinds.length}</strong>
           </p>
+          {shareStatus ? <p style={{ margin: 0, color: '#0369a1' }}>{shareStatus}</p> : null}
           {selection.selectedEdgeKinds.length === 0 ? (
             <p style={{ margin: 0, color: '#b45309' }}>
               All runtime edge kinds are disabled. Re-enable at least one kind to project file
