@@ -40,6 +40,19 @@ describe('buildInspectorPayload', () => {
           'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
         ],
         requestEdgeIds: [],
+        outgoingEdges: [
+          {
+            edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+            label: 'useUser --call--> fetchUser',
+          },
+        ],
+        incomingEdges: [
+          {
+            edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+            label: 'UserPage --use--> useUser',
+          },
+        ],
+        requestEdges: [],
       },
     ]);
   });
@@ -66,6 +79,24 @@ describe('buildInspectorPayload', () => {
           'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
         ],
         requestEdgeIds: ['request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user'],
+        outgoingEdges: [
+          {
+            edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+            label: 'fetchUser --request--> GET /api/user',
+          },
+        ],
+        incomingEdges: [
+          {
+            edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+            label: 'useUser --call--> fetchUser',
+          },
+        ],
+        requestEdges: [
+          {
+            edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+            label: 'fetchUser --request--> GET /api/user',
+          },
+        ],
       },
     ]);
   });

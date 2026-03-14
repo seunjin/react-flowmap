@@ -4,12 +4,14 @@ type GoriCanvasProps = {
   view: FileLevelView;
   selectedSymbolIds?: string[];
   onToggleSymbol?: (symbolId: string) => void;
+  edgeLabelsById?: Record<string, string[]>;
 };
 
 export function GoriCanvas({
   view,
   selectedSymbolIds = [],
   onToggleSymbol,
+  edgeLabelsById = {},
 }: GoriCanvasProps) {
   return (
     <section
@@ -99,11 +101,24 @@ export function GoriCanvas({
       <section>
         <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>File Edges</h3>
         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-          {view.fileEdges.map((edge) => (
-            <li key={edge.id}>
-              {edge.sourceFileId} -&gt; {edge.targetFileId} [{edge.relationTypes.join(', ')}]
-            </li>
-          ))}
+          {view.fileEdges.map((edge) => {
+            const labels = edgeLabelsById[edge.id] ?? [];
+
+            return (
+              <li key={edge.id}>
+                {edge.sourceFileId} -&gt; {edge.targetFileId} [{edge.relationTypes.join(', ')}]
+                {labels.length ? (
+                <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
+                    {labels.map((label) => (
+                    <li key={label} style={{ color: '#475569' }}>
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              </li>
+            );
+          })}
         </ul>
       </section>
     </section>

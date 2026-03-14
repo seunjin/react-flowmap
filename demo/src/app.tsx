@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { buildGraph } from '../../src/core/graph/graph-builder';
 import { buildInspectorPayload } from '../../src/core/inspector/build-inspector-payload';
+import { describeRuntimeEdge } from '../../src/core/inspector/describe-runtime-edge';
+import { InMemoryGraphStore } from '../../src/core/graph/in-memory-graph-store';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
 import type { GoriGraph, SymbolNode } from '../../src/core/types/graph';
 import type { SelectionMode, SelectionState } from '../../src/core/types/selection';
@@ -41,6 +43,24 @@ export function App() {
 
   const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
   const inspector = buildInspectorPayload(graph, selection);
+  const graphStore = new InMemoryGraphStore();
+  graphStore.addGraph(graph);
+  const edgeLabelsById = Object.fromEntries(
+    view.fileEdges.map((edge) => [
+      edge.id,
+      edge.supportingEdges.flatMap((edgeId) => {
+        const runtimeEdge = graphStore.getGraph().edges.find(
+          (candidate) => candidate.id === edgeId && candidate.kind !== 'contains'
+        );
+        const label =
+          runtimeEdge && runtimeEdge.kind !== 'contains'
+            ? describeRuntimeEdge(graphStore, runtimeEdge)
+            : undefined;
+
+        return label ? [label] : [];
+      }),
+    ])
+  );
 
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -160,6 +180,7 @@ export function App() {
         view={view}
         selectedSymbolIds={selection.selectedSymbolIds}
         onToggleSymbol={toggleSymbol}
+        edgeLabelsById={edgeLabelsById}
       />
 
       <section
@@ -276,19 +297,36 @@ export function App() {
                   <li>incoming: {relation?.incomingEdgeIds.length ?? 0}</li>
                   <li>request: {relation?.requestEdgeIds.length ?? 0}</li>
                 </ul>
-                <pre
-                  style={{
-                    marginBottom: 0,
-                    overflowX: 'auto',
-                    fontSize: '0.75rem',
-                    lineHeight: 1.5,
-                    background: '#f8fafc',
-                    padding: '0.75rem',
-                    borderRadius: '0.75rem',
-                  }}
-                >
-                  {JSON.stringify(relation, null, 2)}
-                </pre>
+                {relation?.outgoingEdges.length ? (
+                  <div>
+                    <small style={{ color: '#64748b', fontWeight: 600 }}>Outgoing</small>
+                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
+                      {relation.outgoingEdges.map((edge) => (
+                        <li key={edge.edgeId}>{edge.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {relation?.incomingEdges.length ? (
+                  <div>
+                    <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming</small>
+                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
+                      {relation.incomingEdges.map((edge) => (
+                        <li key={edge.edgeId}>{edge.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {relation?.requestEdges.length ? (
+                  <div>
+                    <small style={{ color: '#64748b', fontWeight: 600 }}>Requests</small>
+                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
+                      {relation.requestEdges.map((edge) => (
+                        <li key={edge.edgeId}>{edge.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </section>
             );
           })}
