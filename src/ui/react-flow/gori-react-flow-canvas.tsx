@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import {
   Background,
   Controls,
@@ -15,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { getSymbolAccent } from '../colors/get-symbol-accent.js';
+import { filterNodeExports } from './filter-node-exports.js';
 import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './project-to-react-flow.js';
 
 type GoriReactFlowCanvasProps = {
@@ -31,9 +33,21 @@ type GoriReactFlowCanvasProps = {
 function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
   const isApi = data.kind === 'api';
   const selectedSymbolIds = data.selectedSymbolIds ?? [];
+  const [query, setQuery] = useState('');
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const selectedExport = data.exports?.find((item) => selectedSymbolIds.includes(item.symbolId));
   const selectedAccent = selectedExport ? getSymbolAccent(selectedExport.symbolId) : undefined;
   const isSelected = Boolean(data.isSelected);
+  const visibleExports = useMemo(
+    () =>
+      filterNodeExports({
+        exports: data.exports ?? [],
+        query,
+        selectedOnly,
+        selectedSymbolIds,
+      }),
+    [data.exports, query, selectedOnly, selectedSymbolIds]
+  );
 
   return (
     <div
@@ -89,8 +103,67 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
               borderTop: '1px solid #e2e8f0',
             }}
           >
-            <small style={{ color: '#475569', fontWeight: 700 }}>Exports</small>
-            {data.exports.map((item) => {
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
+              <small style={{ color: '#475569', fontWeight: 700 }}>Exports</small>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedOnly((current) => !current);
+                }}
+                style={{
+                  padding: '0.2rem 0.45rem',
+                  borderRadius: '999px',
+                  border: selectedOnly ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                  background: selectedOnly ? '#0f172a' : '#ffffff',
+                  color: selectedOnly ? '#f8fafc' : '#334155',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                selected only
+              </button>
+            </div>
+            <input
+              type="search"
+              value={query}
+              placeholder="Search exports"
+              onChange={(event) => setQuery(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.55rem',
+                borderRadius: '0.65rem',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+                color: '#0f172a',
+                fontSize: '0.8rem',
+              }}
+            />
+            <div
+              style={{
+                display: 'grid',
+                gap: '0.4rem',
+                maxHeight: 220,
+                overflowY: 'auto',
+                paddingRight: '0.2rem',
+              }}
+            >
+              {visibleExports.length ? null : (
+                <small
+                  style={{
+                    padding: '0.45rem 0.5rem',
+                    borderRadius: '0.65rem',
+                    background: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b',
+                  }}
+                >
+                  No exports match the current filter.
+                </small>
+              )}
+              {visibleExports.map((item) => {
               const checked = selectedSymbolIds.includes(item.symbolId);
               const accent = getSymbolAccent(item.symbolId);
 
@@ -134,7 +207,8 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
                   </span>
                 </label>
               );
-            })}
+              })}
+            </div>
           </div>
         ) : null}
       </div>
