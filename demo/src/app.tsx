@@ -20,6 +20,7 @@ import { GoriReactFlowCanvas } from '../../src/ui/react-flow/gori-react-flow-can
 import { projectToReactFlow } from '../../src/ui/react-flow/project-to-react-flow';
 import { UserPage } from './pages/user-page';
 import { demoCollector, demoRuntimeSession } from './gori-runtime';
+import { InspectorPanel } from './inspector-panel';
 import {
   clearPersistedViewState,
   persistViewState,
@@ -48,6 +49,11 @@ const initialSelection: SelectionState = {
 
 function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
+}
+
+function resolveInitialTab(): DemoTab {
+  const storedTab = readStoredViewState()?.activeTab;
+  return storedTab === 'events' ? 'events' : 'canvas';
 }
 
 function getEdgePresentation(
@@ -81,9 +87,7 @@ export function App() {
   const [selection, setSelection] = useState<SelectionState>(
     () => readStoredViewState()?.selection ?? initialSelection
   );
-  const [activeTab, setActiveTab] = useState<DemoTab>(
-    () => readStoredViewState()?.activeTab ?? 'canvas'
-  );
+  const [activeTab, setActiveTab] = useState<DemoTab>(resolveInitialTab);
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [selectedFlowEdge, setSelectedFlowEdge] = useState<PersistedFlowEdgeSelection | null>(
     () => readStoredViewState()?.selectedFlowEdge ?? null
@@ -120,6 +124,11 @@ export function App() {
         return presentation ? [presentation] : [];
       }),
     ])
+  );
+  const symbolLabelsById = Object.fromEntries(
+    focusedGraph.nodes
+      .filter((node): node is SymbolNode => node.kind === 'symbol')
+      .map((symbol) => [symbol.id, formatSymbolLabel(symbol)])
   );
 
   useEffect(() => {
@@ -276,7 +285,7 @@ export function App() {
       ...(node.data.fileId ? { selectedFileId: node.data.fileId } : {}),
       selectedSymbolIds: node.data.symbolIds ?? [],
     }));
-    setActiveTab('inspector');
+    setActiveTab('canvas');
   }
 
   function handleFlowEdgeClick(edge: typeof reactFlowGraph.edges[number]): void {
@@ -316,7 +325,11 @@ export function App() {
       labels,
       supportingEdgeIds: edge.data.supportingEdges,
     });
-    setActiveTab('inspector');
+    setActiveTab('canvas');
+  }
+
+  function clearEdgeFocus(): void {
+    setSelectedFlowEdge(null);
   }
 
   return (
@@ -569,7 +582,6 @@ export function App() {
       >
         {([
           { id: 'canvas', label: 'Canvas' },
-          { id: 'inspector', label: 'Inspector' },
           { id: 'events', label: 'Events' },
         ] as const).map((tab) => (
           <button
@@ -592,247 +604,46 @@ export function App() {
       </section>
 
       {activeTab === 'canvas' ? (
-        <section style={{ display: 'grid', gap: '1rem' }}>
-          <GoriReactFlowCanvas
-            graph={reactFlowGraph}
-            selectedSymbolIds={selection.selectedSymbolIds}
-            {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
-            {...(selectedFlowEdge ? { selectedEdgeId: selectedFlowEdge.edgeId } : {})}
-            onToggleSymbol={toggleSymbol}
-            onNodeClick={handleFlowNodeClick}
-            onEdgeClick={handleFlowEdgeClick}
-          />
-          {selectedFlowEdge ? (
-            <section
-              style={{
-                padding: '0.9rem 1rem',
-                borderRadius: '1rem',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-              }}
-            >
-              <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Selected edge: {selectedFlowEdge.edgeId}
-              </strong>
-              {selectedFlowEdge.labels.length ? (
-                <ul style={{ margin: 0, paddingLeft: '1rem', color: '#334155' }}>
-                  {selectedFlowEdge.labels.map((label) => (
-                    <li key={label}>{label}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ margin: 0, color: '#64748b' }}>
-                  No supporting runtime edge labels resolved for this file edge.
-                </p>
-              )}
-            </section>
-          ) : null}
-          <GoriCanvas
-            view={displayView}
-            edgeLayers={edgeLayers}
-            selectedSymbolIds={selection.selectedSymbolIds}
-            selectionMode={selection.mode}
-            selectionHop={selection.hop}
-            activeEdgeKinds={selection.selectedEdgeKinds}
-            selectedSymbolLabelsById={selectedSymbolLabelsById}
-            onToggleSymbol={toggleSymbol}
-            symbolAccentsById={symbolAccentsById}
-            edgeLabelsById={edgeLabelsById}
-          />
-        </section>
-      ) : null}
-
-      {activeTab === 'inspector' ? (
         <section
           style={{
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid #cbd5e1',
-            background: '#ffffff',
             display: 'grid',
             gap: '1rem',
+            alignItems: 'start',
+            gridTemplateColumns: 'minmax(0, 1.7fr) minmax(320px, 0.9fr)',
           }}
         >
-          <header>
-            <h2 style={{ margin: 0, fontSize: '1rem' }}>Inspector</h2>
-            <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
-              Explain why the current file edges exist for the selected symbols.
-            </p>
-          </header>
-
-          {selectedFlowEdge ? (
-            <section
-              style={{
-                padding: '0.85rem 0.95rem',
-                borderRadius: '0.85rem',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-              }}
-            >
-              <strong style={{ display: 'block', marginBottom: '0.4rem' }}>
-                Selected file edge
-              </strong>
-              <small style={{ display: 'block', color: '#64748b', marginBottom: '0.5rem' }}>
-                {selectedFlowEdge.edgeId}
-              </small>
-              {selectedFlowEdge.labels.length ? (
-                <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                  {selectedFlowEdge.labels.map((label) => (
-                    <li key={label}>{label}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ margin: 0, color: '#64748b' }}>
-                  No supporting runtime labels resolved for this edge.
-                </p>
-              )}
-            </section>
-          ) : null}
-
-          {inspector.file ? (
-            <section>
-              <strong>{inspector.file.name}</strong>
-              <small style={{ display: 'block', color: '#64748b' }}>{inspector.file.path}</small>
-            </section>
-          ) : (
-            <p style={{ margin: 0, color: '#64748b' }}>
-              Select a symbol to inspect its file and supporting edges.
-            </p>
-          )}
-
-          {inspector.selectedSymbols.map((symbol) => {
-            const relation = inspector.relations.find((item) => item.symbolId === symbol.id);
-            const accent = symbolAccentsById[symbol.id];
-
-            return (
-              <section
-                key={symbol.id}
-                style={{
-                  paddingTop: '0.75rem',
-                  borderTop: `1px solid ${accent?.border ?? '#e2e8f0'}`,
-                }}
-              >
-                <strong style={{ color: accent?.solid }}>{formatSymbolLabel(symbol)}</strong>
-                <small style={{ display: 'block', color: '#64748b', marginTop: '0.25rem' }}>
-                  {symbol.id}
-                </small>
-                <ul style={{ margin: '0.75rem 0 0', paddingLeft: '1rem', color: '#334155' }}>
-                  <li>outgoing: {relation?.outgoingEdgeIds.length ?? 0}</li>
-                  <li>incoming: {relation?.incomingEdgeIds.length ?? 0}</li>
-                  <li>request: {relation?.requestEdgeIds.length ?? 0}</li>
-                </ul>
-                {relation?.outgoingEdges.length ? (
-                  <div>
-                    <small style={{ color: '#64748b', fontWeight: 600 }}>Outgoing</small>
-                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
-                      {relation.outgoingEdges.map((edge) => (
-                        <li
-                          key={edge.edgeId}
-                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
-                        >
-                          {edge.label}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-                {relation?.outgoingLayers.length ? (
-                  <div>
-                    <small style={{ color: '#64748b', fontWeight: 600 }}>Outgoing Path</small>
-                    <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
-                      {relation.outgoingLayers.map((layer) => (
-                        <section
-                          key={`outgoing-${layer.hop}`}
-                          style={{
-                            padding: '0.65rem 0.75rem',
-                            borderRadius: '0.75rem',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        >
-                          <small style={{ color: '#64748b', fontWeight: 700 }}>
-                            hop {layer.hop}
-                          </small>
-                          <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1rem' }}>
-                            {layer.edges.map((edge) => (
-                              <li
-                                key={edge.edgeId}
-                                style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
-                              >
-                                {edge.label}
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {relation?.incomingEdges.length ? (
-                  <div>
-                    <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming</small>
-                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
-                      {relation.incomingEdges.map((edge) => (
-                        <li
-                          key={edge.edgeId}
-                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
-                        >
-                          {edge.label}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-                {relation?.incomingLayers.length ? (
-                  <div>
-                    <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming Path</small>
-                    <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
-                      {relation.incomingLayers.map((layer) => (
-                        <section
-                          key={`incoming-${layer.hop}`}
-                          style={{
-                            padding: '0.65rem 0.75rem',
-                            borderRadius: '0.75rem',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        >
-                          <small style={{ color: '#64748b', fontWeight: 700 }}>
-                            hop {layer.hop}
-                          </small>
-                          <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1rem' }}>
-                            {layer.edges.map((edge) => (
-                              <li
-                                key={edge.edgeId}
-                                style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
-                              >
-                                {edge.label}
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {relation?.requestEdges.length ? (
-                  <div>
-                    <small style={{ color: '#64748b', fontWeight: 600 }}>Requests</small>
-                    <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
-                      {relation.requestEdges.map((edge) => (
-                        <li
-                          key={edge.edgeId}
-                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
-                        >
-                          {edge.label}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
-            );
-          })}
+          <section style={{ display: 'grid', gap: '1rem', minWidth: 0 }}>
+            <GoriReactFlowCanvas
+              graph={reactFlowGraph}
+              selectedSymbolIds={selection.selectedSymbolIds}
+              {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
+              {...(selectedFlowEdge ? { selectedEdgeId: selectedFlowEdge.edgeId } : {})}
+              onToggleSymbol={toggleSymbol}
+              onNodeClick={handleFlowNodeClick}
+              onEdgeClick={handleFlowEdgeClick}
+            />
+            <GoriCanvas
+              view={displayView}
+              edgeLayers={edgeLayers}
+              selectedSymbolIds={selection.selectedSymbolIds}
+              selectionMode={selection.mode}
+              selectionHop={selection.hop}
+              activeEdgeKinds={selection.selectedEdgeKinds}
+              selectedSymbolLabelsById={selectedSymbolLabelsById}
+              onToggleSymbol={toggleSymbol}
+              symbolAccentsById={symbolAccentsById}
+              edgeLabelsById={edgeLabelsById}
+            />
+          </section>
+          <InspectorPanel
+            inspector={inspector}
+            selection={selection}
+            selectedFlowEdge={selectedFlowEdge}
+            symbolAccentsById={symbolAccentsById}
+            getEdgeColor={(edgeId) => getEdgePresentation(graphStore, edgeId)?.color}
+            formatSymbolLabel={(symbolId) => symbolLabelsById[symbolId] ?? symbolId}
+            onCloseEdgeFocus={clearEdgeFocus}
+          />
         </section>
       ) : null}
 
