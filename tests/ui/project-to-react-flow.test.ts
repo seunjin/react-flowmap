@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { projectToFileEdgeLayers } from '../../src/core/projection/project-to-file-edge-layers';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
 import { projectToReactFlow } from '../../src/ui/react-flow/project-to-react-flow';
+import type { FileLevelView } from '../../src/core/types/projection';
 import type { SelectionState } from '../../src/core/types/selection';
 import { requestUserFlow } from '../fixtures/request-user-flow';
 
@@ -133,5 +134,61 @@ describe('projectToReactFlow', () => {
         },
       },
     ]);
+  });
+
+  it('adds vertical spacing based on file node export height', () => {
+    const view: FileLevelView = {
+      fileNodes: [
+        {
+          id: 'file:src/files/a.ts',
+          kind: 'file',
+          path: 'src/files/a.ts',
+          name: 'a.ts',
+          exports: [
+            {
+              symbolId: 'symbol:src/files/a.ts#alpha',
+              name: 'alpha',
+              symbolType: 'function',
+              exported: true,
+            },
+            {
+              symbolId: 'symbol:src/files/a.ts#beta',
+              name: 'beta',
+              symbolType: 'function',
+              exported: true,
+            },
+            {
+              symbolId: 'symbol:src/files/a.ts#gamma',
+              name: 'gamma',
+              symbolType: 'function',
+              exported: true,
+            },
+          ],
+        },
+        {
+          id: 'file:src/files/b.ts',
+          kind: 'file',
+          path: 'src/files/b.ts',
+          name: 'b.ts',
+          exports: [
+            {
+              symbolId: 'symbol:src/files/b.ts#delta',
+              name: 'delta',
+              symbolType: 'function',
+              exported: true,
+            },
+          ],
+        },
+      ],
+      apiNodes: [],
+      fileEdges: [],
+    };
+
+    const graph = projectToReactFlow(view);
+    const firstNode = graph.nodes.find((node) => node.id === 'file:src/files/a.ts');
+    const secondNode = graph.nodes.find((node) => node.id === 'file:src/files/b.ts');
+
+    expect(firstNode?.position).toEqual({ x: 0, y: 0 });
+    expect(secondNode?.position).toEqual({ x: 0, y: 340 });
   });
 });

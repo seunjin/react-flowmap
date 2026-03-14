@@ -14,6 +14,7 @@ export type ReactFlowNodeData = {
   symbolIds?: string[];
   exports?: ExportRef[];
   selectedSymbolIds?: string[];
+  isSelected?: boolean;
   onToggleSymbol?: (symbolId: string) => void;
   exportCount?: number;
 };
@@ -50,7 +51,11 @@ export type ReactFlowProjectionOptions = {
 };
 
 const DEFAULT_COLUMN_GAP = 320;
-const DEFAULT_ROW_GAP = 180;
+const DEFAULT_ROW_GAP = 56;
+const FILE_NODE_BASE_HEIGHT = 112;
+const FILE_NODE_EXPORT_SECTION_HEIGHT = 40;
+const FILE_NODE_EXPORT_ROW_HEIGHT = 44;
+const API_NODE_HEIGHT = 96;
 
 function assignLayerMap(view: FileLevelView, edgeLayers: FileEdgeLayer[]): Map<string, number> {
   const layerByNodeId = new Map<string, number>();
@@ -102,30 +107,50 @@ function buildPositionMap(
   const rowGap = options?.rowGap ?? DEFAULT_ROW_GAP;
   const layerByNodeId = assignLayerMap(view, edgeLayers);
   const nodes = [...view.fileNodes, ...view.apiNodes];
-  const groupedByLayer = new Map<number, string[]>();
+  const groupedByLayer = new Map<number, typeof nodes>();
 
   nodes
     .slice()
     .sort((left, right) => left.id.localeCompare(right.id))
     .forEach((node) => {
       const layer = layerByNodeId.get(node.id) ?? 0;
-      groupedByLayer.set(layer, [...(groupedByLayer.get(layer) ?? []), node.id]);
+      groupedByLayer.set(layer, [...(groupedByLayer.get(layer) ?? []), node]);
     });
 
   const positionById = new Map<string, ReactFlowPosition>();
 
   [...groupedByLayer.entries()]
     .sort((left, right) => left[0] - right[0])
-    .forEach(([layer, nodeIds]) => {
-      nodeIds.forEach((nodeId, index) => {
-        positionById.set(nodeId, {
+    .forEach(([layer, layerNodes]) => {
+      let currentY = 0;
+
+      layerNodes.forEach((node) => {
+        positionById.set(node.id, {
           x: layer * columnGap,
-          y: index * rowGap,
+          y: currentY,
         });
+
+        currentY += estimateNodeHeight(node) + rowGap;
       });
     });
 
   return positionById;
+}
+
+function estimateNodeHeight(node: FileLevelView['fileNodes'][number] | FileLevelView['apiNodes'][number]): number {
+  if (node.kind === 'api') {
+    return API_NODE_HEIGHT;
+  }
+
+  if (node.exports.length === 0) {
+    return FILE_NODE_BASE_HEIGHT;
+  }
+
+  return (
+    FILE_NODE_BASE_HEIGHT +
+    FILE_NODE_EXPORT_SECTION_HEIGHT +
+    node.exports.length * FILE_NODE_EXPORT_ROW_HEIGHT
+  );
 }
 
 export function projectToReactFlow(

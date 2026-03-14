@@ -162,6 +162,7 @@ export function App() {
   }, [graph, selection]);
 
   function toggleSymbol(symbolId: string): void {
+    setSelectedFlowEdge(null);
     setSelection((current) => {
       const selected = current.selectedSymbolIds.includes(symbolId)
         ? current.selectedSymbolIds.filter((value) => value !== symbolId)
@@ -175,6 +176,7 @@ export function App() {
   }
 
   function setMode(mode: SelectionMode): void {
+    setSelectedFlowEdge(null);
     setSelection((current) => ({
       ...current,
       mode,
@@ -182,6 +184,7 @@ export function App() {
   }
 
   function setHop(hop: number): void {
+    setSelectedFlowEdge(null);
     setSelection((current) => ({
       ...current,
       hop,
@@ -189,6 +192,7 @@ export function App() {
   }
 
   function toggleEdgeKind(kind: RuntimeEdgeKind): void {
+    setSelectedFlowEdge(null);
     setSelection((current) => ({
       ...current,
       selectedEdgeKinds: current.selectedEdgeKinds.includes(kind)
@@ -207,6 +211,7 @@ export function App() {
       return;
     }
 
+    setSelectedFlowEdge(null);
     setSelection((current) => ({
       ...current,
       ...(node.data.fileId ? { selectedFileId: node.data.fileId } : {}),
@@ -468,6 +473,8 @@ export function App() {
           <GoriReactFlowCanvas
             graph={reactFlowGraph}
             selectedSymbolIds={selection.selectedSymbolIds}
+            {...(selection.selectedFileId ? { selectedFileId: selection.selectedFileId } : {})}
+            {...(selectedFlowEdge ? { selectedEdgeId: selectedFlowEdge.edgeId } : {})}
             onToggleSymbol={toggleSymbol}
             onNodeClick={handleFlowNodeClick}
             onEdgeClick={handleFlowEdgeClick}

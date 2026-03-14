@@ -20,7 +20,9 @@ import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './pro
 type GoriReactFlowCanvasProps = {
   graph: ReactFlowGraph;
   height?: number;
+  selectedFileId?: string;
   selectedSymbolIds?: string[];
+  selectedEdgeId?: string;
   onToggleSymbol?: (symbolId: string) => void;
   onNodeClick?: (node: ReactFlowGraph['nodes'][number]) => void;
   onEdgeClick?: (edge: ReactFlowGraph['edges'][number]) => void;
@@ -29,6 +31,9 @@ type GoriReactFlowCanvasProps = {
 function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
   const isApi = data.kind === 'api';
   const selectedSymbolIds = data.selectedSymbolIds ?? [];
+  const selectedExport = data.exports?.find((item) => selectedSymbolIds.includes(item.symbolId));
+  const selectedAccent = selectedExport ? getSymbolAccent(selectedExport.symbolId) : undefined;
+  const isSelected = Boolean(data.isSelected);
 
   return (
     <div
@@ -37,12 +42,24 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
         maxWidth: 320,
         padding: '0.85rem 0.95rem',
         borderRadius: '0.9rem',
-        border: isApi ? '1px solid #7dd3fc' : '1px solid #cbd5e1',
-        background: isApi ? '#eff6ff' : '#ffffff',
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+        border: isSelected
+          ? `2px solid ${selectedAccent?.border ?? '#0f172a'}`
+          : isApi
+            ? '1px solid #7dd3fc'
+            : '1px solid #cbd5e1',
+        background: isSelected ? selectedAccent?.soft ?? '#f8fafc' : isApi ? '#eff6ff' : '#ffffff',
+        boxShadow: isSelected
+          ? '0 18px 40px rgba(15, 23, 42, 0.18)'
+          : '0 10px 30px rgba(15, 23, 42, 0.08)',
+        transform: isSelected ? 'translateY(-2px)' : 'none',
+        transition: 'border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease',
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ background: '#0f172a' }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: selectedAccent?.border ?? '#0f172a' }}
+      />
       <div style={{ display: 'grid', gap: '0.4rem' }}>
         <strong style={{ color: '#0f172a' }}>{data.label}</strong>
         <small style={{ color: '#64748b', lineHeight: 1.4 }}>{data.subtitle}</small>
@@ -121,7 +138,11 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
           </div>
         ) : null}
       </div>
-      <Handle type="source" position={Position.Right} style={{ background: '#0f172a' }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: selectedAccent?.border ?? '#0f172a' }}
+      />
     </div>
   );
 }
@@ -133,6 +154,7 @@ const nodeTypes = {
 
 function toFlowNodes(
   graph: ReactFlowGraph,
+  selectedFileId: string | undefined,
   selectedSymbolIds: string[],
   onToggleSymbol?: (symbolId: string) => void
 ): Node<ReactFlowNodeData>[] {
@@ -145,17 +167,30 @@ function toFlowNodes(
       ...(node.data.kind === 'file'
         ? {
             selectedSymbolIds,
+            isSelected:
+              node.data.fileId === selectedFileId ||
+              (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)),
             ...(onToggleSymbol ? { onToggleSymbol } : {}),
           }
-        : {}),
+        : {
+            isSelected: false,
+          }),
     },
     draggable: false,
+    zIndex:
+      node.data.kind === 'file' &&
+      (node.data.fileId === selectedFileId ||
+        (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)))
+        ? 2
+        : 1,
   }));
 }
 
-function toFlowEdges(graph: ReactFlowGraph): Edge<ReactFlowEdgeData>[] {
+function toFlowEdges(graph: ReactFlowGraph, selectedEdgeId?: string): Edge<ReactFlowEdgeData>[] {
   return graph.edges.map((edge) => {
     const isRequestEdge = edge.data.relationTypes.includes('request');
+    const isSelected = edge.id === selectedEdgeId;
+    const stroke = isSelected ? '#0f172a' : isRequestEdge ? '#0369a1' : '#64748b';
 
     return {
       id: edge.id,
@@ -164,19 +199,20 @@ function toFlowEdges(graph: ReactFlowGraph): Edge<ReactFlowEdgeData>[] {
       type: 'smoothstep',
       label: edge.label,
       data: edge.data,
-      animated: isRequestEdge,
+      animated: isSelected || isRequestEdge,
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: isRequestEdge ? '#0369a1' : '#64748b',
+        color: stroke,
       },
       style: {
-        stroke: isRequestEdge ? '#0369a1' : '#64748b',
-        strokeWidth: isRequestEdge ? 2.5 : 2,
+        stroke,
+        strokeWidth: isSelected ? 3.5 : isRequestEdge ? 2.5 : 2,
+        opacity: selectedEdgeId && !isSelected ? 0.42 : 1,
       },
       labelStyle: {
-        fill: '#334155',
+        fill: isSelected ? '#0f172a' : '#334155',
         fontWeight: 700,
       },
       labelBgStyle: {
@@ -192,13 +228,15 @@ function toFlowEdges(graph: ReactFlowGraph): Edge<ReactFlowEdgeData>[] {
 export function GoriReactFlowCanvas({
   graph,
   height = 520,
+  selectedFileId,
   selectedSymbolIds = [],
+  selectedEdgeId,
   onToggleSymbol,
   onNodeClick,
   onEdgeClick,
 }: GoriReactFlowCanvasProps) {
-  const nodes = toFlowNodes(graph, selectedSymbolIds, onToggleSymbol);
-  const edges = toFlowEdges(graph);
+  const nodes = toFlowNodes(graph, selectedFileId, selectedSymbolIds, onToggleSymbol);
+  const edges = toFlowEdges(graph, selectedEdgeId);
   const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node] as const));
   const graphEdgeById = new Map(graph.edges.map((edge) => [edge.id, edge] as const));
 
@@ -249,6 +287,7 @@ export function GoriReactFlowCanvas({
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
+          fitViewOptions={{ padding: 0.18 }}
           nodesDraggable={false}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}
