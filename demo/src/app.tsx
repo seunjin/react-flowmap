@@ -34,6 +34,8 @@ const initialSelection: SelectionState = {
   hop: 1,
 };
 
+type DemoTab = 'canvas' | 'inspector' | 'events';
+
 function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
 }
@@ -67,6 +69,7 @@ export function App() {
   const [graph, setGraph] = useState<GoriGraph>(emptyGraph);
   const [view, setView] = useState<FileLevelView>(emptyView);
   const [selection, setSelection] = useState<SelectionState>(initialSelection);
+  const [activeTab, setActiveTab] = useState<DemoTab>('canvas');
 
   const observedSymbols = graph.nodes.filter((node): node is SymbolNode => node.kind === 'symbol');
   const inspector = buildInspectorPayload(graph, selection);
@@ -219,35 +222,18 @@ export function App() {
       </header>
 
       <UserPage />
-      <GoriCanvas
-        view={view}
-        edgeLayers={edgeLayers}
-        selectedSymbolIds={selection.selectedSymbolIds}
-        selectionMode={selection.mode}
-        selectionHop={selection.hop}
-        activeEdgeKinds={selection.selectedEdgeKinds}
-        selectedSymbolLabelsById={selectedSymbolLabelsById}
-        onToggleSymbol={toggleSymbol}
-        symbolAccentsById={symbolAccentsById}
-        edgeLabelsById={edgeLabelsById}
-      />
-
       <section
         style={{
+          padding: '1rem',
+          borderRadius: '1rem',
+          border: '1px solid #cbd5e1',
+          background: '#ffffff',
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
           gap: '1rem',
         }}
       >
         <section
-          style={{
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid #cbd5e1',
-            background: '#ffffff',
-            display: 'grid',
-            gap: '1rem',
-          }}
+          style={{ display: 'grid', gap: '1rem' }}
         >
           <header>
             <h2 style={{ margin: 0, fontSize: '1rem' }}>Selection Controls</h2>
@@ -389,8 +375,56 @@ export function App() {
             </div>
           ) : null}
         </section>
+      </section>
 
-        <aside
+      <section
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        {([
+          { id: 'canvas', label: 'Canvas' },
+          { id: 'inspector', label: 'Inspector' },
+          { id: 'events', label: 'Events' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '0.6rem 0.9rem',
+              borderRadius: '999px',
+              border: activeTab === tab.id ? '1px solid #0f172a' : '1px solid #cbd5e1',
+              background: activeTab === tab.id ? '#0f172a' : '#ffffff',
+              color: activeTab === tab.id ? '#f8fafc' : '#0f172a',
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </section>
+
+      {activeTab === 'canvas' ? (
+        <GoriCanvas
+          view={view}
+          edgeLayers={edgeLayers}
+          selectedSymbolIds={selection.selectedSymbolIds}
+          selectionMode={selection.mode}
+          selectionHop={selection.hop}
+          activeEdgeKinds={selection.selectedEdgeKinds}
+          selectedSymbolLabelsById={selectedSymbolLabelsById}
+          onToggleSymbol={toggleSymbol}
+          symbolAccentsById={symbolAccentsById}
+          edgeLabelsById={edgeLabelsById}
+        />
+      ) : null}
+
+      {activeTab === 'inspector' ? (
+        <section
           style={{
             padding: '1rem',
             borderRadius: '1rem',
@@ -398,7 +432,6 @@ export function App() {
             background: '#ffffff',
             display: 'grid',
             gap: '1rem',
-            alignSelf: 'start',
           }}
         >
           <header>
@@ -552,29 +585,31 @@ export function App() {
               </section>
             );
           })}
-        </aside>
-      </section>
+        </section>
+      ) : null}
 
-      <section
-        style={{
-          padding: '1rem',
-          borderRadius: '1rem',
-          background: '#0f172a',
-          color: '#e2e8f0',
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: '1rem' }}>Collected Runtime Events</h2>
-        <pre
+      {activeTab === 'events' ? (
+        <section
           style={{
-            marginBottom: 0,
-            overflowX: 'auto',
-            fontSize: '0.875rem',
-            lineHeight: 1.5,
+            padding: '1rem',
+            borderRadius: '1rem',
+            background: '#0f172a',
+            color: '#e2e8f0',
           }}
         >
-          {JSON.stringify(events, null, 2)}
-        </pre>
-      </section>
+          <h2 style={{ marginTop: 0, fontSize: '1rem' }}>Collected Runtime Events</h2>
+          <pre
+            style={{
+              marginBottom: 0,
+              overflowX: 'auto',
+              fontSize: '0.875rem',
+              lineHeight: 1.5,
+            }}
+          >
+            {JSON.stringify(events, null, 2)}
+          </pre>
+        </section>
+      ) : null}
     </main>
   );
 }

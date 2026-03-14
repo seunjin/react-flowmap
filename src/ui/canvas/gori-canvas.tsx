@@ -33,6 +33,26 @@ export function GoriCanvas({
 }: GoriCanvasProps) {
   const fileLabelsById = Object.fromEntries(view.fileNodes.map((fileNode) => [fileNode.id, fileNode.name]));
   const apiLabelsById = Object.fromEntries(view.apiNodes.map((apiNode) => [apiNode.id, apiNode.label]));
+  const fileRelationBadgesById = view.fileEdges.reduce<Record<string, Partial<Record<FileEdge['relationTypes'][number], number>>>>(
+    (accumulator, edge) => {
+      for (const relationType of edge.relationTypes) {
+        accumulator[edge.sourceFileId] = {
+          ...accumulator[edge.sourceFileId],
+          [relationType]: (accumulator[edge.sourceFileId]?.[relationType] ?? 0) + 1,
+        };
+
+        if (fileLabelsById[edge.targetFileId]) {
+          accumulator[edge.targetFileId] = {
+            ...accumulator[edge.targetFileId],
+            [relationType]: (accumulator[edge.targetFileId]?.[relationType] ?? 0) + 1,
+          };
+        }
+      }
+
+      return accumulator;
+    },
+    {}
+  );
 
   function renderEdgeList(edges: FileEdge[]) {
     return (
@@ -168,6 +188,28 @@ export function GoriCanvas({
           >
             <strong style={{ display: 'block' }}>{fileNode.name}</strong>
             <small style={{ color: '#64748b' }}>{fileNode.path}</small>
+            {fileRelationBadgesById[fileNode.id] ? (
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
+                {Object.entries(fileRelationBadgesById[fileNode.id] ?? {}).map(([kind, count]) => (
+                  <span
+                    key={`${fileNode.id}:${kind}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '0.22rem 0.5rem',
+                      borderRadius: '999px',
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {kind} {count}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <hr style={{ margin: '0.75rem 0', border: 0, borderTop: '1px solid #e2e8f0' }} />
             {fileNode.exports.length > 0 ? (
               <div style={{ display: 'grid', gap: '0.5rem' }}>
