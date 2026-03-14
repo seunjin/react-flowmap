@@ -123,4 +123,49 @@ describe('buildInspectorPayload', () => {
       },
     ]);
   });
+
+  it('expands outgoing inspector relations across multiple hops', () => {
+    const selection: SelectionState = {
+      selectedSymbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
+      mode: 'outgoing',
+      hop: 3,
+    };
+
+    const payload = buildInspectorPayload(requestUserFlow, selection);
+
+    expect(payload.relations).toEqual([
+      {
+        symbolId: 'symbol:src/pages/user-page.tsx#UserPage',
+        outgoingEdgeIds: [
+          'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+          'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+          'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+        ],
+        incomingEdgeIds: [],
+        requestEdgeIds: ['request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user'],
+        outgoingEdges: [
+          {
+            edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+            label: 'UserPage --use--> useUser',
+          },
+          {
+            edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
+            label: 'useUser --call--> fetchUser',
+          },
+          {
+            edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+            label: 'fetchUser --request--> GET /api/user',
+          },
+        ],
+        incomingEdges: [],
+        requestEdges: [
+          {
+            edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
+            label: 'fetchUser --request--> GET /api/user',
+          },
+        ],
+      },
+    ]);
+  });
 });

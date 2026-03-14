@@ -1,8 +1,9 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
 import type { GoriGraph, RuntimeEdge } from '../types/graph.js';
-import type { RuntimeEdgeKind, SelectionState } from '../types/selection.js';
+import type { SelectionState } from '../types/selection.js';
 import type { FileEdge, FileLevelView } from '../types/projection.js';
 
+import { selectRuntimeEdges } from '../selection/select-runtime-edges.js';
 import { buildFileEdge } from './build-file-edge.js';
 
 function resolveTargetFileId(store: InMemoryGraphStore, edge: RuntimeEdge): string | undefined {
@@ -31,127 +32,6 @@ function resolveSourceFileId(store: InMemoryGraphStore, edge: RuntimeEdge): stri
   }
 
   return store.getFileForSymbol(sourceNode.id)?.id;
-}
-
-function normalizeHop(selection?: SelectionState): number {
-  if (!selection) {
-    return 1;
-  }
-
-  return Math.max(1, Math.floor(selection.hop));
-}
-
-function normalizeEdgeKinds(selection?: SelectionState): Set<RuntimeEdgeKind> {
-  if (!selection) {
-    return new Set(['render', 'use', 'call', 'request']);
-  }
-
-  return new Set(selection.selectedEdgeKinds);
-}
-
-function collectOutgoingEdges(
-  store: InMemoryGraphStore,
-  selectedSymbolIds: string[],
-  hop: number
-): RuntimeEdge[] {
-  const collected = new Map<string, RuntimeEdge>();
-  let frontier = new Set(selectedSymbolIds);
-  const visitedSymbols = new Set(selectedSymbolIds);
-
-  for (let depth = 0; depth < hop; depth += 1) {
-    const nextFrontier = new Set<string>();
-
-    for (const symbolId of frontier) {
-      for (const edge of store.getOutgoingEdges(symbolId)) {
-        if (edge.kind === 'contains') {
-          continue;
-        }
-
-        collected.set(edge.id, edge);
-
-        const targetNode = store.getNode(edge.target);
-        if (targetNode?.kind === 'symbol' && !visitedSymbols.has(targetNode.id)) {
-          visitedSymbols.add(targetNode.id);
-          nextFrontier.add(targetNode.id);
-        }
-      }
-    }
-
-    frontier = nextFrontier;
-    if (frontier.size === 0) {
-      break;
-    }
-  }
-
-  return [...collected.values()];
-}
-
-function collectIncomingEdges(
-  store: InMemoryGraphStore,
-  selectedSymbolIds: string[],
-  hop: number
-): RuntimeEdge[] {
-  const collected = new Map<string, RuntimeEdge>();
-  let frontier = new Set(selectedSymbolIds);
-  const visitedSymbols = new Set(selectedSymbolIds);
-
-  for (let depth = 0; depth < hop; depth += 1) {
-    const nextFrontier = new Set<string>();
-
-    for (const symbolId of frontier) {
-      for (const edge of store.getIncomingEdges(symbolId)) {
-        if (edge.kind === 'contains') {
-          continue;
-        }
-
-        collected.set(edge.id, edge);
-
-        const sourceNode = store.getNode(edge.source);
-        if (sourceNode?.kind === 'symbol' && !visitedSymbols.has(sourceNode.id)) {
-          visitedSymbols.add(sourceNode.id);
-          nextFrontier.add(sourceNode.id);
-        }
-      }
-    }
-
-    frontier = nextFrontier;
-    if (frontier.size === 0) {
-      break;
-    }
-  }
-
-  return [...collected.values()];
-}
-
-function getSelectedRuntimeEdges(
-  store: InMemoryGraphStore,
-  selection?: SelectionState
-): RuntimeEdge[] {
-  const allowedEdgeKinds = normalizeEdgeKinds(selection);
-
-  if (!selection || selection.selectedSymbolIds.length === 0) {
-    return store.getRuntimeEdges().filter((edge) => allowedEdgeKinds.has(edge.kind));
-  }
-
-  const hop = normalizeHop(selection);
-  const filterAllowed = (edges: RuntimeEdge[]) =>
-    edges.filter((edge) => allowedEdgeKinds.has(edge.kind));
-
-  switch (selection.mode) {
-    case 'outgoing':
-      return filterAllowed(collectOutgoingEdges(store, selection.selectedSymbolIds, hop));
-    case 'incoming':
-      return filterAllowed(collectIncomingEdges(store, selection.selectedSymbolIds, hop));
-    default:
-      return [
-        ...new Map(
-          filterAllowed([
-            ...collectOutgoingEdges(store, selection.selectedSymbolIds, hop),
-            ...collectIncomingEdges(store, selection.selectedSymbolIds, hop),
-          ]).map((edge) => [edge.id, edge])
-        ).values(),
-      ];
-  }
 }
 
 function toRelationType(edge: RuntimeEdge): FileEdge['relationTypes'][number] {
@@ -183,7 +63,7 @@ export function projectToFileLevelView(
   );
 
   const fileEdges = new Map<string, FileEdge>();
-  const selectedEdges = getSelectedRuntimeEdges(store, selection);
+  const selectedEdges = selectRuntimeEdges(store, selection);
 
   for (const edge of selectedEdges) {
     const sourceFileId = resolveSourceFileId(store, edge);

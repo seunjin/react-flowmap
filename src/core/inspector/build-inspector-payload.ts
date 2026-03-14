@@ -1,56 +1,58 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
-import type { GoriGraph, SymbolNode } from '../types/graph.js';
+import type { GoriGraph, RuntimeEdge, SymbolNode } from '../types/graph.js';
 import type { InspectorPayload, SymbolRelationSummary } from '../types/inspector.js';
-import type { RuntimeEdgeKind, SelectionState } from '../types/selection.js';
+import type { SelectionState } from '../types/selection.js';
 
-import { summarizeSymbolRelations } from './summarize-symbol-relations.js';
+import { describeRuntimeEdge } from './describe-runtime-edge.js';
+import { selectRuntimeEdgesForSymbol } from '../selection/select-runtime-edges.js';
 
-function applySelectionToRelation(
-  relation: SymbolRelationSummary,
+function toEdgeDescriptions(store: InMemoryGraphStore, edges: RuntimeEdge[]) {
+  return edges.flatMap((edge) => {
+    const label = describeRuntimeEdge(store, edge);
+    return label ? [{ edgeId: edge.id, label }] : [];
+  });
+}
+
+function buildRelationSummary(
+  store: InMemoryGraphStore,
+  symbolId: string,
   selection: SelectionState
 ): SymbolRelationSummary {
-  const allowedKinds = new Set(selection.selectedEdgeKinds);
-  const outgoingIds = relation.outgoingEdgeIds.filter((edgeId) => allowedKinds.has(edgeId.split(':', 1)[0] as RuntimeEdgeKind));
-  const incomingIds = relation.incomingEdgeIds.filter((edgeId) => allowedKinds.has(edgeId.split(':', 1)[0] as RuntimeEdgeKind));
-  const requestIds = relation.requestEdgeIds.filter(() => allowedKinds.has('request'));
-  const outgoingEdges = relation.outgoingEdges.filter((edge) =>
-    allowedKinds.has(edge.edgeId.split(':', 1)[0] as RuntimeEdgeKind)
-  );
-  const incomingEdges = relation.incomingEdges.filter((edge) =>
-    allowedKinds.has(edge.edgeId.split(':', 1)[0] as RuntimeEdgeKind)
-  );
-  const requestEdges = relation.requestEdges.filter(() => allowedKinds.has('request'));
+  const selectedEdges = selectRuntimeEdgesForSymbol(store, symbolId, selection);
+  const outgoingEdges = selectedEdges.outgoingEdges;
+  const incomingEdges = selectedEdges.incomingEdges;
+  const requestEdges = outgoingEdges.filter((edge) => edge.kind === 'request');
 
   switch (selection.mode) {
     case 'outgoing':
       return {
-        ...relation,
-        outgoingEdgeIds: outgoingIds,
+        symbolId,
+        outgoingEdgeIds: outgoingEdges.map((edge) => edge.id),
         incomingEdgeIds: [],
-        requestEdgeIds: requestIds,
-        outgoingEdges,
+        requestEdgeIds: requestEdges.map((edge) => edge.id),
+        outgoingEdges: toEdgeDescriptions(store, outgoingEdges),
         incomingEdges: [],
-        requestEdges,
+        requestEdges: toEdgeDescriptions(store, requestEdges),
       };
     case 'incoming':
       return {
-        ...relation,
+        symbolId,
         outgoingEdgeIds: [],
-        incomingEdgeIds: incomingIds,
+        incomingEdgeIds: incomingEdges.map((edge) => edge.id),
         requestEdgeIds: [],
         outgoingEdges: [],
-        incomingEdges,
+        incomingEdges: toEdgeDescriptions(store, incomingEdges),
         requestEdges: [],
       };
     default:
       return {
-        ...relation,
-        outgoingEdgeIds: outgoingIds,
-        incomingEdgeIds: incomingIds,
-        requestEdgeIds: requestIds,
-        outgoingEdges,
-        incomingEdges,
-        requestEdges,
+        symbolId,
+        outgoingEdgeIds: outgoingEdges.map((edge) => edge.id),
+        incomingEdgeIds: incomingEdges.map((edge) => edge.id),
+        requestEdgeIds: requestEdges.map((edge) => edge.id),
+        outgoingEdges: toEdgeDescriptions(store, outgoingEdges),
+        incomingEdges: toEdgeDescriptions(store, incomingEdges),
+        requestEdges: toEdgeDescriptions(store, requestEdges),
       };
   }
 }
@@ -72,8 +74,6 @@ export function buildInspectorPayload(
   return {
     ...(fileNode?.kind === 'file' ? { file: fileNode } : {}),
     selectedSymbols,
-    relations: selectedSymbols.map((symbol) =>
-      applySelectionToRelation(summarizeSymbolRelations(store, symbol.id), selection)
-    ),
+    relations: selectedSymbols.map((symbol) => buildRelationSummary(store, symbol.id, selection)),
   };
 }
