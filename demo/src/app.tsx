@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { buildGraph } from '../../src/core/graph/graph-builder';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import type { FileLevelView } from '../../src/core/types/projection';
-import { RuntimeCollector } from '../../src/runtime/collector/collector';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
 import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
 import { UserPage } from './pages/user-page';
-import { getRuntimeContext } from './runtime-context';
+import { demoCollector, demoRuntimeSession } from './gori-runtime';
 
 const emptyView: FileLevelView = {
   fileNodes: [],
@@ -17,14 +16,11 @@ const emptyView: FileLevelView = {
 };
 
 export function App() {
-  const collectorRef = useRef(new RuntimeCollector());
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   const [view, setView] = useState<FileLevelView>(emptyView);
 
   useEffect(() => {
-    const collector = collectorRef.current;
     const originalFetch = globalThis.fetch;
-    let sequence = 0;
 
     const demoFetch: typeof fetch = async (input, init) => {
       const url =
@@ -53,14 +49,14 @@ export function App() {
     };
 
     globalThis.fetch = demoFetch;
+    demoCollector.reset();
 
     const detachInterceptor = attachFetchInterceptor({
-      collector,
-      getContext: getRuntimeContext,
-      createEventId: () => `evt-request-${++sequence}`,
+      collector: demoCollector,
+      getContext: () => demoRuntimeSession.getContext(),
     });
 
-    const unsubscribe = collector.subscribe((nextEvents) => {
+    const unsubscribe = demoCollector.subscribe((nextEvents) => {
       setEvents(nextEvents);
       setView(projectToFileLevelView(buildGraph(nextEvents)));
     });
@@ -69,7 +65,7 @@ export function App() {
       unsubscribe();
       detachInterceptor();
       globalThis.fetch = originalFetch;
-      collector.reset();
+      demoCollector.reset();
     };
   }, []);
 

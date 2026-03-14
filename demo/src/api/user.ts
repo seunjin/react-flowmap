@@ -3,10 +3,10 @@ export type DemoUser = {
   name: string;
 };
 
-import { withRuntimeContext } from '../runtime-context';
+import { demoRuntimeSession } from '../gori-runtime';
 
 export async function fetchUser(): Promise<DemoUser> {
-  return withRuntimeContext(
+  return demoRuntimeSession.runWithContext(
     {
       sourceSymbolId: 'symbol:demo/src/api/user.ts#fetchUser',
       traceId: 'demo-trace',
