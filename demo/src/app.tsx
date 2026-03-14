@@ -10,6 +10,7 @@ import type { SelectionMode, SelectionState } from '../../src/core/types/selecti
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import type { FileLevelView } from '../../src/core/types/projection';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
+import { getSymbolAccent } from '../../src/ui/colors/get-symbol-accent';
 import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
 import { UserPage } from './pages/user-page';
 import { demoCollector, demoRuntimeSession } from './gori-runtime';
@@ -35,6 +36,30 @@ function formatSymbolLabel(symbol: SymbolNode): string {
   return `${symbol.name} (${symbol.symbolType})`;
 }
 
+function getEdgePresentation(
+  graphStore: InMemoryGraphStore,
+  edgeId: string
+): { label: string; color: string } | undefined {
+  const runtimeEdge = graphStore
+    .getGraph()
+    .edges.find((candidate) => candidate.id === edgeId && candidate.kind !== 'contains');
+
+  if (!runtimeEdge || runtimeEdge.kind === 'contains') {
+    return undefined;
+  }
+
+  const label = describeRuntimeEdge(graphStore, runtimeEdge);
+
+  if (!label) {
+    return undefined;
+  }
+
+  return {
+    label,
+    color: getSymbolAccent(runtimeEdge.source).border,
+  };
+}
+
 export function App() {
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   const [graph, setGraph] = useState<GoriGraph>(emptyGraph);
@@ -45,19 +70,15 @@ export function App() {
   const inspector = buildInspectorPayload(graph, selection);
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
+  const symbolAccentsById = Object.fromEntries(
+    observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
+  );
   const edgeLabelsById = Object.fromEntries(
     view.fileEdges.map((edge) => [
       edge.id,
       edge.supportingEdges.flatMap((edgeId) => {
-        const runtimeEdge = graphStore.getGraph().edges.find(
-          (candidate) => candidate.id === edgeId && candidate.kind !== 'contains'
-        );
-        const label =
-          runtimeEdge && runtimeEdge.kind !== 'contains'
-            ? describeRuntimeEdge(graphStore, runtimeEdge)
-            : undefined;
-
-        return label ? [label] : [];
+        const presentation = getEdgePresentation(graphStore, edgeId);
+        return presentation ? [presentation] : [];
       }),
     ])
   );
@@ -180,6 +201,7 @@ export function App() {
         view={view}
         selectedSymbolIds={selection.selectedSymbolIds}
         onToggleSymbol={toggleSymbol}
+        symbolAccentsById={symbolAccentsById}
         edgeLabelsById={edgeLabelsById}
       />
 
@@ -246,6 +268,47 @@ export function App() {
           <p style={{ margin: 0, color: '#64748b' }}>
             Observed symbols: <strong>{observedSymbols.length}</strong>
           </p>
+          {selection.selectedSymbolIds.length ? (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {selection.selectedSymbolIds.map((symbolId) => {
+                const symbol = observedSymbols.find((item) => item.id === symbolId);
+                const accent = symbolAccentsById[symbolId];
+
+                if (!symbol || !accent) {
+                  return null;
+                }
+
+                return (
+                  <span
+                    key={symbolId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      padding: '0.35rem 0.6rem',
+                      borderRadius: '999px',
+                      background: accent.soft,
+                      border: `1px solid ${accent.border}`,
+                      color: accent.solid,
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: '0.55rem',
+                        height: '0.55rem',
+                        borderRadius: '999px',
+                        background: accent.border,
+                      }}
+                    />
+                    {symbol.name}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
         </section>
 
         <aside
@@ -279,16 +342,17 @@ export function App() {
 
           {inspector.selectedSymbols.map((symbol) => {
             const relation = inspector.relations.find((item) => item.symbolId === symbol.id);
+            const accent = symbolAccentsById[symbol.id];
 
             return (
               <section
                 key={symbol.id}
                 style={{
                   paddingTop: '0.75rem',
-                  borderTop: '1px solid #e2e8f0',
+                  borderTop: `1px solid ${accent?.border ?? '#e2e8f0'}`,
                 }}
               >
-                <strong>{formatSymbolLabel(symbol)}</strong>
+                <strong style={{ color: accent?.solid }}>{formatSymbolLabel(symbol)}</strong>
                 <small style={{ display: 'block', color: '#64748b', marginTop: '0.25rem' }}>
                   {symbol.id}
                 </small>
@@ -302,7 +366,12 @@ export function App() {
                     <small style={{ color: '#64748b', fontWeight: 600 }}>Outgoing</small>
                     <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
                       {relation.outgoingEdges.map((edge) => (
-                        <li key={edge.edgeId}>{edge.label}</li>
+                        <li
+                          key={edge.edgeId}
+                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
+                        >
+                          {edge.label}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -312,7 +381,12 @@ export function App() {
                     <small style={{ color: '#64748b', fontWeight: 600 }}>Incoming</small>
                     <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
                       {relation.incomingEdges.map((edge) => (
-                        <li key={edge.edgeId}>{edge.label}</li>
+                        <li
+                          key={edge.edgeId}
+                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
+                        >
+                          {edge.label}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -322,7 +396,12 @@ export function App() {
                     <small style={{ color: '#64748b', fontWeight: 600 }}>Requests</small>
                     <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1rem' }}>
                       {relation.requestEdges.map((edge) => (
-                        <li key={edge.edgeId}>{edge.label}</li>
+                        <li
+                          key={edge.edgeId}
+                          style={{ color: getEdgePresentation(graphStore, edge.edgeId)?.color }}
+                        >
+                          {edge.label}
+                        </li>
                       ))}
                     </ul>
                   </div>

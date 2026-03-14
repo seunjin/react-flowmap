@@ -1,16 +1,24 @@
 import type { FileLevelView } from '../../core/types/projection.js';
+import type { SymbolAccent } from '../colors/get-symbol-accent.js';
+
+type EdgeLabel = {
+  label: string;
+  color: string;
+};
 
 type GoriCanvasProps = {
   view: FileLevelView;
   selectedSymbolIds?: string[];
   onToggleSymbol?: (symbolId: string) => void;
-  edgeLabelsById?: Record<string, string[]>;
+  symbolAccentsById?: Record<string, SymbolAccent>;
+  edgeLabelsById?: Record<string, EdgeLabel[]>;
 };
 
 export function GoriCanvas({
   view,
   selectedSymbolIds = [],
   onToggleSymbol,
+  symbolAccentsById = {},
   edgeLabelsById = {},
 }: GoriCanvasProps) {
   return (
@@ -56,11 +64,28 @@ export function GoriCanvas({
                 <small style={{ color: '#475569', fontWeight: 600 }}>Symbols</small>
                 {fileNode.exports.map((item) => {
                   const checked = selectedSymbolIds.includes(item.symbolId);
+                  const accent = symbolAccentsById[item.symbolId];
 
                   if (!onToggleSymbol) {
                     return (
-                      <div key={item.symbolId}>
-                        {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
+                      <div
+                        key={item.symbolId}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        {accent ? (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: '0.6rem',
+                              height: '0.6rem',
+                              borderRadius: '999px',
+                              background: accent.border,
+                            }}
+                          />
+                        ) : null}
+                        <span>
+                          {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
+                        </span>
                       </div>
                     );
                   }
@@ -74,8 +99,10 @@ export function GoriCanvas({
                         gap: '0.55rem',
                         padding: '0.45rem 0.5rem',
                         borderRadius: '0.5rem',
-                        background: checked ? '#f8fafc' : '#ffffff',
-                        border: checked ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                        background: checked ? accent?.soft ?? '#f8fafc' : '#ffffff',
+                        border: checked
+                          ? `1px solid ${accent?.border ?? '#0f172a'}`
+                          : '1px solid #e2e8f0',
                         cursor: 'pointer',
                       }}
                     >
@@ -84,8 +111,21 @@ export function GoriCanvas({
                         checked={checked}
                         onChange={() => onToggleSymbol(item.symbolId)}
                       />
-                      <span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        {accent ? (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: '0.6rem',
+                              height: '0.6rem',
+                              borderRadius: '999px',
+                              background: accent.border,
+                            }}
+                          />
+                        ) : null}
+                        <span>
                         {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
+                        </span>
                       </span>
                     </label>
                   );
@@ -108,14 +148,22 @@ export function GoriCanvas({
               <li key={edge.id}>
                 {edge.sourceFileId} -&gt; {edge.targetFileId} [{edge.relationTypes.join(', ')}]
                 {labels.length ? (
-                <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
+                  <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
                     {labels.map((label) => (
-                    <li key={label} style={{ color: '#475569' }}>
-                      {label}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+                      <li
+                        key={label.label}
+                        style={{
+                          color: label.color,
+                          paddingLeft: '0.25rem',
+                          borderLeft: `3px solid ${label.color}`,
+                          marginBottom: '0.25rem',
+                        }}
+                      >
+                        {label.label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             );
           })}
