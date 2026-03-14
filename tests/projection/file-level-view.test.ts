@@ -50,18 +50,21 @@ describe('projectToFileLevelView', () => {
   it('filters projected edges by selection mode using direct 1-hop symbol relationships', () => {
     const outgoingSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'outgoing',
       hop: 1,
     };
 
     const incomingSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'incoming',
       hop: 1,
     };
 
     const bothSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'both',
       hop: 1,
     };
@@ -115,12 +118,14 @@ describe('projectToFileLevelView', () => {
   it('expands outgoing selections across multiple hops', () => {
     const twoHopSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'outgoing',
       hop: 2,
     };
 
     const threeHopSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'outgoing',
       hop: 3,
     };
@@ -178,6 +183,7 @@ describe('projectToFileLevelView', () => {
   it('expands incoming selections across multiple hops', () => {
     const twoHopSelection: SelectionState = {
       selectedSymbolIds: ['symbol:src/api/user.ts#fetchUser'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'incoming',
       hop: 2,
     };
@@ -200,6 +206,34 @@ describe('projectToFileLevelView', () => {
         supportingEdges: [
           'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
         ],
+      },
+    ]);
+  });
+
+  it('filters projected edges by selected runtime edge kinds', () => {
+    const selection: SelectionState = {
+      selectedSymbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
+      selectedEdgeKinds: ['use', 'request'],
+      mode: 'outgoing',
+      hop: 3,
+    };
+
+    expect(projectToFileLevelView(requestUserFlow, selection).fileEdges).toEqual([
+      {
+        id: 'file-edge:file:src/pages/user-page.tsx->file:src/hooks/use-user.ts',
+        sourceFileId: 'file:src/pages/user-page.tsx',
+        targetFileId: 'file:src/hooks/use-user.ts',
+        relationTypes: ['use'],
+        supportingEdges: [
+          'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+        ],
+      },
+      {
+        id: 'file-edge:file:src/api/user.ts->api:GET:/api/user',
+        sourceFileId: 'file:src/api/user.ts',
+        targetFileId: 'api:GET:/api/user',
+        relationTypes: ['request'],
+        supportingEdges: ['request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user'],
       },
     ]);
   });

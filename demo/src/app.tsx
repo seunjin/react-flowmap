@@ -6,7 +6,7 @@ import { describeRuntimeEdge } from '../../src/core/inspector/describe-runtime-e
 import { InMemoryGraphStore } from '../../src/core/graph/in-memory-graph-store';
 import { projectToFileLevelView } from '../../src/core/projection/project-to-file-level-view';
 import type { GoriGraph, SymbolNode } from '../../src/core/types/graph';
-import type { SelectionMode, SelectionState } from '../../src/core/types/selection';
+import type { RuntimeEdgeKind, SelectionMode, SelectionState } from '../../src/core/types/selection';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import type { FileLevelView } from '../../src/core/types/projection';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
@@ -28,6 +28,7 @@ const emptyGraph: GoriGraph = {
 
 const initialSelection: SelectionState = {
   selectedSymbolIds: [],
+  selectedEdgeKinds: ['render', 'use', 'call', 'request'],
   mode: 'both',
   hop: 1,
 };
@@ -165,6 +166,15 @@ export function App() {
     }));
   }
 
+  function toggleEdgeKind(kind: RuntimeEdgeKind): void {
+    setSelection((current) => ({
+      ...current,
+      selectedEdgeKinds: current.selectedEdgeKinds.includes(kind)
+        ? current.selectedEdgeKinds.filter((value) => value !== kind)
+        : [...current.selectedEdgeKinds, kind],
+    }));
+  }
+
   function resetSelection(): void {
     setSelection(initialSelection);
   }
@@ -293,10 +303,40 @@ export function App() {
             ))}
           </div>
 
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <strong style={{ fontSize: '0.875rem' }}>edges</strong>
+            {(['render', 'use', 'call', 'request'] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => toggleEdgeKind(kind)}
+                style={{
+                  padding: '0.45rem 0.7rem',
+                  borderRadius: '999px',
+                  border: selection.selectedEdgeKinds.includes(kind)
+                    ? '1px solid #0f172a'
+                    : '1px solid #cbd5e1',
+                  background: selection.selectedEdgeKinds.includes(kind) ? '#0f172a' : '#ffffff',
+                  color: selection.selectedEdgeKinds.includes(kind) ? '#f8fafc' : '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                {kind}
+              </button>
+            ))}
+          </div>
+
           <p style={{ margin: 0, color: '#64748b' }}>
             Observed symbols: <strong>{observedSymbols.length}</strong> · current hop:{' '}
-            <strong>{selection.hop}</strong>
+            <strong>{selection.hop}</strong> · active edges:{' '}
+            <strong>{selection.selectedEdgeKinds.length}</strong>
           </p>
+          {selection.selectedEdgeKinds.length === 0 ? (
+            <p style={{ margin: 0, color: '#b45309' }}>
+              All runtime edge kinds are disabled. Re-enable at least one kind to project file
+              edges.
+            </p>
+          ) : null}
           {selection.selectedSymbolIds.length ? (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {selection.selectedSymbolIds.map((symbolId) => {

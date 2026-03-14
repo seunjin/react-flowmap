@@ -15,8 +15,8 @@ export function summarizeSymbolRelations(
 
   return {
     symbolId,
-    outgoingEdgeIds: outgoingEdges.map((edge) => edge.id),
-    incomingEdgeIds: incomingEdges.map((edge) => edge.id),
+    outgoingEdgeIds: outgoingRuntimeEdges.map((edge) => edge.id),
+    incomingEdgeIds: incomingRuntimeEdges.map((edge) => edge.id),
     requestEdgeIds: requestEdges.map((edge) => edge.id),
     outgoingEdges: outgoingRuntimeEdges.flatMap((edge) => {
       const label = describeRuntimeEdge(store, edge);

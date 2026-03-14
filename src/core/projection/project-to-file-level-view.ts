@@ -1,6 +1,6 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
 import type { GoriGraph, RuntimeEdge } from '../types/graph.js';
-import type { SelectionState } from '../types/selection.js';
+import type { RuntimeEdgeKind, SelectionState } from '../types/selection.js';
 import type { FileEdge, FileLevelView } from '../types/projection.js';
 
 import { buildFileEdge } from './build-file-edge.js';
@@ -39,6 +39,14 @@ function normalizeHop(selection?: SelectionState): number {
   }
 
   return Math.max(1, Math.floor(selection.hop));
+}
+
+function normalizeEdgeKinds(selection?: SelectionState): Set<RuntimeEdgeKind> {
+  if (!selection) {
+    return new Set(['render', 'use', 'call', 'request']);
+  }
+
+  return new Set(selection.selectedEdgeKinds);
 }
 
 function collectOutgoingEdges(
@@ -119,24 +127,28 @@ function getSelectedRuntimeEdges(
   store: InMemoryGraphStore,
   selection?: SelectionState
 ): RuntimeEdge[] {
+  const allowedEdgeKinds = normalizeEdgeKinds(selection);
+
   if (!selection || selection.selectedSymbolIds.length === 0) {
-    return store.getRuntimeEdges();
+    return store.getRuntimeEdges().filter((edge) => allowedEdgeKinds.has(edge.kind));
   }
 
   const hop = normalizeHop(selection);
+  const filterAllowed = (edges: RuntimeEdge[]) =>
+    edges.filter((edge) => allowedEdgeKinds.has(edge.kind));
 
   switch (selection.mode) {
     case 'outgoing':
-      return collectOutgoingEdges(store, selection.selectedSymbolIds, hop);
+      return filterAllowed(collectOutgoingEdges(store, selection.selectedSymbolIds, hop));
     case 'incoming':
-      return collectIncomingEdges(store, selection.selectedSymbolIds, hop);
+      return filterAllowed(collectIncomingEdges(store, selection.selectedSymbolIds, hop));
     default:
       return [
         ...new Map(
-          [...collectOutgoingEdges(store, selection.selectedSymbolIds, hop), ...collectIncomingEdges(store, selection.selectedSymbolIds, hop)].map((edge) => [
-            edge.id,
-            edge,
-          ])
+          filterAllowed([
+            ...collectOutgoingEdges(store, selection.selectedSymbolIds, hop),
+            ...collectIncomingEdges(store, selection.selectedSymbolIds, hop),
+          ]).map((edge) => [edge.id, edge])
         ).values(),
       ];
   }

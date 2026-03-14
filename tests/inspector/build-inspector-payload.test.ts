@@ -9,6 +9,7 @@ describe('buildInspectorPayload', () => {
     const selection: SelectionState = {
       selectedSymbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
       selectedFileId: 'file:src/hooks/use-user.ts',
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'both',
       hop: 1,
     };
@@ -36,7 +37,6 @@ describe('buildInspectorPayload', () => {
           'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
         ],
         incomingEdgeIds: [
-          'contains:file:src/hooks/use-user.ts->symbol:src/hooks/use-user.ts#useUser',
           'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
         ],
         requestEdgeIds: [],
@@ -60,6 +60,7 @@ describe('buildInspectorPayload', () => {
   it('captures request edges for selected request-producing symbols', () => {
     const selection: SelectionState = {
       selectedSymbolIds: ['symbol:src/api/user.ts#fetchUser'],
+      selectedEdgeKinds: ['render', 'use', 'call', 'request'],
       mode: 'outgoing',
       hop: 1,
     };
@@ -74,10 +75,7 @@ describe('buildInspectorPayload', () => {
       {
         symbolId: 'symbol:src/api/user.ts#fetchUser',
         outgoingEdgeIds: ['request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user'],
-        incomingEdgeIds: [
-          'contains:file:src/api/user.ts->symbol:src/api/user.ts#fetchUser',
-          'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
-        ],
+        incomingEdgeIds: [],
         requestEdgeIds: ['request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user'],
         outgoingEdges: [
           {
@@ -85,18 +83,43 @@ describe('buildInspectorPayload', () => {
             label: 'fetchUser --request--> GET /api/user',
           },
         ],
-        incomingEdges: [
-          {
-            edgeId: 'call:symbol:src/hooks/use-user.ts#useUser->symbol:src/api/user.ts#fetchUser',
-            label: 'useUser --call--> fetchUser',
-          },
-        ],
+        incomingEdges: [],
         requestEdges: [
           {
             edgeId: 'request:symbol:src/api/user.ts#fetchUser->api:GET:/api/user',
             label: 'fetchUser --request--> GET /api/user',
           },
         ],
+      },
+    ]);
+  });
+
+  it('filters inspector relations by selected edge kinds', () => {
+    const selection: SelectionState = {
+      selectedSymbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
+      selectedEdgeKinds: ['use'],
+      mode: 'both',
+      hop: 1,
+    };
+
+    const payload = buildInspectorPayload(requestUserFlow, selection);
+
+    expect(payload.relations).toEqual([
+      {
+        symbolId: 'symbol:src/hooks/use-user.ts#useUser',
+        outgoingEdgeIds: [],
+        incomingEdgeIds: [
+          'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+        ],
+        requestEdgeIds: [],
+        outgoingEdges: [],
+        incomingEdges: [
+          {
+            edgeId: 'use:symbol:src/pages/user-page.tsx#UserPage->symbol:src/hooks/use-user.ts#useUser',
+            label: 'UserPage --use--> useUser',
+          },
+        ],
+        requestEdges: [],
       },
     ]);
   });

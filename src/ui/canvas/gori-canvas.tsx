@@ -171,42 +171,48 @@ export function GoriCanvas({
 
       <section>
         <h3 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>File Edges</h3>
-        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-          {view.fileEdges.map((edge) => {
-            const labels = edgeLabelsById[edge.id] ?? [];
-            const sourceLabel =
-              fileLabelsById[edge.sourceFileId] ??
-              apiLabelsById[edge.sourceFileId] ??
-              edge.sourceFileId;
-            const targetLabel =
-              fileLabelsById[edge.targetFileId] ??
-              apiLabelsById[edge.targetFileId] ??
-              edge.targetFileId;
+        {view.fileEdges.length ? (
+          <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+            {view.fileEdges.map((edge) => {
+              const labels = edgeLabelsById[edge.id] ?? [];
+              const sourceLabel =
+                fileLabelsById[edge.sourceFileId] ??
+                apiLabelsById[edge.sourceFileId] ??
+                edge.sourceFileId;
+              const targetLabel =
+                fileLabelsById[edge.targetFileId] ??
+                apiLabelsById[edge.targetFileId] ??
+                edge.targetFileId;
 
-            return (
-              <li key={edge.id}>
-                {sourceLabel} -&gt; {targetLabel} [{edge.relationTypes.join(', ')}]
-                {labels.length ? (
-                  <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
-                    {labels.map((label) => (
-                      <li
-                        key={label.label}
-                        style={{
-                          color: label.color,
-                          paddingLeft: '0.25rem',
-                          borderLeft: `3px solid ${label.color}`,
-                          marginBottom: '0.25rem',
-                        }}
-                      >
-                        {label.label}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+              return (
+                <li key={edge.id}>
+                  {sourceLabel} -&gt; {targetLabel} [{edge.relationTypes.join(', ')}]
+                  {labels.length ? (
+                    <ul style={{ marginTop: '0.35rem', paddingLeft: '1rem' }}>
+                      {labels.map((label) => (
+                        <li
+                          key={label.label}
+                          style={{
+                            color: label.color,
+                            paddingLeft: '0.25rem',
+                            borderLeft: `3px solid ${label.color}`,
+                            marginBottom: '0.25rem',
+                          }}
+                        >
+                          {label.label}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: '#64748b' }}>
+            No projected file edges match the current symbol, hop, and edge filters.
+          </p>
+        )}
       </section>
     </section>
   );
