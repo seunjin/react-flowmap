@@ -467,6 +467,8 @@ export function App() {
         <section style={{ display: 'grid', gap: '1rem' }}>
           <GoriReactFlowCanvas
             graph={reactFlowGraph}
+            selectedSymbolIds={selection.selectedSymbolIds}
+            onToggleSymbol={toggleSymbol}
             onNodeClick={handleFlowNodeClick}
             onEdgeClick={handleFlowEdgeClick}
           />

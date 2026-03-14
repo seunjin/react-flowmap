@@ -29,6 +29,14 @@ describe('projectToReactFlow', () => {
           subtitle: 'src/pages/user-page.tsx',
           fileId: 'file:src/pages/user-page.tsx',
           symbolIds: ['symbol:src/pages/user-page.tsx#UserPage'],
+          exports: [
+            {
+              symbolId: 'symbol:src/pages/user-page.tsx#UserPage',
+              name: 'UserPage',
+              symbolType: 'component',
+              exported: true,
+            },
+          ],
           exportCount: 1,
         },
       },
@@ -42,6 +50,14 @@ describe('projectToReactFlow', () => {
           subtitle: 'src/hooks/use-user.ts',
           fileId: 'file:src/hooks/use-user.ts',
           symbolIds: ['symbol:src/hooks/use-user.ts#useUser'],
+          exports: [
+            {
+              symbolId: 'symbol:src/hooks/use-user.ts#useUser',
+              name: 'useUser',
+              symbolType: 'hook',
+              exported: true,
+            },
+          ],
           exportCount: 1,
         },
       },
@@ -55,6 +71,14 @@ describe('projectToReactFlow', () => {
           subtitle: 'src/api/user.ts',
           fileId: 'file:src/api/user.ts',
           symbolIds: ['symbol:src/api/user.ts#fetchUser'],
+          exports: [
+            {
+              symbolId: 'symbol:src/api/user.ts#fetchUser',
+              name: 'fetchUser',
+              symbolType: 'function',
+              exported: true,
+            },
+          ],
           exportCount: 1,
         },
       },

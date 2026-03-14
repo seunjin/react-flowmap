@@ -1,4 +1,5 @@
 import type { FileEdgeLayer, FileLevelView } from '../../core/types/projection.js';
+import type { ExportRef } from '../../core/types/static-metadata.js';
 
 export type ReactFlowPosition = {
   x: number;
@@ -11,6 +12,9 @@ export type ReactFlowNodeData = {
   subtitle: string;
   fileId?: string;
   symbolIds?: string[];
+  exports?: ExportRef[];
+  selectedSymbolIds?: string[];
+  onToggleSymbol?: (symbolId: string) => void;
   exportCount?: number;
 };
 
@@ -142,6 +146,7 @@ export function projectToReactFlow(
         subtitle: node.path,
         fileId: node.id,
         symbolIds: node.exports.map((item) => item.symbolId),
+        exports: node.exports,
         exportCount: node.exports.length,
       },
     })),

@@ -14,23 +14,27 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { getSymbolAccent } from '../colors/get-symbol-accent.js';
 import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './project-to-react-flow.js';
 
 type GoriReactFlowCanvasProps = {
   graph: ReactFlowGraph;
   height?: number;
+  selectedSymbolIds?: string[];
+  onToggleSymbol?: (symbolId: string) => void;
   onNodeClick?: (node: ReactFlowGraph['nodes'][number]) => void;
   onEdgeClick?: (edge: ReactFlowGraph['edges'][number]) => void;
 };
 
 function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
   const isApi = data.kind === 'api';
+  const selectedSymbolIds = data.selectedSymbolIds ?? [];
 
   return (
     <div
       style={{
-        minWidth: 220,
-        maxWidth: 260,
+        minWidth: 260,
+        maxWidth: 320,
         padding: '0.85rem 0.95rem',
         borderRadius: '0.9rem',
         border: isApi ? '1px solid #7dd3fc' : '1px solid #cbd5e1',
@@ -58,6 +62,64 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
             exports {data.exportCount}
           </span>
         ) : null}
+        {data.kind === 'file' && data.exports?.length ? (
+          <div
+            style={{
+              display: 'grid',
+              gap: '0.4rem',
+              marginTop: '0.35rem',
+              paddingTop: '0.55rem',
+              borderTop: '1px solid #e2e8f0',
+            }}
+          >
+            <small style={{ color: '#475569', fontWeight: 700 }}>Exports</small>
+            {data.exports.map((item) => {
+              const checked = selectedSymbolIds.includes(item.symbolId);
+              const accent = getSymbolAccent(item.symbolId);
+
+              return (
+                <label
+                  key={item.symbolId}
+                  onClick={(event) => event.stopPropagation()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.42rem 0.5rem',
+                    borderRadius: '0.65rem',
+                    border: checked ? `1px solid ${accent.border}` : '1px solid #e2e8f0',
+                    background: checked ? accent.soft : '#ffffff',
+                    cursor: data.onToggleSymbol ? 'pointer' : 'default',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => data.onToggleSymbol?.(item.symbolId)}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: '0.55rem',
+                      height: '0.55rem',
+                      borderRadius: '999px',
+                      background: accent.border,
+                    }}
+                  />
+                  <span style={{ display: 'grid', gap: '0.12rem' }}>
+                    <span style={{ color: '#0f172a', fontSize: '0.84rem', fontWeight: 600 }}>
+                      {item.name}
+                    </span>
+                    <span style={{ color: '#64748b', fontSize: '0.72rem' }}>
+                      {item.symbolType}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       <Handle type="source" position={Position.Right} style={{ background: '#0f172a' }} />
     </div>
@@ -69,12 +131,24 @@ const nodeTypes = {
   api: GoriFlowNode,
 };
 
-function toFlowNodes(graph: ReactFlowGraph): Node<ReactFlowNodeData>[] {
+function toFlowNodes(
+  graph: ReactFlowGraph,
+  selectedSymbolIds: string[],
+  onToggleSymbol?: (symbolId: string) => void
+): Node<ReactFlowNodeData>[] {
   return graph.nodes.map((node) => ({
     id: node.id,
     type: node.type,
     position: node.position,
-    data: node.data,
+    data: {
+      ...node.data,
+      ...(node.data.kind === 'file'
+        ? {
+            selectedSymbolIds,
+            ...(onToggleSymbol ? { onToggleSymbol } : {}),
+          }
+        : {}),
+    },
     draggable: false,
   }));
 }
@@ -118,10 +192,12 @@ function toFlowEdges(graph: ReactFlowGraph): Edge<ReactFlowEdgeData>[] {
 export function GoriReactFlowCanvas({
   graph,
   height = 520,
+  selectedSymbolIds = [],
+  onToggleSymbol,
   onNodeClick,
   onEdgeClick,
 }: GoriReactFlowCanvasProps) {
-  const nodes = toFlowNodes(graph);
+  const nodes = toFlowNodes(graph, selectedSymbolIds, onToggleSymbol);
   const edges = toFlowEdges(graph);
   const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node] as const));
   const graphEdgeById = new Map(graph.edges.map((edge) => [edge.id, edge] as const));
