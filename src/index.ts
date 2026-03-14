@@ -8,3 +8,4 @@ export * from './runtime/events/index.js';
 export * from './runtime/tracing/index.js';
 export * from './ui/canvas/index.js';
 export * from './ui/events/index.js';
+export * from './ui/react-flow/index.js';
