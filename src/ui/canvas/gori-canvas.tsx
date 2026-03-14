@@ -2,9 +2,15 @@ import type { FileLevelView } from '../../core/types/projection.js';
 
 type GoriCanvasProps = {
   view: FileLevelView;
+  selectedSymbolIds?: string[];
+  onToggleSymbol?: (symbolId: string) => void;
 };
 
-export function GoriCanvas({ view }: GoriCanvasProps) {
+export function GoriCanvas({
+  view,
+  selectedSymbolIds = [],
+  onToggleSymbol,
+}: GoriCanvasProps) {
   return (
     <section
       style={{
@@ -43,13 +49,49 @@ export function GoriCanvas({ view }: GoriCanvasProps) {
             <strong style={{ display: 'block' }}>{fileNode.name}</strong>
             <small style={{ color: '#64748b' }}>{fileNode.path}</small>
             <hr style={{ margin: '0.75rem 0', border: 0, borderTop: '1px solid #e2e8f0' }} />
-            <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-              {fileNode.exports.map((item) => (
-                <li key={item.symbolId}>
-                  {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
-                </li>
-              ))}
-            </ul>
+            {fileNode.exports.length > 0 ? (
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                <small style={{ color: '#475569', fontWeight: 600 }}>Symbols</small>
+                {fileNode.exports.map((item) => {
+                  const checked = selectedSymbolIds.includes(item.symbolId);
+
+                  if (!onToggleSymbol) {
+                    return (
+                      <div key={item.symbolId}>
+                        {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <label
+                      key={item.symbolId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.55rem',
+                        padding: '0.45rem 0.5rem',
+                        borderRadius: '0.5rem',
+                        background: checked ? '#f8fafc' : '#ffffff',
+                        border: checked ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleSymbol(item.symbolId)}
+                      />
+                      <span>
+                        {item.name} <em style={{ color: '#64748b' }}>({item.symbolType})</em>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <small style={{ color: '#94a3b8' }}>No observed symbols yet.</small>
+            )}
           </article>
         ))}
       </div>

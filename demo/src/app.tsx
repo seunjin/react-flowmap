@@ -156,7 +156,11 @@ export function App() {
       </header>
 
       <UserPage />
-      <GoriCanvas view={view} />
+      <GoriCanvas
+        view={view}
+        selectedSymbolIds={selection.selectedSymbolIds}
+        onToggleSymbol={toggleSymbol}
+      />
 
       <section
         style={{
@@ -178,7 +182,8 @@ export function App() {
           <header>
             <h2 style={{ margin: 0, fontSize: '1rem' }}>Selection Controls</h2>
             <p style={{ margin: '0.5rem 0 0', color: '#475569' }}>
-              Select observed symbols to re-project the file graph using the current selection mode.
+              Toggle symbols inside each file node and use the mode controls here to re-project the
+              graph.
             </p>
           </header>
 
@@ -217,43 +222,9 @@ export function App() {
             </button>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '0.75rem',
-            }}
-          >
-            {observedSymbols.map((symbol) => {
-              const checked = selection.selectedSymbolIds.includes(symbol.id);
-
-              return (
-                <label
-                  key={symbol.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    borderRadius: '0.75rem',
-                    border: checked ? '1px solid #0f172a' : '1px solid #e2e8f0',
-                    background: checked ? '#f8fafc' : '#ffffff',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleSymbol(symbol.id)}
-                  />
-                  <span>
-                    <strong>{formatSymbolLabel(symbol)}</strong>
-                    <small style={{ display: 'block', color: '#64748b' }}>{symbol.fileId}</small>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            Observed symbols: <strong>{observedSymbols.length}</strong>
+          </p>
         </section>
 
         <aside

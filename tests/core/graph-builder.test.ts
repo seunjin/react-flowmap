@@ -13,7 +13,14 @@ describe('buildGraph', () => {
         kind: 'file',
         path: 'src/pages/user-page.tsx',
         name: 'user-page.tsx',
-        exports: [],
+        exports: [
+          {
+            symbolId: 'symbol:src/pages/user-page.tsx#UserPage',
+            name: 'UserPage',
+            symbolType: 'component',
+            exported: false,
+          },
+        ],
       },
       {
         id: 'symbol:src/pages/user-page.tsx#UserPage',
@@ -28,7 +35,14 @@ describe('buildGraph', () => {
         kind: 'file',
         path: 'src/components/user-card.tsx',
         name: 'user-card.tsx',
-        exports: [],
+        exports: [
+          {
+            symbolId: 'symbol:src/components/user-card.tsx#UserCard',
+            name: 'UserCard',
+            symbolType: 'component',
+            exported: false,
+          },
+        ],
       },
       {
         id: 'symbol:src/components/user-card.tsx#UserCard',
@@ -43,7 +57,14 @@ describe('buildGraph', () => {
         kind: 'file',
         path: 'src/hooks/use-user.ts',
         name: 'use-user.ts',
-        exports: [],
+        exports: [
+          {
+            symbolId: 'symbol:src/hooks/use-user.ts#useUser',
+            name: 'useUser',
+            symbolType: 'hook',
+            exported: false,
+          },
+        ],
       },
       {
         id: 'symbol:src/hooks/use-user.ts#useUser',
@@ -58,7 +79,14 @@ describe('buildGraph', () => {
         kind: 'file',
         path: 'src/api/user.ts',
         name: 'user.ts',
-        exports: [],
+        exports: [
+          {
+            symbolId: 'symbol:src/api/user.ts#fetchUser',
+            name: 'fetchUser',
+            symbolType: 'function',
+            exported: false,
+          },
+        ],
       },
       {
         id: 'symbol:src/api/user.ts#fetchUser',

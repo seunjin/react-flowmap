@@ -11,6 +11,7 @@ import type {
   RuntimeEdge,
   SymbolNode,
 } from '../types/graph.js';
+import type { ExportRef } from '../types/static-metadata.js';
 import type { RuntimeEvent } from '../types/runtime-events.js';
 
 function getFileName(path: string): string {
@@ -70,10 +71,33 @@ function ensureFileNode(state: BuilderState, fileIdOrPath: string): FileNode {
   return node;
 }
 
+function ensureFileExportRef(fileNode: FileNode, symbolNode: SymbolNode): void {
+  const alreadyPresent = fileNode.exports.some((entry) => entry.symbolId === symbolNode.id);
+
+  if (alreadyPresent) {
+    return;
+  }
+
+  const exportRef: ExportRef = {
+    symbolId: symbolNode.id,
+    name: symbolNode.name,
+    symbolType: symbolNode.symbolType,
+    exported: symbolNode.exported,
+  };
+
+  fileNode.exports.push(exportRef);
+}
+
 function ensureSymbolNode(state: BuilderState, symbolId: string): SymbolNode | undefined {
   const existing = state.nodes.get(symbolId);
 
   if (existing?.kind === 'symbol') {
+    const fileNode = state.nodes.get(existing.fileId);
+
+    if (fileNode?.kind === 'file') {
+      ensureFileExportRef(fileNode, existing);
+    }
+
     return existing;
   }
 
@@ -95,6 +119,7 @@ function ensureSymbolNode(state: BuilderState, symbolId: string): SymbolNode | u
   };
 
   addNode(state, node);
+  ensureFileExportRef(fileNode, node);
   addEdge(state, {
     id: `contains:${fileNode.id}->${symbolId}`,
     kind: 'contains',
