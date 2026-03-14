@@ -13,6 +13,7 @@ import type { FileLevelView } from '../../src/core/types/projection';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
 import { getSymbolAccent } from '../../src/ui/colors/get-symbol-accent';
 import { GoriCanvas } from '../../src/ui/canvas/gori-canvas';
+import { buildRuntimeTimeline } from '../../src/ui/events/build-runtime-timeline';
 import { UserPage } from './pages/user-page';
 import { demoCollector, demoRuntimeSession } from './gori-runtime';
 
@@ -76,6 +77,7 @@ export function App() {
   const graphStore = new InMemoryGraphStore();
   graphStore.addGraph(graph);
   const edgeLayers = projectToFileEdgeLayers(graph, selection);
+  const timeline = buildRuntimeTimeline(graph, events);
   const symbolAccentsById = Object.fromEntries(
     observedSymbols.map((symbol) => [symbol.id, getSymbolAccent(symbol.id)])
   );
@@ -593,21 +595,99 @@ export function App() {
           style={{
             padding: '1rem',
             borderRadius: '1rem',
-            background: '#0f172a',
-            color: '#e2e8f0',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            color: '#0f172a',
+            display: 'grid',
+            gap: '0.75rem',
           }}
         >
-          <h2 style={{ marginTop: 0, fontSize: '1rem' }}>Collected Runtime Events</h2>
-          <pre
-            style={{
-              marginBottom: 0,
-              overflowX: 'auto',
-              fontSize: '0.875rem',
-              lineHeight: 1.5,
-            }}
-          >
-            {JSON.stringify(events, null, 2)}
-          </pre>
+          <header>
+            <h2 style={{ marginTop: 0, marginBottom: '0.35rem', fontSize: '1rem' }}>
+              Runtime Timeline
+            </h2>
+            <p style={{ margin: 0, color: '#475569' }}>
+              Ordered execution trace for the current demo session.
+            </p>
+          </header>
+          {timeline.length ? (
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {timeline.map((item) => (
+                <article
+                  key={item.id}
+                  style={{
+                    display: 'grid',
+                    gap: '0.45rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: '0.85rem',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <strong>{item.title}</strong>
+                    <span
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '999px',
+                        background: '#e2e8f0',
+                        color: '#334155',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      +{item.relativeMs}ms
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: '0.22rem 0.5rem',
+                        borderRadius: '999px',
+                        background: '#0f172a',
+                        color: '#f8fafc',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {item.eventType}
+                    </span>
+                    {item.detail ? (
+                      <span style={{ color: '#475569', fontSize: '0.875rem' }}>{item.detail}</span>
+                    ) : null}
+                    {item.traceId ? (
+                      <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                        trace: {item.traceId}
+                      </span>
+                    ) : null}
+                    {item.sessionId ? (
+                      <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                        session: {item.sessionId}
+                      </span>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p style={{ margin: 0, color: '#64748b' }}>No runtime events collected yet.</p>
+          )}
         </section>
       ) : null}
     </main>
