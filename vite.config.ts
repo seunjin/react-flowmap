@@ -2,11 +2,12 @@ import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { goriInspect } from './src/vite-plugin/index.js';
 
 const libraryEntry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 
 export default defineConfig(({ mode }) => ({
-  plugins: react(),
+  plugins: [goriInspect(), react()],
   ...(mode === 'demo'
     ? {}
     : {

@@ -178,6 +178,31 @@ Projection 결과를 실제 UI로 렌더링합니다.
 
 ---
 
+### 7. Component Overlay Inspector
+
+앱 화면 위에서 직접 컴포넌트를 탐색하는 개발 도구입니다.
+
+구성:
+
+- **Vite 플러그인** (`src/vite-plugin/`) — 빌드 타임에 다음을 자동 주입:
+  - `data-gori-id`, `data-gori-loc` DOM 속성 (hover 탐색용)
+  - `useContext(__GoriCtx)` + `__useGoriRecord()` 훅 (렌더 추적용)
+  - `<__GoriCtx.Provider>` 래핑 (부모-자식 관계 자동 전달)
+  - 개발 서버 미들웨어 `/__gori-open` (에디터 오픈)
+- **Runtime Context** (`src/runtime/gori-context.ts`) — `__GoriCtx`, `__useGoriRecord`, `__goriCollector`, `__goriSession` 싱글턴
+- **Component Overlay UI** (`demo/src/component-overlay.tsx`) — hover/select 박스, 폴더 트리 사이드바
+
+동작 원리:
+
+1. Vite 플러그인이 각 컴포넌트 함수에 `data-gori-id` 주입 + Context Provider로 감쌈
+2. 앱 실행 중 컴포넌트가 렌더될 때 `__useGoriRecord`가 parent-child 관계를 `__goriCollector`에 기록
+3. Inspector 활성화 시 `document.elementsFromPoint`로 커서 아래 컴포넌트 스택 탐색
+4. 컴포넌트 선택 시 `/__gori-open` 엔드포인트를 통해 에디터에서 해당 파일 오픈
+
+프로덕션 빌드에서는 Vite 플러그인의 `transform`이 `isDev = false`일 때 즉시 반환되어 어떠한 코드도 번들에 포함되지 않습니다.
+
+---
+
 ## Core Data Model
 
 Gori v1의 최소 그래프 모델은 다음 세 종류의 node와 다섯 종류의 edge를 가집니다.

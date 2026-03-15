@@ -359,30 +359,41 @@ src/ui/inspector/
 
 ## `demo/` Structure
 
-추천 구조:
+현재 데모는 FSD(Feature-Sliced Design) 구조의 e-커머스 앱입니다.
 
 ```text
 demo/
   src/
-    api/
-      user.ts
-    hooks/
-      use-user.ts
+    entities/
+      product/        — ProductCard, ProductBadge, ProductPrice
+      cart/           — CartItem
+      user/           — UserMenu
+    features/
+      category-filter.tsx
+      add-to-cart.tsx
+      quantity-control.tsx
+    widgets/
+      product-catalog.tsx
+      product-detail.tsx
+      cart-summary.tsx
     pages/
-      user-page.tsx
-    components/
-      user-card.tsx
+      home-page.tsx
+      product-page.tsx
+      cart-page.tsx
+    shared/
+      types.ts
+      api/
+    app.tsx
     main.tsx
+    component-overlay.tsx   — Inspector UI (hover/select/editor open)
+    gori-runtime.ts         — __goriCollector, __goriSession re-export
 ```
 
-초기 데모 목표:
+데모 목표:
 
-- `component -> hook`
-- `hook -> function`
-- `function -> request`
-- same-file relation 예제
-
-이 데모는 문서 예제와 최대한 닮아야 합니다.
+- 실제 프로젝트 수준의 FSD 구조에서 Inspector 동작 검증
+- 리스트 아이템 등 동일 컴포넌트 다중 인스턴스 시나리오 포함
+- API 호출 추적 (`/api/products`, `/api/cart` 등)
 
 ---
 
