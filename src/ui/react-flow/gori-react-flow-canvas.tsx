@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
 import {
   Background,
+  BackgroundVariant,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
-  MiniMap,
   Position,
   ReactFlow,
+  getSmoothStepPath,
   type EdgeMouseHandler,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeMouseHandler,
   type NodeProps,
@@ -17,7 +21,18 @@ import '@xyflow/react/dist/style.css';
 
 import { getSymbolAccent } from '../colors/get-symbol-accent.js';
 import { filterNodeExports } from './filter-node-exports.js';
+import { FSD_LAYER_ACCENT } from './project-to-react-flow.js';
 import type { ReactFlowEdgeData, ReactFlowGraph, ReactFlowNodeData } from './project-to-react-flow.js';
+
+const API_COLLECTION_ID = 'api-collection';
+
+const HTTP_COLORS: Record<string, { bg: string; color: string }> = {
+  GET:    { bg: '#dcfce7', color: '#15803d' },
+  POST:   { bg: '#dbeafe', color: '#1d4ed8' },
+  PUT:    { bg: '#fef9c3', color: '#b45309' },
+  PATCH:  { bg: '#f3e8ff', color: '#7e22ce' },
+  DELETE: { bg: '#fee2e2', color: '#b91c1c' },
+};
 
 type GoriReactFlowCanvasProps = {
   graph: ReactFlowGraph;
@@ -52,205 +67,408 @@ function GoriFlowNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
   );
 
   if (isFolder) {
+    const isAncestor = data.isAncestor === true;
     return (
       <div
         style={{
           width: data.width ?? 320,
           height: data.height ?? 220,
-          borderRadius: '1.15rem',
-          border: '1px solid rgba(148, 163, 184, 0.35)',
-          background: 'rgba(226, 232, 240, 0.22)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.65)',
-          padding: '0.9rem 1rem',
+          borderRadius: isAncestor ? '18px' : '12px',
+          border: isAncestor
+            ? '1.5px dashed rgba(148,163,184,0.3)'
+            : '1px solid rgba(148,163,184,0.22)',
+          background: isAncestor
+            ? 'rgba(241,245,249,0.18)'
+            : 'rgba(241,245,249,0.5)',
+          boxShadow: isAncestor ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.8)',
+          padding: '10px 12px',
           display: 'grid',
           alignContent: 'start',
-          gap: '0.25rem',
+          gap: '3px',
           pointerEvents: 'none',
         }}
       >
-        <strong style={{ color: '#334155', fontSize: '0.95rem' }}>{data.label}</strong>
-        <small style={{ color: '#64748b' }}>{data.subtitle}</small>
+        <strong
+          style={{
+            color: isAncestor ? '#94a3b8' : '#475569',
+            fontSize: isAncestor ? '11px' : '12px',
+            fontWeight: isAncestor ? 500 : 600,
+            letterSpacing: isAncestor ? '0.04em' : undefined,
+            textTransform: isAncestor ? 'uppercase' : undefined,
+          }}
+        >
+          {data.label}
+        </strong>
+        {!isAncestor && (
+          <small style={{ color: '#94a3b8', fontSize: '11px' }}>{data.subtitle}</small>
+        )}
       </div>
     );
   }
 
+  // ── API 컬렉션 카드 ─────────────────────────────────────────────────────────
+  if (isApi && data.apiEndpoints && data.apiEndpoints.length > 0) {
+    return (
+      <div style={{ minWidth: 240, borderRadius: '10px', border: '1px solid #93c5fd', background: '#eff6ff', boxShadow: '0 2px 8px rgba(15,23,42,0.06)', overflow: 'hidden' }}>
+        <Handle type="target" position={Position.Left} style={{ background: '#93c5fd', border: 'none', width: 8, height: 8 }} />
+        <div style={{ padding: '7px 11px 6px', borderBottom: '1px solid #bfdbfe', background: '#dbeafe', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>API</span>
+          <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 600 }}>Endpoints</span>
+          <span style={{ marginLeft: 'auto', padding: '1px 5px', borderRadius: '4px', background: '#bfdbfe', color: '#1d4ed8', fontSize: '10px', fontWeight: 700 }}>
+            {data.apiEndpoints.length}
+          </span>
+        </div>
+        <div style={{ padding: '3px 0' }}>
+          {data.apiEndpoints.map((ep) => {
+            const c = HTTP_COLORS[ep.method] ?? { bg: '#f1f5f9', color: '#64748b' };
+            return (
+              <div key={ep.path} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 11px' }}>
+                <span style={{ padding: '1px 5px', borderRadius: '3px', background: c.bg, color: c.color, fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', flexShrink: 0, minWidth: '34px', textAlign: 'center' }}>
+                  {ep.method}
+                </span>
+                <span style={{ fontSize: '11px', color: '#1e40af', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {ep.path}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const borderColor = isSelected
+    ? (selectedAccent?.border ?? '#0f172a')
+    : '#e2e8f0';
+
+  const bg = isSelected ? (selectedAccent?.soft ?? '#f8fafc') : '#ffffff';
+
   return (
     <div
       style={{
-        minWidth: 260,
-        maxWidth: 320,
-        padding: '0.85rem 0.95rem',
-        borderRadius: '0.9rem',
-        border: isSelected
-          ? `2px solid ${selectedAccent?.border ?? '#0f172a'}`
-          : isApi
-            ? '1px solid #7dd3fc'
-            : '1px solid #cbd5e1',
-        background: isSelected ? selectedAccent?.soft ?? '#f8fafc' : isApi ? '#eff6ff' : '#ffffff',
+        minWidth: 240,
+        maxWidth: 300,
+        padding: '10px 11px',
+        borderRadius: '10px',
+        border: isSelected ? `2px solid ${borderColor}` : `1px solid ${borderColor}`,
+        background: bg,
         boxShadow: isSelected
-          ? '0 18px 40px rgba(15, 23, 42, 0.18)'
-          : '0 10px 30px rgba(15, 23, 42, 0.08)',
-        transform: isSelected ? 'translateY(-2px)' : 'none',
+          ? '0 12px 32px rgba(15,23,42,0.14), 0 2px 8px rgba(15,23,42,0.08)'
+          : '0 2px 8px rgba(15,23,42,0.06)',
+        transform: isSelected ? 'translateY(-1px)' : 'none',
         transition: 'border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease',
       }}
     >
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: selectedAccent?.border ?? '#0f172a' }}
+        style={{ background: selectedAccent?.border ?? '#94a3b8', border: 'none', width: 8, height: 8 }}
       />
-      <div style={{ display: 'grid', gap: '0.4rem' }}>
-        <strong style={{ color: '#0f172a' }}>{data.label}</strong>
-        <small style={{ color: '#64748b', lineHeight: 1.4 }}>{data.subtitle}</small>
-        {typeof data.exportCount === 'number' ? (
-          <span
+
+      <div style={{ display: 'grid', gap: '4px' }}>
+        {/* 노드 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {isApi && (
+            <span
+              style={{
+                padding: '1px 5px',
+                borderRadius: '3px',
+                background: '#dbeafe',
+                color: '#1d4ed8',
+                fontSize: '9px',
+                fontWeight: 700,
+                flexShrink: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              API
+            </span>
+          )}
+          <strong
             style={{
-              justifySelf: 'start',
-              padding: '0.22rem 0.5rem',
-              borderRadius: '999px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#334155',
-              fontSize: '0.72rem',
-              fontWeight: 700,
+              color: '#0f172a',
+              fontSize: '12px',
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
           >
-            exports {data.exportCount}
-          </span>
-        ) : null}
+            {data.label}
+          </strong>
+        </div>
+
+        <small style={{ color: '#94a3b8', lineHeight: 1.4, fontSize: '10px', wordBreak: 'break-all' }}>
+          {data.subtitle}
+        </small>
+
+        {typeof data.exportCount === 'number' && (
+          <div style={{ justifySelf: 'start', display: 'flex', gap: '4px' }}>
+            {(data.depCount ?? 0) > 0 && (
+              <span style={{
+                padding: '1px 6px', borderRadius: '4px',
+                background: '#f0fdf4', border: '1px solid #bbf7d0',
+                color: '#15803d', fontSize: '10px', fontWeight: 600,
+              }}>
+                dep {data.depCount}
+              </span>
+            )}
+            {data.exportCount > 0 && (
+              <span style={{
+                padding: '1px 6px', borderRadius: '4px',
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                color: '#64748b', fontSize: '10px', fontWeight: 600,
+              }}>
+                exp {data.exportCount}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* 익스포트 목록 */}
         {data.kind === 'file' && data.exports?.length ? (
           <div
             style={{
               display: 'grid',
-              gap: '0.4rem',
-              marginTop: '0.35rem',
-              paddingTop: '0.55rem',
-              borderTop: '1px solid #e2e8f0',
+              gap: '6px',
+              marginTop: '4px',
+              paddingTop: '8px',
+              borderTop: '1px solid #f1f5f9',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
-              <small style={{ color: '#475569', fontWeight: 700 }}>Exports</small>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'center' }}>
+              <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>익스포트</small>
               <button
                 type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedOnly((current) => !current);
-                }}
+                onClick={(e) => { e.stopPropagation(); setSelectedOnly((p) => !p); }}
                 style={{
-                  padding: '0.2rem 0.45rem',
-                  borderRadius: '999px',
-                  border: selectedOnly ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  border: `1px solid ${selectedOnly ? '#0f172a' : '#e2e8f0'}`,
                   background: selectedOnly ? '#0f172a' : '#ffffff',
-                  color: selectedOnly ? '#f8fafc' : '#334155',
-                  fontSize: '0.68rem',
-                  fontWeight: 700,
+                  color: selectedOnly ? '#f8fafc' : '#64748b',
+                  fontSize: '10px',
+                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
-                selected only
+                선택만
               </button>
             </div>
+
             <input
               type="search"
               value={query}
-              placeholder="Search exports"
-              onChange={(event) => setQuery(event.target.value)}
-              onClick={(event) => event.stopPropagation()}
+              placeholder="익스포트 검색"
+              onChange={(e) => setQuery(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                padding: '0.45rem 0.55rem',
-                borderRadius: '0.65rem',
-                border: '1px solid #cbd5e1',
+                padding: '5px 7px',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
                 background: '#f8fafc',
                 color: '#0f172a',
-                fontSize: '0.8rem',
+                fontSize: '11px',
+                outline: 'none',
+                boxSizing: 'border-box',
               }}
             />
-            <div
-              style={{
-                display: 'grid',
-                gap: '0.4rem',
-                maxHeight: 220,
-                overflowY: 'auto',
-                paddingRight: '0.2rem',
-              }}
-            >
-              {visibleExports.length ? null : (
+
+            <div style={{ display: 'grid', gap: '3px', maxHeight: 200, overflowY: 'auto' }}>
+              {visibleExports.length === 0 ? (
                 <small
                   style={{
-                    padding: '0.45rem 0.5rem',
-                    borderRadius: '0.65rem',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     background: '#f8fafc',
-                    border: '1px dashed #cbd5e1',
-                    color: '#64748b',
+                    border: '1px dashed #e2e8f0',
+                    color: '#94a3b8',
+                    fontSize: '11px',
                   }}
                 >
-                  No exports match the current filter.
+                  일치하는 익스포트가 없습니다.
                 </small>
-              )}
-              {visibleExports.map((item) => {
-              const checked = selectedSymbolIds.includes(item.symbolId);
-              const accent = getSymbolAccent(item.symbolId);
+              ) : null}
 
-              return (
-                <label
-                  key={item.symbolId}
-                  onClick={(event) => event.stopPropagation()}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.42rem 0.5rem',
-                    borderRadius: '0.65rem',
-                    border: checked ? `1px solid ${accent.border}` : '1px solid #e2e8f0',
-                    background: checked ? accent.soft : '#ffffff',
-                    cursor: data.onToggleSymbol ? 'pointer' : 'default',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => data.onToggleSymbol?.(item.symbolId)}
-                    onClick={(event) => event.stopPropagation()}
-                  />
-                  <span
-                    aria-hidden="true"
+              {visibleExports.map((item) => {
+                const checked = selectedSymbolIds.includes(item.symbolId);
+                const accent = getSymbolAccent(item.symbolId);
+
+                return (
+                  <label
+                    key={item.symbolId}
+                    onClick={(e) => e.stopPropagation()}
                     style={{
-                      width: '0.55rem',
-                      height: '0.55rem',
-                      borderRadius: '999px',
-                      background: accent.border,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '5px 7px',
+                      borderRadius: '6px',
+                      border: checked ? `1px solid ${accent.border}` : '1px solid #f1f5f9',
+                      background: checked ? accent.soft : '#ffffff',
+                      cursor: data.onToggleSymbol ? 'pointer' : 'default',
                     }}
-                  />
-                  <span style={{ display: 'grid', gap: '0.12rem' }}>
-                    <span style={{ color: '#0f172a', fontSize: '0.84rem', fontWeight: 600 }}>
-                      {item.name}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => data.onToggleSymbol?.(item.symbolId)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ display: 'none' }}
+                    />
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '999px',
+                        background: accent.border,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ display: 'grid', gap: '1px', flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          color: checked ? accent.solid : '#0f172a',
+                          fontSize: '11px',
+                          fontWeight: checked ? 600 : 400,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '10px' }}>{item.symbolType}</span>
                     </span>
-                    <span style={{ color: '#64748b', fontSize: '0.72rem' }}>
-                      {item.symbolType}
-                    </span>
-                  </span>
-                </label>
-              );
+                  </label>
+                );
               })}
             </div>
           </div>
         ) : null}
       </div>
+
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: selectedAccent?.border ?? '#0f172a' }}
+        style={{ background: selectedAccent?.border ?? '#94a3b8', border: 'none', width: 8, height: 8 }}
       />
     </div>
   );
 }
 
-const nodeTypes = {
-  folder: GoriFlowNode,
-  file: GoriFlowNode,
-  api: GoriFlowNode,
-};
+function GoriFlowEdge({
+  id, sourceX, sourceY, targetX, targetY,
+  sourcePosition, targetPosition,
+  label, selected, style, markerEnd,
+}: EdgeProps<Edge<ReactFlowEdgeData>>) {
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  });
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} {...(markerEnd ? { markerEnd } : {})} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: 'none',
+              zIndex: 200,
+              padding: '2px 6px',
+              borderRadius: '5px',
+              background: 'rgba(255,255,255,0.95)',
+              border: '1px solid #e2e8f0',
+              fontSize: 11,
+              fontWeight: 600,
+              color: selected ? '#0f172a' : '#475569',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+function GoriFolderCardNode({ data }: NodeProps<Node<ReactFlowNodeData>>) {
+  const files = data.folderFiles ?? [];
+  const isSelected = data.isSelected === true;
+  const accent = data.fsdLayer !== undefined ? FSD_LAYER_ACCENT[data.fsdLayer] : undefined;
+
+  return (
+    <div
+      style={{
+        minWidth: 220,
+        borderRadius: '10px',
+        border: isSelected
+          ? `2px solid ${accent?.border ?? '#3b82f6'}`
+          : `1px solid ${accent?.border ?? 'rgba(148,163,184,0.4)'}`,
+        background: isSelected ? (accent?.bg ?? '#eff6ff') : '#ffffff',
+        boxShadow: isSelected
+          ? '0 8px 24px rgba(15,23,42,0.10)'
+          : '0 2px 8px rgba(15,23,42,0.06)',
+        overflow: 'hidden',
+        transition: 'border-color 120ms ease, box-shadow 120ms ease',
+      }}
+    >
+      <Handle type="target" position={Position.Left} style={{ background: accent?.color ?? '#94a3b8', border: 'none', width: 8, height: 8 }} />
+
+      {/* 폴더 헤더 */}
+      <div style={{
+        padding: '8px 11px 7px',
+        background: accent?.bg ?? 'rgba(241,245,249,0.8)',
+        borderBottom: `1px solid ${accent?.border ?? 'rgba(148,163,184,0.15)'}`,
+        display: 'flex', alignItems: 'center', gap: '6px',
+      }}>
+        <span style={{ fontSize: '12px', lineHeight: 1, flexShrink: 0 }}>📁</span>
+        <strong style={{ fontSize: '12px', color: '#0f172a', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          {data.label}
+        </strong>
+        <span style={{ padding: '1px 5px', borderRadius: '4px', background: 'rgba(255,255,255,0.7)', border: `1px solid ${accent?.border ?? '#e2e8f0'}`, color: accent?.color ?? '#64748b', fontSize: '10px', fontWeight: 600, flexShrink: 0 }}>
+          {files.length}
+        </span>
+      </div>
+
+      {/* 파일 목록 */}
+      <div style={{ padding: '3px 0 4px' }}>
+        {files.map((file) => (
+          <div key={file.fileId} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 11px' }}>
+            <span style={{ fontSize: '10px', color: '#cbd5e1', flexShrink: 0 }}>📄</span>
+            <span style={{ fontSize: '11px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {file.name}
+            </span>
+            <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+              {file.depCount > 0 && (
+                <span style={{ padding: '0 4px', borderRadius: '3px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: '9px', fontWeight: 600 }}>
+                  dep {file.depCount}
+                </span>
+              )}
+              {file.exportCount > 0 && (
+                <span style={{ padding: '0 4px', borderRadius: '3px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '9px', fontWeight: 600 }}>
+                  exp {file.exportCount}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Handle type="source" position={Position.Right} style={{ background: accent?.color ?? '#94a3b8', border: 'none', width: 8, height: 8 }} />
+    </div>
+  );
+}
+
+const nodeTypes = { folder: GoriFlowNode, file: GoriFlowNode, api: GoriFlowNode, 'folder-card': GoriFolderCardNode };
+const edgeTypes = { fileRelation: GoriFlowEdge };
 
 function toFlowNodes(
   graph: ReactFlowGraph,
@@ -258,7 +476,10 @@ function toFlowNodes(
   selectedSymbolIds: string[],
   onToggleSymbol?: (symbolId: string) => void
 ): Node<ReactFlowNodeData>[] {
-  return graph.nodes.map((node) => ({
+  const apiGraphNodes = graph.nodes.filter((n) => n.data.kind === 'api');
+  const nonApiNodes = graph.nodes.filter((n) => n.data.kind !== 'api');
+
+  const regularNodes: Node<ReactFlowNodeData>[] = nonApiNodes.map((node) => ({
     id: node.id,
     type: node.type,
     position: node.position,
@@ -269,65 +490,105 @@ function toFlowNodes(
             selectedSymbolIds,
             isSelected:
               node.data.fileId === selectedFileId ||
-              (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)),
+              (node.data.symbolIds ?? []).some((id) => selectedSymbolIds.includes(id)),
             ...(onToggleSymbol ? { onToggleSymbol } : {}),
           }
-        : {
-            isSelected: false,
-          }),
+        : node.data.kind === 'folder-card'
+        ? {
+            isSelected: (node.data.symbolIds ?? []).some((id) => selectedSymbolIds.includes(id)),
+          }
+        : { isSelected: false }),
     },
     draggable: false,
     selectable: node.data.kind !== 'folder',
     connectable: node.data.kind !== 'folder',
     focusable: node.data.kind !== 'folder',
-    zIndex:
-      node.data.kind === 'folder'
-        ? 0
-        : node.data.kind === 'file' &&
-            (node.data.fileId === selectedFileId ||
-              (node.data.symbolIds ?? []).some((symbolId) => selectedSymbolIds.includes(symbolId)))
-          ? 2
-          : 1,
+    zIndex: node.data.kind === 'folder'
+      ? (node.data.isAncestor ? -2 : -1)
+      : node.data.kind === 'file' &&
+          (node.data.fileId === selectedFileId ||
+            (node.data.symbolIds ?? []).some((id) => selectedSymbolIds.includes(id)))
+        ? 2
+        : 1,
   }));
+
+  if (apiGraphNodes.length === 0) return regularNodes;
+
+  const minX = Math.min(...apiGraphNodes.map((n) => n.position.x));
+  const minY = Math.min(...apiGraphNodes.map((n) => n.position.y));
+
+  const collectionNode: Node<ReactFlowNodeData> = {
+    id: API_COLLECTION_ID,
+    type: 'api',
+    position: { x: minX, y: minY },
+    data: {
+      kind: 'api',
+      label: 'API Endpoints',
+      subtitle: `${apiGraphNodes.length}개 엔드포인트`,
+      isSelected: false,
+      apiEndpoints: apiGraphNodes.map((n) => ({
+        method: n.data.method ?? '',
+        path: n.data.subtitle,
+      })),
+    },
+    draggable: false,
+    selectable: true,
+    connectable: false,
+    focusable: true,
+    zIndex: 1,
+  };
+
+  return [...regularNodes, collectionNode];
 }
 
 function toFlowEdges(graph: ReactFlowGraph, selectedEdgeId?: string): Edge<ReactFlowEdgeData>[] {
-  return graph.edges.map((edge) => {
-    const isRequestEdge = edge.data.relationTypes.includes('request');
-    const isSelected = edge.id === selectedEdgeId;
-    const stroke = isSelected ? '#0f172a' : isRequestEdge ? '#0369a1' : '#64748b';
+  const apiNodeIds = new Set(graph.nodes.filter((n) => n.data.kind === 'api').map((n) => n.id));
 
-    return {
-      id: edge.id,
+  // Remap edges targeting individual API nodes → API_COLLECTION_ID, then deduplicate.
+  const edgeByKey = new Map<string, Edge<ReactFlowEdgeData>>();
+
+  for (const edge of graph.edges) {
+    const targetId = apiNodeIds.has(edge.target) ? API_COLLECTION_ID : edge.target;
+    const key = `${edge.source}->${targetId}`;
+
+    const existing = edgeByKey.get(key);
+    const mergedRelationTypes = existing
+      ? [...new Set([...existing.data!.relationTypes, ...edge.data.relationTypes])]
+      : edge.data.relationTypes;
+    const mergedSupportingEdges = existing
+      ? [...new Set([...existing.data!.supportingEdges, ...edge.data.supportingEdges])]
+      : edge.data.supportingEdges;
+    const mergedIsViolation = (existing?.data?.isViolation ?? false) || (edge.data.isViolation ?? false);
+
+    const isRequest = mergedRelationTypes.includes('request');
+    const isSelected = (!existing && edge.id === selectedEdgeId) ||
+      (existing?.id === selectedEdgeId);
+    const stroke = isSelected
+      ? '#0f172a'
+      : mergedIsViolation
+      ? '#ef4444'
+      : isRequest
+      ? '#3b82f6'
+      : '#94a3b8';
+
+    edgeByKey.set(key, {
+      id: existing?.id ?? `${edge.source}->${targetId}`,
       source: edge.source,
-      target: edge.target,
-      type: 'smoothstep',
-      label: edge.label,
-      data: edge.data,
-      animated: isSelected || isRequestEdge,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 18,
-        height: 18,
-        color: stroke,
-      },
+      target: targetId,
+      type: 'fileRelation' as const,
+      label: mergedRelationTypes.join(', '),
+      data: { relationTypes: mergedRelationTypes, supportingEdges: mergedSupportingEdges, isViolation: mergedIsViolation },
+      animated: (isSelected || isRequest) && !mergedIsViolation,
+      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: stroke },
       style: {
         stroke,
-        strokeWidth: isSelected ? 3.5 : isRequestEdge ? 2.5 : 2,
-        opacity: selectedEdgeId && !isSelected ? 0.42 : 1,
+        strokeWidth: isSelected ? 3 : mergedIsViolation ? 2.5 : isRequest ? 2 : 1.5,
+        opacity: selectedEdgeId && !isSelected ? 0.35 : 1,
       },
-      labelStyle: {
-        fill: isSelected ? '#0f172a' : '#334155',
-        fontWeight: 700,
-      },
-      labelBgStyle: {
-        fill: '#ffffff',
-        fillOpacity: 0.9,
-      },
-      labelBgPadding: [6, 3],
-      labelBgBorderRadius: 6,
-    };
-  });
+    });
+  }
+
+  return [...edgeByKey.values()];
 }
 
 export function GoriReactFlowCanvas({
@@ -343,79 +604,75 @@ export function GoriReactFlowCanvas({
 }: GoriReactFlowCanvasProps) {
   const nodes = toFlowNodes(graph, selectedFileId, selectedSymbolIds, onToggleSymbol);
   const edges = toFlowEdges(graph, selectedEdgeId);
-  const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node] as const));
-  const graphEdgeById = new Map(graph.edges.map((edge) => [edge.id, edge] as const));
+  const graphNodeById = new Map(graph.nodes.map((n) => [n.id, n] as const));
+  const graphEdgeById = new Map(graph.edges.map((e) => [e.id, e] as const));
 
-  const handleNodeClick: NodeMouseHandler<Node<ReactFlowNodeData>> = (_event, node) => {
-    const nextNode = graphNodeById.get(node.id);
-
-    if (nextNode && onNodeClick) {
-      onNodeClick(nextNode);
-    }
+  const handleNodeClick: NodeMouseHandler<Node<ReactFlowNodeData>> = (_e, node) => {
+    const next = graphNodeById.get(node.id);
+    if (next && onNodeClick) onNodeClick(next);
   };
 
-  const handleEdgeClick: EdgeMouseHandler<Edge<ReactFlowEdgeData>> = (_event, edge) => {
-    const nextEdge = graphEdgeById.get(edge.id);
-
-    if (nextEdge && onEdgeClick) {
-      onEdgeClick(nextEdge);
-    }
+  const handleEdgeClick: EdgeMouseHandler<Edge<ReactFlowEdgeData>> = (_e, edge) => {
+    const next = graphEdgeById.get(edge.id);
+    if (next && onEdgeClick) onEdgeClick(next);
   };
 
   const canvas = (
     <div
       style={{
         height,
-        borderRadius: showChrome ? '0.9rem' : '1.2rem',
+        borderRadius: showChrome ? '10px' : 0,
         overflow: 'hidden',
         border: showChrome ? '1px solid #e2e8f0' : 'none',
-        background:
-          'radial-gradient(circle at top left, rgba(191,219,254,0.25), transparent 30%), #f8fafc',
+        background: '#f8fafc',
       }}
     >
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.18 }}
+        fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={false}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
+        style={{ background: '#f8fafc' }}
       >
-        <Background gap={20} size={1} color="#cbd5e1" />
-          <MiniMap
-            pannable
-            zoomable
-            nodeStrokeColor={(node) =>
-              node.type === 'folder' ? '#94a3b8' : node.type === 'api' ? '#0369a1' : '#334155'
-            }
-            nodeColor={(node) =>
-              node.type === 'folder' ? '#e2e8f0' : node.type === 'api' ? '#bfdbfe' : '#e2e8f0'
-            }
-          />
-        <Controls showInteractive={false} />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1.2}
+          color="rgba(148,163,184,0.3)"
+        />
+        <Controls
+          showInteractive={false}
+          style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+          }}
+        />
       </ReactFlow>
     </div>
   );
 
-  if (!showChrome) {
-    return canvas;
-  }
+  if (!showChrome) return canvas;
 
   return (
     <section
       style={{
-        padding: '1rem',
-        borderRadius: '1rem',
-        border: '1px solid #d7dce2',
+        padding: '12px',
+        borderRadius: '10px',
+        border: '1px solid #e2e8f0',
         background: '#ffffff',
       }}
     >
-      <header style={{ marginBottom: '0.75rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>React Flow Preview</h2>
-        <p style={{ margin: '0.45rem 0 0', color: '#475569' }}>
-          Adapter-backed diagram view for the current file graph projection.
+      <header style={{ marginBottom: '10px' }}>
+        <h2 style={{ margin: 0, fontSize: '13px', color: '#0f172a' }}>React Flow 미리보기</h2>
+        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '11px' }}>
+          현재 파일 그래프 프로젝션의 다이어그램 뷰입니다.
         </p>
       </header>
       {canvas}

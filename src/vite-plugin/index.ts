@@ -164,11 +164,16 @@ function openInEditor(absPath: string, line: number, editor: string): void {
 export type GoriInspectOptions = {
   /** 변환에서 제외할 파일 경로 패턴 (정규식) */
   exclude?: RegExp[];
+  /**
+   * 에디터 명령어. VITE_EDITOR 환경변수가 있으면 그것을 우선합니다.
+   * @example 'cursor' | 'code' | 'windsurf' | 'zed' | 'antigravity'
+   */
+  editor?: string;
 };
 
 export function goriInspect(options: GoriInspectOptions = {}): Plugin {
   let root = process.cwd();
-  let editorCmd = process.env['VITE_EDITOR'] ?? process.env['EDITOR'] ?? 'code';
+  let editorCmd = process.env['VITE_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
   let isDev = false;
   // transform 시 수집: symbolId → 줄번호
   const symbolLocMap = new Map<string, number>();
