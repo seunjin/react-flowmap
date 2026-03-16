@@ -40,15 +40,18 @@ function saveFloatPos(pos: { x: number; y: number }) {
 
 function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): React.CSSProperties {
   const base: React.CSSProperties = {
-    position: 'fixed', background: '#ffffff',
+    position: 'fixed',
+    background: 'rgba(255,255,255,0.82)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
     zIndex: 10000, display: 'flex', flexDirection: 'column',
     fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
     overflow: 'hidden',
   };
-  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid #e2e8f0', boxShadow: '-4px 0 20px rgba(15,23,42,0.08)' };
-  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid #e2e8f0', boxShadow: '4px 0 20px rgba(15,23,42,0.08)' };
-  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid #e2e8f0', boxShadow: '0 -4px 20px rgba(15,23,42,0.08)' };
-  return { ...base, top: floatPos.y, left: floatPos.x, width: SIDEBAR_W, maxHeight: '85vh', borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 8px 32px rgba(15,23,42,0.18)' };
+  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(226,232,240,0.7)', boxShadow: '-2px 0 24px rgba(15,23,42,0.06)' };
+  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(226,232,240,0.7)', boxShadow: '2px 0 24px rgba(15,23,42,0.06)' };
+  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(226,232,240,0.7)', boxShadow: '0 -2px 24px rgba(15,23,42,0.06)' };
+  return { ...base, top: floatPos.y, left: floatPos.x, width: SIDEBAR_W, maxHeight: '85vh', borderRadius: 12, border: '1px solid rgba(226,232,240,0.6)', boxShadow: '0 8px 32px rgba(15,23,42,0.12)' };
 }
 
 // 독 위치 아이콘
@@ -204,14 +207,14 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
 
   return (
     <div style={{
-      borderRadius: 5, border: '1px solid #e8edf2', overflow: 'hidden',
-      background: '#ffffff',
+      borderRadius: 5, border: '1px solid rgba(226,232,240,0.7)', overflow: 'hidden',
+      background: 'rgba(255,255,255,0.5)',
     }}>
       {/* 헤더: name: TypeName */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '4px 8px', background: '#f1f5f9',
-        borderBottom: '1px solid #e8edf2',
+        padding: '4px 8px', background: 'rgba(241,245,249,0.7)',
+        borderBottom: '1px solid rgba(226,232,240,0.6)',
       }}>
         <span style={{ ...mono, color: '#7c3aed', fontWeight: 600 }}>{name}</span>
         {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
@@ -229,7 +232,7 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
         ) : (
           <pre style={{
             margin: 0, padding: '4px 6px',
-            background: '#f8fafc', border: '1px solid #e8edf2', borderRadius: 3,
+            background: 'rgba(248,250,252,0.6)', border: '1px solid rgba(226,232,240,0.6)', borderRadius: 3,
             ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}>
@@ -1081,8 +1084,8 @@ function FloatingSidebar({
           height: 44, minHeight: 44,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 8px 0 12px',
-          borderBottom: '1px solid #f1f5f9',
-          background: '#fafafa',
+          borderBottom: '1px solid rgba(226,232,240,0.6)',
+          background: 'rgba(248,250,252,0.6)',
           flexShrink: 0,
           cursor: dockPosition === 'float' ? 'grab' : 'default',
           userSelect: 'none',
@@ -1157,12 +1160,12 @@ function FloatingSidebar({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '5px 26px 5px 26px',
-                  borderRadius: 5, border: '1px solid #e2e8f0',
-                  background: '#f8fafc', fontSize: 11, color: '#0f172a',
+                  borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
+                  background: 'rgba(248,250,252,0.6)', fontSize: 11, color: '#0f172a',
                   outline: 'none', fontFamily: 'inherit',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = '#fff'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(226,232,240,0.8)'; e.currentTarget.style.background = 'rgba(248,250,252,0.6)'; }}
               />
               {searchQuery && (
                 <button
@@ -1209,8 +1212,8 @@ function FloatingSidebar({
             height: 36, minHeight: 36,
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '0 8px',
-            borderBottom: '1px solid #f1f5f9',
-            background: '#fafafa',
+            borderBottom: '1px solid rgba(226,232,240,0.6)',
+            background: 'rgba(248,250,252,0.5)',
             flexShrink: 0,
           }}>
             <button
@@ -1219,7 +1222,7 @@ function FloatingSidebar({
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: '3px 7px', borderRadius: 4,
-                border: '1px solid #e2e8f0', background: '#fff',
+                border: '1px solid rgba(226,232,240,0.8)', background: 'rgba(255,255,255,0.7)',
                 cursor: 'pointer', fontSize: 11, color: '#475569',
                 flexShrink: 0,
               }}
