@@ -938,14 +938,10 @@ function BreadcrumbBar({
     return (
       <div style={{
         height: 30, minHeight: 30,
-        display: 'flex', alignItems: 'center',
-        padding: '0 12px',
         borderBottom: '1px solid #f1f5f9',
         background: '#fafafa',
         flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 11, color: '#94a3b8' }}>마우스를 컴포넌트 위로 이동</span>
-      </div>
+      }} />
     );
   }
 
