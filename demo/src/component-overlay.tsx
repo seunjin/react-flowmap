@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { Folder, FileCode, Component, Crosshair, X, Search, ChevronLeft } from 'lucide-react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
@@ -569,33 +570,13 @@ function TreeNodeView({
 
 // ─── 아이콘 ───────────────────────────────────────────────────────────────────
 function FolderIcon({ hovered }: { hovered: boolean }) {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M1 3.5C1 2.948 1.448 2.5 2 2.5H4.586L5.293 3.207C5.48 3.395 5.733 3.5 6 3.5H10C10.552 3.5 11 3.948 11 4.5V9C11 9.552 10.552 10 10 10H2C1.448 10 1 9.552 1 9V3.5Z"
-        fill={hovered ? '#fbbf24' : '#d1d5db'} />
-    </svg>
-  );
+  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#f59e0b' : '#94a3b8' }} />;
 }
 function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return (
-    <svg width="11" height="12" viewBox="0 0 11 12" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M2 1H7L10 4V11C10 11.552 9.552 12 9 12H2C1.448 12 1 11.552 1 11V2C1 1.448 1.448 1 2 1Z"
-        fill={selected ? '#bfdbfe' : hovered ? '#fde68a' : '#e2e8f0'} />
-      <path d="M7 1V4H10"
-        stroke={selected ? '#60a5fa' : hovered ? '#f59e0b' : '#cbd5e1'}
-        strokeWidth="1" fill="none" />
-    </svg>
-  );
+  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#3b82f6' : hovered ? '#f59e0b' : '#94a3b8' }} />;
 }
-
 function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  const color = isSelected ? '#3b82f6' : isHovered ? '#f59e0b' : '#cbd5e1';
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
-      <rect x="1" y="1" width="8" height="8" rx="2" stroke={color} strokeWidth="1.5" />
-      <path d="M3 5H7M5 3V7" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
+  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#3b82f6' : isHovered ? '#f59e0b' : '#cbd5e1' }} />;
 }
 
 // ─── 커서 아래 컴포넌트 스택 ──────────────────────────────────────────────────
@@ -1167,24 +1148,17 @@ function FloatingSidebar({
               transition: 'all 120ms',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-              <circle cx="10" cy="10" r="3" fill="currentColor" />
-              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
-              <line x1="10" y1="1" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="10" y1="16" x2="10" y2="19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="1" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="16" y1="10" x2="19" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <Crosshair size={14} />
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <DockDropdown current={dockPosition} onChange={onDockChange} />
           <div style={{ width: 1, height: 16, background: 'rgba(226,232,240,0.8)', margin: '0 2px' }} />
           <button type="button" onClick={onClose} style={{
-            width: 24, height: 24, borderRadius: 5, border: '1px solid #e2e8f0',
+            width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
             background: 'transparent', color: '#94a3b8', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-          }}>✕</button>
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}><X size={13} /></button>
         </div>
       </div>
 
@@ -1195,13 +1169,7 @@ function FloatingSidebar({
           {/* 검색 */}
           <div style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
             <div style={{ position: 'relative' }}>
-              <svg
-                width="12" height="12" viewBox="0 0 20 20" fill="none"
-                style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }}
-              >
-                <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="2" />
-                <line x1="13.5" y1="13.5" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }} />
               <input
                 type="text"
                 placeholder="컴포넌트 검색..."
@@ -1225,10 +1193,10 @@ function FloatingSidebar({
                     position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
                     width: 16, height: 16, borderRadius: '50%', border: 'none',
                     background: '#cbd5e1', color: '#fff', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 0,
                   }}
-                >✕</button>
+                ><X size={10} /></button>
               )}
             </div>
           </div>
@@ -1279,7 +1247,7 @@ function FloatingSidebar({
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
             >
-              ← 목록
+              <ChevronLeft size={12} />목록
             </button>
             <span style={{
               fontSize: 12, fontWeight: 600, color: '#0f172a',
