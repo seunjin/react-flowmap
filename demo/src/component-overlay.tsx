@@ -222,7 +222,11 @@ function primitiveLabel(value: unknown): string {
   if (value === null)      return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'function') {
-    const name = (value as { name?: string }).name;
+    const raw = (value as { name?: string }).name ?? '';
+    const name = raw === 'bound dispatchSetState'    ? 'setState'
+               : raw === 'bound dispatchReducerState' ? 'dispatch'
+               : raw.startsWith('bound ')             ? raw.slice(6)
+               : raw;
     return name ? `${name} ƒ` : 'ƒ()';
   }
   if (typeof value === 'string') return `"${value}"`;
