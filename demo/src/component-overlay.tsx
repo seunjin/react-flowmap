@@ -232,7 +232,6 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
             background: '#f8fafc', border: '1px solid #e8edf2', borderRadius: 3,
             ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-            overflowX: 'auto', maxHeight: 200, overflowY: 'auto',
           }}>
             {JSON.stringify(value, (_k, v) => typeof v === 'function' ? primitiveLabel(v) : v, 2)}
           </pre>
