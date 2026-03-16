@@ -607,26 +607,22 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
           ? Object.entries(props).filter(([k]) => k !== 'children')
           : [];
         if (entries.length === 0) return null;
-        const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, string>> })
-          .__goriPropTypes?.[entry.symbolId];
         return (
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {entries.map(([k, v]) => {
-                  const typeStr = propTypes?.[k];
                   const valColor = typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#64748b';
                   return (
                     <div key={k} style={{
-                      display: 'flex', alignItems: 'baseline', gap: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                       padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
                       border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
-                      overflow: 'hidden',
                     }}>
                       <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
-                      {typeStr && <span style={{ color: '#94a3b8', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>: {typeStr}</span>}
-                      <span style={{ color: '#94a3b8', margin: '0 4px', flexShrink: 0 }}>=</span>
-                      <span style={{ color: valColor, flexShrink: 0 }}>{formatPropValue(v)}</span>
+                      <span style={{ color: valColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textAlign: 'right' }}>
+                        {formatPropValue(v)}
+                      </span>
                     </div>
                   );
                 })}
