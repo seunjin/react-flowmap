@@ -179,7 +179,7 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
 
   if (isPrimitive(value)) {
     return (
-      <span style={{ color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11 }}>
+      <span style={{ color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>
         {primitiveLabel(value)}
       </span>
     );
@@ -200,20 +200,28 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
         onClick={() => setOpen(o => !o)}
         style={{
           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-          color: '#64748b', fontFamily: 'monospace', fontSize: 11,
-          display: 'inline-flex', alignItems: 'center', gap: 2,
+          color: '#475569', fontFamily: 'monospace', fontSize: 11,
+          display: 'inline-flex', alignItems: 'center', gap: 3,
         }}
       >
-        <span style={{ fontSize: 8, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 120ms' }}>▶</span>
+        <span style={{
+          fontSize: 7, display: 'inline-block',
+          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 120ms', color: '#94a3b8',
+        }}>▶</span>
         <span>{preview}</span>
       </button>
       {open && depth < 3 && (
-        <div style={{ marginLeft: 12, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div style={{
+          marginTop: 4, marginLeft: 8,
+          display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)',
+          columnGap: 10, rowGap: 3,
+        }}>
           {entries.map(([k, v]) => (
-            <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-              <span style={{ color: '#7c3aed', flexShrink: 0, fontFamily: 'monospace', fontSize: 11 }}>{k}:</span>
+            <Fragment key={k}>
+              <span style={{ color: '#7c3aed', fontFamily: 'monospace', fontSize: 11, paddingTop: 1 }}>{k}</span>
               <PropValueView value={v} depth={depth + 1} />
-            </div>
+            </Fragment>
           ))}
         </div>
       )}
@@ -225,22 +233,26 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
 function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 2,
+      display: 'flex', flexDirection: 'column', gap: 3,
       padding: '5px 7px', borderRadius: 4, background: '#f8fafc',
-      border: '1px solid #f1f5f9', fontFamily: 'monospace', fontSize: 11,
+      border: '1px solid #f1f5f9',
     }}>
-      {/* 레이블 행: 이름 + optional + 타입 힌트 */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-        <span style={{ color: '#7c3aed', fontSize: 10 }}>{name}</span>
-        {typeEntry?.optional && <span style={{ color: '#94a3b8', fontSize: 10 }}>?</span>}
+      {/* 레이블 행: 이름 + optional + 타입 힌트 (한 줄) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <span style={{ color: '#7c3aed', fontSize: 10, fontFamily: 'monospace', flexShrink: 0 }}>{name}</span>
+        {typeEntry?.optional && <span style={{ color: '#94a3b8', fontSize: 10, flexShrink: 0 }}>?</span>}
         {typeEntry && (
-          <span style={{ color: '#cbd5e1', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{
+            color: '#cbd5e1', fontSize: 10, fontFamily: 'monospace',
+            marginLeft: 2, overflow: 'hidden', textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 0',
+          }}>
             : {typeEntry.type}
           </span>
         )}
       </div>
-      {/* 값 행: 전체 너비 */}
-      <div style={{ overflow: 'hidden' }}>
+      {/* 값: 전체 너비 */}
+      <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
         <PropValueView value={value} />
       </div>
     </div>
