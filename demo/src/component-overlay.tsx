@@ -1151,9 +1151,10 @@ function ToggleTab({
 
 // ─── 플로팅 Inspect 버튼 ──────────────────────────────────────────────────────
 export function InspectButton({
-  active, onClick, dockPosition = 'right',
+  open, picking, onClick, dockPosition = 'right',
 }: {
-  active: boolean;
+  open: boolean;
+  picking: boolean;
   onClick: () => void;
   dockPosition?: DockPosition;
 }) {
@@ -1162,42 +1163,65 @@ export function InspectButton({
   let btnBottom: number;
 
   if (dockPosition === 'right') {
-    btnRight  = active ? SIDEBAR_W + 12 : 20;
+    btnRight  = open ? SIDEBAR_W + 12 : 20;
     btnBottom = 20;
   } else if (dockPosition === 'left') {
-    btnLeft   = active ? SIDEBAR_W + 12 : 20;
+    btnLeft   = open ? SIDEBAR_W + 12 : 20;
     btnBottom = 20;
   } else if (dockPosition === 'bottom') {
     btnRight  = 20;
-    btnBottom = active ? BOTTOM_H + 12 : 20;
+    btnBottom = open ? BOTTOM_H + 12 : 20;
   } else {
-    // float
     btnRight  = 20;
     btnBottom = 20;
   }
+
+  const bg =
+    picking ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' :
+    open    ? '#1e40af' :
+              '#0f172a';
+
+  const shadow =
+    picking ? '0 0 0 3px rgba(99,102,241,0.35), 0 4px 14px rgba(59,130,246,0.45)' :
+    open    ? '0 0 0 2px rgba(59,130,246,0.3), 0 2px 10px rgba(15,23,42,0.2)' :
+              '0 2px 10px rgba(15,23,42,0.3)';
+
+  const title =
+    picking ? '클릭 취소 (선택 대기 중)' :
+    open    ? '다시 선택하기' :
+              '컴포넌트 Inspect';
 
   return (
     <button
       data-gori-overlay
       type="button"
       onClick={onClick}
-      title={active ? 'Inspect 종료 (Esc)' : '컴포넌트 Inspect'}
+      title={title}
       style={{
         position: 'fixed',
         bottom: btnBottom,
-        ...(btnRight  !== undefined ? { right: btnRight }  : {}),
-        ...(btnLeft   !== undefined ? { left:  btnLeft  }  : {}),
+        ...(btnRight !== undefined ? { right: btnRight } : {}),
+        ...(btnLeft  !== undefined ? { left:  btnLeft  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: active ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : '#0f172a',
-        color: '#ffffff', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-        boxShadow: active
-          ? '0 0 0 3px rgba(99,102,241,0.35), 0 4px 14px rgba(59,130,246,0.45)'
-          : '0 2px 10px rgba(15,23,42,0.3)',
+        background: bg, color: '#ffffff', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: shadow,
         transition: 'all 180ms', zIndex: 10001,
       }}
     >
-      {active ? '✕' : '⬡'}
+      {picking ? (
+        // 피킹 중: 커서 아이콘
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="3" fill="#fff" />
+          <circle cx="10" cy="10" r="7" stroke="#fff" strokeWidth="1.5" fill="none" />
+          <line x1="10" y1="1" x2="10" y2="4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="10" y1="16" x2="10" y2="19" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="1" y1="10" x2="4" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="16" y1="10" x2="19" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <span style={{ fontSize: 18 }}>⬡</span>
+      )}
     </button>
   );
 }
@@ -1211,6 +1235,7 @@ export function ComponentOverlay({
   const [stack,      setStack]      = useState<FoundComp[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [highlightId, setHighlightId] = useState<string>('');
+  const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(loadFloatPos);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
@@ -1249,11 +1274,22 @@ export function ComponentOverlay({
     return [...graphEntries, ...extra];
   }, [graphEntries]);
 
+  // 패널 열림/닫힘
   useEffect(() => {
-    if (!active) {
+    if (active) {
+      setPicking(true); // 패널 열릴 때 자동으로 피킹 시작
+    } else {
+      setPicking(false);
       setStack([]);
       setSelectedId('');
       selectedElRef.current = null;
+    }
+  }, [active]);
+
+  // 피킹 모드 — 마우스/클릭 이벤트 (picking일 때만 활성)
+  useEffect(() => {
+    if (!picking) {
+      document.body.style.cursor = '';
       return;
     }
 
@@ -1271,7 +1307,6 @@ export function ComponentOverlay({
       });
     }
 
-    // 앱 클릭 → 호버 중인 컴포넌트를 액티브로 확정
     function onClickApp(e: MouseEvent) {
       if ((e.target as HTMLElement).closest('[data-gori-overlay]')) return;
       const found = findComponentsAt(e.clientX, e.clientY);
@@ -1280,24 +1315,35 @@ export function ComponentOverlay({
         e.stopPropagation();
         setSelectedId(found[0].symbolId);
         selectedElRef.current = found[0].el;
+        setPicking(false); // 선택 완료 → 피킹 종료, 패널은 유지
+        setStack([]);
       }
-    }
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onDeactivateRef.current();
     }
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('click',     onClickApp, true);
-    document.addEventListener('keydown',   onKeyDown);
     return () => {
       document.body.style.cursor = '';
       cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('click',     onClickApp, true);
-      document.removeEventListener('keydown',   onKeyDown);
     };
-  }, [active]);
+  }, [picking]);
+
+  // Escape: 피킹 중이면 피킹 취소, 아니면 패널 닫기
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      if (picking) {
+        setPicking(false);
+        setStack([]);
+      } else {
+        onDeactivateRef.current();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [picking]);
 
   // 호버 중인 가장 구체적 컴포넌트 (amber 프리뷰)
   const hoveredComp = stack[0] ?? null;
@@ -1332,10 +1378,21 @@ export function ComponentOverlay({
   const hoveredLabel   = hoveredComp?.symbolId.split('#').at(-1) ?? '';
   const selectedLabel  = selectedId.split('#').at(-1) ?? '';
 
+  function handleButtonClick() {
+    if (!active) {
+      onToggle?.(); // 패널 열기
+    } else if (picking) {
+      setPicking(false); // 피킹 취소, 패널 유지
+      setStack([]);
+    } else {
+      setPicking(true); // 다시 피킹 시작
+    }
+  }
+
   if (!active) {
-    return onToggle ? (
-      <InspectButton active={false} onClick={onToggle} dockPosition={dockPosition} />
-    ) : null;
+    return (
+      <InspectButton open={false} picking={false} onClick={handleButtonClick} dockPosition={dockPosition} />
+    );
   }
 
   return (
@@ -1350,8 +1407,8 @@ export function ComponentOverlay({
         });
       })()}
 
-      {/* 호버 프리뷰: 점선 amber */}
-      {showHoverBox && (
+      {/* 호버 프리뷰: 점선 amber — 피킹 중일 때만 */}
+      {picking && showHoverBox && (
         <HoverPreviewBox rect={hoveredComp.rect} label={hoveredLabel} />
       )}
 
@@ -1360,9 +1417,7 @@ export function ComponentOverlay({
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
 
-      {onToggle && (
-        <InspectButton active={true} onClick={onToggle} dockPosition={dockPosition} />
-      )}
+      <InspectButton open={true} picking={picking} onClick={handleButtonClick} dockPosition={dockPosition} />
 
       {/* 플로팅 사이드바 */}
       <FloatingSidebar
