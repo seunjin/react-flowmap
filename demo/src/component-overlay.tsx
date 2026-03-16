@@ -424,12 +424,13 @@ function folderHasHovered(node: FolderTreeNode, hoveredIds: Set<string>): boolea
 
 // ─── 트리 렌더 ────────────────────────────────────────────────────────────────
 function TreeNodeView({
-  node, depth, hoveredIds, selectedId, focusedSymbolId, onSelect, selectedRef,
+  node, depth, hoveredIds, treeHoveredId, selectedId, focusedSymbolId, onSelect, selectedRef,
   onHover, onHoverEnd, forceExpanded,
 }: {
   node: AnyTreeNode;
   depth: number;
   hoveredIds: Set<string>;
+  treeHoveredId: string;
   selectedId: string;
   focusedSymbolId: string;
   onSelect: (symbolId: string) => void;
@@ -476,6 +477,7 @@ function TreeNodeView({
             node={child}
             depth={node.name !== '' ? depth + 1 : depth}
             hoveredIds={hoveredIds}
+            treeHoveredId={treeHoveredId}
             selectedId={selectedId}
             focusedSymbolId={focusedSymbolId}
             onSelect={onSelect}
@@ -512,7 +514,7 @@ function TreeNodeView({
       </div>
 
       {node.entries.map((entry) => {
-        const isHovered  = hoveredIds.has(entry.symbolId);
+        const isHovered  = hoveredIds.has(entry.symbolId) || treeHoveredId === entry.symbolId;
         const isSelected = entry.symbolId === selectedId;
         const isFocused  = entry.symbolId === focusedSymbolId && !isSelected;
         const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
@@ -1001,6 +1003,7 @@ function FloatingSidebar({
   }, [selectedId]);
 
   const hoveredIds = useMemo(() => new Set(stack.map(c => c.symbolId)), [stack]);
+  const [treeHoveredId, setTreeHoveredId] = useState('');
 
   const displayEntries = useMemo(() => {
     const domIds = new Set(
@@ -1175,12 +1178,13 @@ function FloatingSidebar({
                 node={tree}
                 depth={0}
                 hoveredIds={hoveredIds}
+                treeHoveredId={treeHoveredId}
                 selectedId={selectedId}
                 focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
                 onSelect={onSelect}
                 selectedRef={selectedRef}
-                onHover={onHighlight}
-                onHoverEnd={onHighlightEnd}
+                onHover={(id) => { setTreeHoveredId(id); onHighlight(id); }}
+                onHoverEnd={() => { setTreeHoveredId(''); onHighlightEnd(); }}
                 forceExpanded={searchQuery.length > 0}
               />
             )}
