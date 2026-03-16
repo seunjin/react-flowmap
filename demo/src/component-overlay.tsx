@@ -1259,50 +1259,41 @@ function FloatingSidebar({
 }
 
 
+// ─── Config ───────────────────────────────────────────────────────────────────
+export type GoriConfig = {
+  /** 플로팅 패널 초기 위치 (localStorage 저장값이 없을 때 사용) */
+  defaultFloatPos?: { x: number; y: number };
+  /** 인스펙터 버튼 위치 */
+  buttonPosition?: { bottom?: number; right?: number; left?: number };
+};
+
 // ─── 플로팅 Inspect 버튼 ──────────────────────────────────────────────────────
 export function InspectButton({
-  open, onClick, dockPosition = 'right',
+  onClick, positionOverride,
 }: {
-  open: boolean;
   onClick: () => void;
-  dockPosition?: DockPosition;
+  positionOverride?: GoriConfig['buttonPosition'];
 }) {
-  let btnRight: number | undefined;
-  let btnLeft: number | undefined;
-  let btnBottom: number;
-
-  if (dockPosition === 'right') {
-    btnRight  = open ? SIDEBAR_W + 12 : 20;
-    btnBottom = 20;
-  } else if (dockPosition === 'left') {
-    btnLeft   = open ? SIDEBAR_W + 12 : 20;
-    btnBottom = 20;
-  } else if (dockPosition === 'bottom') {
-    btnRight  = 20;
-    btnBottom = open ? BOTTOM_H + 12 : 20;
-  } else {
-    btnRight  = 20;
-    btnBottom = 20;
-  }
+  const bottom = positionOverride?.bottom ?? 20;
+  const right  = positionOverride?.right  ?? (positionOverride?.left !== undefined ? undefined : 20);
+  const left   = positionOverride?.left;
 
   return (
     <button
       data-gori-overlay
       type="button"
       onClick={onClick}
-      title={open ? '인스펙터 닫기' : '컴포넌트 Inspector'}
+      title="컴포넌트 Inspector"
       style={{
         position: 'fixed',
-        bottom: btnBottom,
-        ...(btnRight !== undefined ? { right: btnRight } : {}),
-        ...(btnLeft  !== undefined ? { left:  btnLeft  } : {}),
+        bottom,
+        ...(right !== undefined ? { right } : {}),
+        ...(left  !== undefined ? { left  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: open ? '#0f172a' : '#0f172a',
+        background: '#0f172a',
         color: '#ffffff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: open
-          ? '0 0 0 2px rgba(51,65,85,0.25), 0 2px 10px rgba(15,23,42,0.2)'
-          : '0 2px 10px rgba(15,23,42,0.3)',
+        boxShadow: '0 2px 10px rgba(15,23,42,0.3)',
         transition: 'all 180ms', zIndex: 10001,
       }}
     >
@@ -1313,16 +1304,24 @@ export function InspectButton({
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 export function ComponentOverlay({
-  graph, active, onDeactivate, onToggle,
+  graph, active, onDeactivate, onToggle, config = {},
 }: {
   graph: GoriGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
+  config?: GoriConfig;
 }) {
   const [stack,      setStack]      = useState<FoundComp[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [highlightId, setHighlightId] = useState<string>('');
   const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
-  const [floatPos,     setFloatPos]     = useState(loadFloatPos);
+  const [floatPos,     setFloatPos]     = useState(() => {
+    try {
+      const s = localStorage.getItem('gori-float-pos');
+      if (s) return JSON.parse(s) as { x: number; y: number };
+    } catch { /* noop */ }
+    return config.defaultFloatPos
+      ?? { x: Math.max(20, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 360), y: 80 };
+  });
   // ref 교체 후 re-render 강제용 (setSelectedId가 동일값이면 React가 스킵하므로)
   const [, forceRender] = useState(0);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
@@ -1495,7 +1494,7 @@ export function ComponentOverlay({
 
   if (!active) {
     return (
-      <InspectButton open={false} onClick={handleButtonClick} dockPosition={dockPosition} />
+      <InspectButton onClick={handleButtonClick} positionOverride={config.buttonPosition} />
     );
   }
 
@@ -1511,17 +1510,15 @@ export function ComponentOverlay({
         });
       })()}
 
-      {/* 호버 프리뷰: 점선 amber — 피킹 중일 때만 */}
+      {/* 호버 프리뷰: 점선 — 피킹 중일 때만 */}
       {picking && showHoverBox && (
         <HoverPreviewBox rect={hoveredComp.rect} label={hoveredLabel} />
       )}
 
-      {/* 액티브 선택: 실선 파란색 */}
+      {/* 액티브 선택: 실선 */}
       {selectedRect && (
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
-
-      <InspectButton open={true} onClick={handleButtonClick} dockPosition={dockPosition} />
 
       {/* 플로팅 사이드바 */}
       <FloatingSidebar
