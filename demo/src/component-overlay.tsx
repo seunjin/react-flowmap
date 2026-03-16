@@ -17,13 +17,14 @@ const BOTTOM_H  = 320;
 type DockPosition = 'right' | 'left' | 'bottom' | 'float';
 
 function loadDock(): DockPosition {
-  try { return (localStorage.getItem('gori-dock') as DockPosition) ?? 'right'; } catch { return 'right'; }
+  try { return (localStorage.getItem('gori-dock') as DockPosition) ?? 'float'; } catch { return 'float'; }
 }
 function loadFloatPos() {
   try {
     const s = localStorage.getItem('gori-float-pos');
-    return s ? (JSON.parse(s) as { x: number; y: number }) : { x: 40, y: 80 };
-  } catch { return { x: 40, y: 80 }; }
+    if (s) return JSON.parse(s) as { x: number; y: number };
+    return { x: Math.max(20, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 360), y: 80 };
+  } catch { return { x: 900, y: 80 }; }
 }
 function saveDock(pos: DockPosition) {
   try { localStorage.setItem('gori-dock', pos); } catch { /* noop */ }
@@ -35,17 +36,25 @@ function saveFloatPos(pos: { x: number; y: number }) {
 function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): React.CSSProperties {
   const base: React.CSSProperties = {
     position: 'fixed',
-    background: 'rgba(255,255,255,0.82)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    background: 'rgba(255,255,255,0.88)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
     zIndex: 10000, display: 'flex', flexDirection: 'column',
     fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
     overflow: 'hidden',
   };
-  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(226,232,240,0.7)', boxShadow: '-2px 0 24px rgba(15,23,42,0.06)' };
-  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(226,232,240,0.7)', boxShadow: '2px 0 24px rgba(15,23,42,0.06)' };
-  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(226,232,240,0.7)', boxShadow: '0 -2px 24px rgba(15,23,42,0.06)' };
-  return { ...base, top: floatPos.y, left: floatPos.x, width: SIDEBAR_W, maxHeight: '85vh', borderRadius: 12, border: '1px solid rgba(226,232,240,0.6)', boxShadow: '0 8px 32px rgba(15,23,42,0.12)' };
+  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(226,232,240,0.7)', boxShadow: '-4px 0 32px rgba(15,23,42,0.08)' };
+  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(226,232,240,0.7)', boxShadow: '4px 0 32px rgba(15,23,42,0.08)' };
+  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(226,232,240,0.7)', boxShadow: '0 -4px 32px rgba(15,23,42,0.08)' };
+  // float
+  return {
+    ...base,
+    top: floatPos.y, left: floatPos.x,
+    width: SIDEBAR_W, maxHeight: '80vh',
+    borderRadius: 14,
+    border: '1px solid rgba(226,232,240,0.8)',
+    boxShadow: '0 4px 6px rgba(15,23,42,0.04), 0 12px 32px rgba(15,23,42,0.10), 0 32px 64px rgba(15,23,42,0.06)',
+  };
 }
 
 const DOCK_LABELS: Record<DockPosition, string> = {
@@ -1077,8 +1086,8 @@ function FloatingSidebar({
           height: 44, minHeight: 44,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 8px 0 12px',
-          borderBottom: '1px solid rgba(226,232,240,0.6)',
-          background: 'rgba(248,250,252,0.6)',
+          borderBottom: '1px solid rgba(226,232,240,0.5)',
+          background: dockPosition === 'float' ? 'rgba(248,250,252,0.5)' : 'rgba(248,250,252,0.6)',
           flexShrink: 0,
           cursor: dockPosition === 'float' ? 'grab' : 'default',
           userSelect: 'none',
