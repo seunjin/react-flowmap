@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Folder, FileCode, Component, MousePointer2, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
+import { Folder, FileCode, Component, SquareMousePointer, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
@@ -123,7 +123,7 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
         <div
           data-gori-overlay
           style={{
-            position: 'absolute', top: 30, right: 0,
+            position: 'absolute', top: 30, left: 0,
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
@@ -1112,7 +1112,7 @@ function FloatingSidebar({
               transition: 'all 120ms',
             }}
           >
-            <MousePointer2 size={14} />
+            <SquareMousePointer size={14} />
           </button>
           <div style={{ width: 1, height: 14, background: 'rgba(219,234,254,0.8)' }} />
           {/* 포지션 버튼 */}
