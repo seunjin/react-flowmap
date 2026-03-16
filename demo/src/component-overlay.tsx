@@ -173,18 +173,42 @@ function primitiveLabel(value: unknown): string {
   return String(value);
 }
 
-/** 재귀적으로 펼칠 수 있는 prop 값 뷰어 */
-function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number }) {
-  const [open, setOpen] = useState(false);
+/** JSON을 사람이 읽기 좋은 형태로 포맷 (최대 2뎁스, 이후는 …) */
+function formatJson(value: unknown, depth = 0): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'function') return primitiveLabel(value);
+  if (Array.isArray(value)) {
+    if (depth >= 2) return `[…${value.length}]`;
+    if (value.length === 0) return '[]';
+    const items = value.slice(0, 5).map(v => formatJson(v, depth + 1));
+    const truncated = value.length > 5 ? [...items, `…${value.length - 5} more`] : items;
+    return `[${truncated.join(', ')}]`;
+  }
+  if (typeof value === 'object') {
+    if (depth >= 2) return '{…}';
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return '{}';
+    const items = entries.slice(0, 6).map(([k, v]) => `${k}: ${formatJson(v, depth + 1)}`);
+    const truncated = entries.length > 6 ? [...items, `…${entries.length - 6} more`] : items;
+    return `{ ${truncated.join(', ')} }`;
+  }
+  return String(value);
+}
+
+/** Docs 스타일 prop 값 뷰어 — primitive는 인라인, object는 코드블록 */
+function PropValueView({ value }: { value: unknown }) {
+  const [expanded, setExpanded] = useState(false);
 
   if (isPrimitive(value)) {
     return (
-      <div style={{
+      <span style={{
         color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {primitiveLabel(value)}
-      </div>
+      </span>
     );
   }
 
@@ -192,43 +216,55 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
   const entries = isArr
     ? (value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
     : Object.entries(value as Record<string, unknown>);
-  const preview = isArr
-    ? `[${entries.length}]`
-    : `{${entries.slice(0, 3).map(([k]) => k).join(', ')}${entries.length > 3 ? ', …' : ''}}`;
+
+  // 한 줄 compact 미리보기
+  const oneLiner = formatJson(value, 0);
+  const isShort = oneLiner.length <= 60;
+
+  if (isShort) {
+    return (
+      <span style={{
+        fontFamily: 'monospace', fontSize: 11, color: '#475569',
+        background: '#f1f5f9', borderRadius: 3, padding: '1px 4px',
+      }}>
+        {oneLiner}
+      </span>
+    );
+  }
+
+  // 길면 펼칠 수 있는 코드블록
+  const multiLine = isArr
+    ? `[\n${entries.map(([, v]) => `  ${formatJson(v, 1)}`).join(',\n')}\n]`
+    : `{\n${entries.map(([k, v]) => `  ${k}: ${formatJson(v, 1)}`).join(',\n')}\n}`;
 
   return (
     <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setExpanded(o => !o)}
         style={{
-          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-          color: '#475569', fontFamily: 'monospace', fontSize: 11,
-          display: 'inline-flex', alignItems: 'center', gap: 3,
+          background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 3,
+          padding: '1px 6px', cursor: 'pointer', color: '#64748b',
+          fontFamily: 'monospace', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4,
         }}
       >
         <span style={{
           fontSize: 7, display: 'inline-block',
-          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 120ms', color: '#94a3b8',
+          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 120ms',
         }}>▶</span>
-        <span>{preview}</span>
+        <span style={{ color: '#94a3b8' }}>{isArr ? `Array(${entries.length})` : `Object(${entries.length})`}</span>
       </button>
-      {open && depth < 3 && (
-        <div style={{
-          marginTop: 4,
-          paddingLeft: 8,
-          borderLeft: '1.5px solid #e2e8f0',
-          display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)',
-          columnGap: 10, rowGap: 3,
+      {expanded && (
+        <pre style={{
+          margin: '4px 0 0', padding: '6px 8px',
+          background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4,
+          fontSize: 10, lineHeight: 1.6, color: '#334155',
+          overflowX: 'auto', whiteSpace: 'pre', maxHeight: 180,
+          overflowY: 'auto',
         }}>
-          {entries.map(([k, v]) => (
-            <Fragment key={k}>
-              <span style={{ color: '#7c3aed', fontFamily: 'monospace', fontSize: 11, alignSelf: 'start', paddingTop: 1 }}>{k}</span>
-              <PropValueView value={v} depth={depth + 1} />
-            </Fragment>
-          ))}
-        </div>
+          {multiLine}
+        </pre>
       )}
     </div>
   );
