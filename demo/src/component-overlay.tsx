@@ -43,16 +43,16 @@ function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): R
     fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
     overflow: 'hidden',
   };
-  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(219,234,254,0.7)', boxShadow: '-4px 0 32px rgba(23,37,84,0.08)' };
-  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(219,234,254,0.7)', boxShadow: '4px 0 32px rgba(23,37,84,0.08)' };
-  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(219,234,254,0.7)', boxShadow: '0 -4px 32px rgba(23,37,84,0.08)' };
+  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(229,231,235,0.7)', boxShadow: '-4px 0 32px rgba(23,37,84,0.08)' };
+  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(229,231,235,0.7)', boxShadow: '4px 0 32px rgba(23,37,84,0.08)' };
+  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 -4px 32px rgba(23,37,84,0.08)' };
   // float
   return {
     ...base,
     top: floatPos.y, left: floatPos.x,
     width: SIDEBAR_W, maxHeight: '80vh',
     borderRadius: 14,
-    border: '1px solid rgba(219,234,254,0.8)',
+    border: '1px solid rgba(229,231,235,0.8)',
     boxShadow: '0 4px 6px rgba(23,37,84,0.04), 0 12px 32px rgba(23,37,84,0.10), 0 32px 64px rgba(23,37,84,0.06)',
   };
 }
@@ -111,8 +111,8 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
         title="패널 위치 변경"
         style={{
           width: 26, height: 26, borderRadius: 5,
-          border: '1px solid rgba(219,234,254,0.8)',
-          background: open ? 'rgba(239,246,255,0.9)' : 'transparent',
+          border: '1px solid rgba(229,231,235,0.8)',
+          background: open ? 'rgba(243,244,246,0.9)' : 'transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 3, transition: 'background 100ms',
         }}
@@ -127,7 +127,7 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(219,234,254,0.8)',
+            border: '1px solid rgba(229,231,235,0.8)',
             borderRadius: 8, boxShadow: '0 4px 16px rgba(23,37,84,0.1)',
             padding: 4, zIndex: 10001, minWidth: 110,
           }}
@@ -142,12 +142,12 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
                 display: 'flex', alignItems: 'center', gap: 8,
                 width: '100%', padding: '6px 8px', borderRadius: 5,
                 border: 'none', cursor: 'pointer', textAlign: 'left',
-                background: current === pos ? 'rgba(239,246,255,0.9)' : 'transparent',
+                background: current === pos ? 'rgba(243,244,246,0.9)' : 'transparent',
                 color: current === pos ? '#111827' : '#6b7280',
                 fontSize: 11, fontWeight: current === pos ? 600 : 400,
                 transition: 'background 80ms',
               }}
-              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; }}
+              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; }}
               onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <DockSvg pos={pos} color={current === pos ? '#111827' : '#9ca3af'} />
@@ -274,14 +274,14 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
 
   return (
     <div style={{
-      borderRadius: 5, border: '1px solid rgba(219,234,254,0.7)', overflow: 'hidden',
+      borderRadius: 5, border: '1px solid rgba(229,231,235,0.7)', overflow: 'hidden',
       background: 'rgba(255,255,255,0.5)',
     }}>
       {/* 헤더: name? : TypeName */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '4px 8px', background: 'rgba(239,246,255,0.7)',
-        borderBottom: '1px solid rgba(219,234,254,0.6)',
+        padding: '4px 8px', background: 'rgba(243,244,246,0.7)',
+        borderBottom: '1px solid rgba(229,231,235,0.6)',
       }}>
         <span style={{ ...mono, color: '#111827', fontWeight: 600 }}>{name}</span>
         {typeEntry?.optional && <span style={{ ...mono, color: '#9ca3af' }}>?</span>}
@@ -294,7 +294,7 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
                 onClick={() => setTypeOpen(o => !o)}
                 style={{
                   ...mono, fontSize: 10, color: typeOpen ? '#1e40af' : '#9ca3af',
-                  background: typeOpen ? 'rgba(219,234,254,0.6)' : 'transparent',
+                  background: typeOpen ? 'rgba(229,231,235,0.6)' : 'transparent',
                   border: typeOpen ? '1px solid rgba(203,213,225,0.8)' : '1px solid transparent',
                   borderRadius: 3, padding: '0 4px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 2, transition: 'all 80ms',
@@ -314,8 +314,8 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
       {typeOpen && (typeEntry?.fields || typeEntry?.resolvedType) && (
         <div style={{
           padding: '6px 8px 8px',
-          borderBottom: '1px solid rgba(219,234,254,0.6)',
-          background: 'rgba(240,249,255,0.4)',
+          borderBottom: '1px solid rgba(229,231,235,0.6)',
+          background: 'rgba(249,250,251,0.4)',
         }}>
           {typeEntry.fields
             ? <TypeFieldsView fields={typeEntry.fields} />
@@ -547,7 +547,7 @@ function TreeNodeView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: `4px 10px 3px ${10 + depth * 14}px`,
-        background: fileSelected ? '#eff6ff' : fileHovered ? '#f0f9ff' : 'transparent',
+        background: fileSelected ? '#f3f4f6' : fileHovered ? '#f3f4f6' : 'transparent',
       }}>
         <FileIcon hovered={fileHovered} selected={fileSelected} />
         <span style={{
@@ -587,7 +587,7 @@ function TreeNodeView({
                     ? '2px solid #9ca3af'
                     : '2px solid transparent',
               textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#dbeafe' : isFocused ? '#eff6ff' : isHovered ? '#eff6ff' : 'transparent',
+              background: isSelected ? '#dbeafe' : isFocused ? '#f3f4f6' : isHovered ? '#f3f4f6' : 'transparent',
               outline: 'none',
               transition: 'background 60ms',
             }}
@@ -731,7 +731,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 섹션 */}
-      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #eff6ff' }}>
+      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
             {entry.name}
@@ -752,19 +752,19 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '5px 8px', borderRadius: 5,
-              border: '1px solid #dbeafe', background: '#f0f9ff',
+              border: '1px solid #e5e7eb', background: '#f9fafb',
               cursor: 'pointer', width: '100%', textAlign: 'left',
               transition: 'all 100ms',
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#eff6ff';
-              el.style.borderColor = '#bfdbfe';
+              el.style.background = '#f3f4f6';
+              el.style.borderColor = '#d1d5db';
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#f0f9ff';
-              el.style.borderColor = '#dbeafe';
+              el.style.background = '#f9fafb';
+              el.style.borderColor = '#e5e7eb';
             }}
           >
             <ExternalLink size={11} style={{ color: '#1e40af', flexShrink: 0 }} />
@@ -802,7 +802,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
         const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, PropTypeEntry>> })
           .__goriPropTypes?.[entry.symbolId];
         return (
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #eff6ff' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid #e5e7eb' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {entries.map(([k, v]) => (
@@ -844,8 +844,8 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
         title={name}
         style={{
           padding: '5px 12px', borderRadius: 7,
-          border: isCenter ? '1.5px solid #1e40af' : '1px solid rgba(219,234,254,0.9)',
-          background: isCenter ? 'rgba(239,246,255,0.9)' : 'rgba(240,249,255,0.7)',
+          border: isCenter ? '1.5px solid #1e40af' : '1px solid rgba(229,231,235,0.9)',
+          background: isCenter ? 'rgba(243,244,246,0.9)' : 'rgba(249,250,251,0.7)',
           color: isCenter ? '#111827' : '#6b7280',
           fontSize: 11, fontWeight: isCenter ? 700 : 500,
           cursor: isCenter ? 'default' : 'pointer',
@@ -855,7 +855,7 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
         }}
         onMouseEnter={e => {
           if (!isCenter) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.9)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.9)';
             (e.currentTarget as HTMLElement).style.borderColor = '#9ca3af';
             (e.currentTarget as HTMLElement).style.color = '#111827';
           }
@@ -863,8 +863,8 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
         }}
         onMouseLeave={e => {
           if (!isCenter) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(240,249,255,0.7)';
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(219,234,254,0.9)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(249,250,251,0.7)';
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(229,231,235,0.9)';
             (e.currentTarget as HTMLElement).style.color = '#6b7280';
           }
           onHoverEnd?.();
@@ -879,12 +879,12 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
 function GraphConnector() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, margin: '6px 0' }}>
-      <div style={{ width: 1, height: 16, background: '#bfdbfe' }} />
+      <div style={{ width: 1, height: 16, background: '#d1d5db' }} />
       <div style={{
         width: 0, height: 0,
         borderLeft: '3.5px solid transparent',
         borderRight: '3.5px solid transparent',
-        borderTop: '4.5px solid #bfdbfe',
+        borderTop: '4.5px solid #d1d5db',
       }} />
     </div>
   );
@@ -1086,8 +1086,8 @@ function FloatingSidebar({
           height: 44, minHeight: 44,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 8px 0 12px',
-          borderBottom: '1px solid rgba(219,234,254,0.5)',
-          background: dockPosition === 'float' ? 'rgba(240,249,255,0.5)' : 'rgba(240,249,255,0.6)',
+          borderBottom: '1px solid rgba(229,231,235,0.5)',
+          background: dockPosition === 'float' ? 'rgba(249,250,251,0.5)' : 'rgba(249,250,251,0.6)',
           flexShrink: 0,
           cursor: dockPosition === 'float' ? 'grab' : 'default',
           userSelect: 'none',
@@ -1099,12 +1099,12 @@ function FloatingSidebar({
             type="button"
             onClick={onPickToggle}
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
-            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; } }}
+            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; } }}
             onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
             style={{
               width: 26, height: 26, borderRadius: 5,
               border: '1px solid',
-              borderColor: picking ? '#1e40af' : 'rgba(219,234,254,0.8)',
+              borderColor: picking ? '#1e40af' : 'rgba(229,231,235,0.8)',
               background: picking ? '#eff6ff' : 'transparent',
               color: picking ? '#1e40af' : '#9ca3af',
               cursor: 'pointer',
@@ -1114,16 +1114,16 @@ function FloatingSidebar({
           >
             <SquareMousePointer size={14} />
           </button>
-          <div style={{ width: 1, height: 14, background: 'rgba(219,234,254,0.8)' }} />
+          <div style={{ width: 1, height: 14, background: 'rgba(229,231,235,0.8)' }} />
           {/* 포지션 버튼 */}
           <DockDropdown current={dockPosition} onChange={onDockChange} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button type="button" onClick={onClose}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; }}
             style={{
-              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(219,234,254,0.8)',
+              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(229,231,235,0.8)',
               background: 'transparent', color: '#9ca3af', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 100ms',
@@ -1136,7 +1136,7 @@ function FloatingSidebar({
         <>
 
           {/* 검색 */}
-          <div style={{ padding: '6px 8px', borderBottom: '1px solid #eff6ff', flexShrink: 0 }}>
+          <div style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
             <div style={{ position: 'relative' }}>
               <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
               <input
@@ -1147,12 +1147,12 @@ function FloatingSidebar({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '5px 26px 5px 26px',
-                  borderRadius: 5, border: '1px solid rgba(219,234,254,0.8)',
-                  background: 'rgba(240,249,255,0.6)', fontSize: 11, color: '#111827',
+                  borderRadius: 5, border: '1px solid rgba(229,231,235,0.8)',
+                  background: 'rgba(249,250,251,0.6)', fontSize: 11, color: '#111827',
                   outline: 'none', fontFamily: 'inherit',
                 }}
                 onFocus={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(219,234,254,0.8)'; e.currentTarget.style.background = 'rgba(240,249,255,0.6)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(229,231,235,0.8)'; e.currentTarget.style.background = 'rgba(249,250,251,0.6)'; }}
               />
               {searchQuery && (
                 <button
@@ -1161,7 +1161,7 @@ function FloatingSidebar({
                   style={{
                     position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
                     width: 16, height: 16, borderRadius: '50%', border: 'none',
-                    background: '#bfdbfe', color: '#fff', cursor: 'pointer',
+                    background: '#d1d5db', color: '#fff', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 0,
                   }}
@@ -1201,8 +1201,8 @@ function FloatingSidebar({
             display: 'grid', gridTemplateColumns: '32px 1fr 32px',
             alignItems: 'center',
             padding: '0 6px',
-            borderBottom: '1px solid rgba(219,234,254,0.6)',
-            background: 'rgba(240,249,255,0.5)',
+            borderBottom: '1px solid rgba(229,231,235,0.6)',
+            background: 'rgba(249,250,251,0.5)',
             flexShrink: 0,
           }}>
             <button
@@ -1210,11 +1210,11 @@ function FloatingSidebar({
               onClick={() => setView('tree')}
               style={{
                 width: 28, height: 28, borderRadius: 5,
-                border: '1px solid rgba(219,234,254,0.8)', background: 'transparent',
+                border: '1px solid rgba(229,231,235,0.8)', background: 'transparent',
                 cursor: 'pointer', color: '#9ca3af',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <ChevronLeft size={14} />
