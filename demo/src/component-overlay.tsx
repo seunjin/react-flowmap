@@ -54,54 +54,106 @@ function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): R
   return { ...base, top: floatPos.y, left: floatPos.x, width: SIDEBAR_W, maxHeight: '85vh', borderRadius: 12, border: '1px solid rgba(226,232,240,0.6)', boxShadow: '0 8px 32px rgba(15,23,42,0.12)' };
 }
 
-// 독 위치 아이콘
-function DockIcon({ pos, active, onClick }: { pos: DockPosition; active: boolean; onClick: () => void }) {
-  const c = active ? '#3b82f6' : '#94a3b8';
-  const bg = active ? '#eff6ff' : 'transparent';
-  const icons: Record<DockPosition, React.ReactNode> = {
-    left: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
-        <rect x="1" y="1" width="5" height="12" rx="2" fill={c} opacity="0.3"/>
-        <rect x="1" y="1" width="5" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
-      </svg>
-    ),
-    bottom: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
-        <rect x="1" y="8" width="12" height="5" rx="2" fill={c} opacity="0.3"/>
-        <rect x="1" y="8" width="12" height="5" rx="2" stroke={c} strokeWidth="1.2"/>
-      </svg>
-    ),
-    right: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
-        <rect x="8" y="1" width="5" height="12" rx="2" fill={c} opacity="0.3"/>
-        <rect x="8" y="1" width="5" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
-      </svg>
-    ),
-    float: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="3" y="1" width="10" height="9" rx="2" stroke={c} strokeWidth="1.2"/>
-        <rect x="1" y="4" width="10" height="9" rx="2" fill={active ? '#eff6ff' : '#fff'} stroke={c} strokeWidth="1.2"/>
-      </svg>
-    ),
-  };
+const DOCK_LABELS: Record<DockPosition, string> = {
+  left: '왼쪽', bottom: '하단', right: '오른쪽', float: '플로팅',
+};
+
+function DockSvg({ pos, color }: { pos: DockPosition; color: string }) {
+  const c = color;
+  if (pos === 'left') return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+      <rect x="1" y="1" width="5" height="12" rx="2" fill={c} opacity="0.35" stroke={c} strokeWidth="1.2"/>
+    </svg>
+  );
+  if (pos === 'bottom') return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+      <rect x="1" y="8" width="12" height="5" rx="2" fill={c} opacity="0.35" stroke={c} strokeWidth="1.2"/>
+    </svg>
+  );
+  if (pos === 'right') return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+      <rect x="8" y="1" width="5" height="12" rx="2" fill={c} opacity="0.35" stroke={c} strokeWidth="1.2"/>
+    </svg>
+  );
   return (
-    <button
-      type="button" onClick={onClick}
-      title={{ left: '왼쪽 고정', bottom: '하단 고정', right: '오른쪽 고정', float: '플로팅' }[pos]}
-      style={{
-        width: 24, height: 24, borderRadius: 4, border: active ? '1px solid #bfdbfe' : '1px solid transparent',
-        background: bg, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 100ms',
-      }}
-      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
-      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = bg; }}
-    >
-      {icons[pos]}
-    </button>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="3" y="1" width="10" height="9" rx="2" stroke={c} strokeWidth="1.2"/>
+      <rect x="1" y="4" width="10" height="9" rx="2" fill="rgba(255,255,255,0.8)" stroke={c} strokeWidth="1.2"/>
+    </svg>
+  );
+}
+
+function DockDropdown({ current, onChange }: { current: DockPosition; onChange: (p: DockPosition) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        data-gori-overlay
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        title="패널 위치 변경"
+        style={{
+          width: 26, height: 26, borderRadius: 5,
+          border: '1px solid rgba(226,232,240,0.8)',
+          background: open ? 'rgba(241,245,249,0.9)' : 'transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 3, transition: 'background 100ms',
+        }}
+      >
+        <DockSvg pos={current} color="#64748b" />
+      </button>
+      {open && (
+        <div
+          data-gori-overlay
+          style={{
+            position: 'absolute', top: 30, right: 0,
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(226,232,240,0.8)',
+            borderRadius: 8, boxShadow: '0 4px 16px rgba(15,23,42,0.1)',
+            padding: 4, zIndex: 10001, minWidth: 110,
+          }}
+        >
+          {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
+            <button
+              data-gori-overlay
+              key={pos}
+              type="button"
+              onClick={() => { onChange(pos); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '6px 8px', borderRadius: 5,
+                border: 'none', cursor: 'pointer', textAlign: 'left',
+                background: current === pos ? 'rgba(239,246,255,0.9)' : 'transparent',
+                color: current === pos ? '#1d4ed8' : '#475569',
+                fontSize: 11, fontWeight: current === pos ? 600 : 400,
+                transition: 'background 80ms',
+              }}
+              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
+              onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              <DockSvg pos={pos} color={current === pos ? '#1d4ed8' : '#94a3b8'} />
+              {DOCK_LABELS[pos]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1125,11 +1177,9 @@ function FloatingSidebar({
             </svg>
           </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
-            <DockIcon key={pos} pos={pos} active={dockPosition === pos} onClick={() => onDockChange(pos)} />
-          ))}
-          <div style={{ width: 1, height: 16, background: '#e2e8f0', margin: '0 4px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <DockDropdown current={dockPosition} onChange={onDockChange} />
+          <div style={{ width: 1, height: 16, background: 'rgba(226,232,240,0.8)', margin: '0 2px' }} />
           <button type="button" onClick={onClose} style={{
             width: 24, height: 24, borderRadius: 5, border: '1px solid #e2e8f0',
             background: 'transparent', color: '#94a3b8', cursor: 'pointer',
