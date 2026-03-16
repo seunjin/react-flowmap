@@ -923,94 +923,6 @@ function _ChipList({ items, color = 'default', onNavigate }: {
 }
 
 // ─── 브레드크럼 ───────────────────────────────────────────────────────────────
-function BreadcrumbBar({
-  stack, onSelect,
-}: {
-  stack: FoundComp[];
-  onSelect: (symbolId: string, el: HTMLElement) => void;
-}) {
-  const all = [...stack].reverse(); // outermost → innermost
-  const MAX_VISIBLE = 3;
-  const hiddenCount = all.length > MAX_VISIBLE ? all.length - MAX_VISIBLE : 0;
-  const items = hiddenCount > 0 ? all.slice(-MAX_VISIBLE) : all;
-
-  if (all.length === 0) {
-    return (
-      <div style={{
-        height: 30, minHeight: 30,
-        borderBottom: '1px solid #f1f5f9',
-        background: '#fafafa',
-        flexShrink: 0,
-      }} />
-    );
-  }
-
-  return (
-    <div style={{
-      height: 30, minHeight: 30,
-      display: 'flex', alignItems: 'center',
-      padding: '0 8px',
-      borderBottom: '1px solid #f1f5f9',
-      background: '#fffbeb',
-      flexShrink: 0,
-      gap: 2,
-      overflow: 'hidden',
-    }}>
-      {hiddenCount > 0 && (
-        <>
-          <span
-            title={all.slice(0, hiddenCount).map(c => c.symbolId.split('#').at(-1)).join(' › ')}
-            style={{
-              fontSize: 10, color: '#d97706', flexShrink: 0,
-              padding: '1px 4px', borderRadius: 3,
-              background: 'rgba(245,158,11,0.10)',
-              cursor: 'default', userSelect: 'none',
-            }}
-          >
-            ···
-          </span>
-          <span style={{ fontSize: 10, color: '#d97706', flexShrink: 0, userSelect: 'none' }}>›</span>
-        </>
-      )}
-      {items.map((comp, i) => {
-        const name = comp.symbolId.split('#').at(-1) ?? comp.symbolId;
-        const isLast = i === items.length - 1;
-        return (
-          <Fragment key={`${comp.symbolId}-${i}`}>
-            <button
-              type="button"
-              onClick={() => onSelect(comp.symbolId, comp.el)}
-              style={{
-                padding: '1px 4px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                borderRadius: 3,
-                fontSize: 11,
-                fontWeight: isLast ? 600 : 400,
-                color: isLast ? '#92400e' : '#b45309',
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                transition: 'background 80ms',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 90,
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.12)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              title={name}
-            >
-              {name}
-            </button>
-            {!isLast && (
-              <span style={{ fontSize: 10, color: '#d97706', flexShrink: 0, userSelect: 'none' }}>›</span>
-            )}
-          </Fragment>
-        );
-      })}
-    </div>
-  );
-}
 
 // ─── 플로팅 사이드바 ──────────────────────────────────────────────────────────
 function FloatingSidebar({
@@ -1202,8 +1114,6 @@ function FloatingSidebar({
         </div>
       </div>
 
-      {/* 브레드크럼 — 항상 표시 */}
-      <BreadcrumbBar stack={stack} onSelect={onSelect} />
 
       {view === 'tree' ? (
         <>
