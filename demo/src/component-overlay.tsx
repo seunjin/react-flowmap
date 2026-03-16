@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
@@ -17,7 +17,90 @@ const CAT_STYLE: Record<string, { bg: string; color: string; label: string }> = 
   function:  { bg: '#fff7ed', color: '#c2410c', label: 'Fn'        },
 };
 
-const SIDEBAR_W = 280;
+const SIDEBAR_W = 320;
+const BOTTOM_H  = 320;
+
+type DockPosition = 'right' | 'left' | 'bottom' | 'float';
+
+function loadDock(): DockPosition {
+  try { return (localStorage.getItem('gori-dock') as DockPosition) ?? 'right'; } catch { return 'right'; }
+}
+function loadFloatPos() {
+  try {
+    const s = localStorage.getItem('gori-float-pos');
+    return s ? (JSON.parse(s) as { x: number; y: number }) : { x: 40, y: 80 };
+  } catch { return { x: 40, y: 80 }; }
+}
+function saveDock(pos: DockPosition) {
+  try { localStorage.setItem('gori-dock', pos); } catch { /* noop */ }
+}
+function saveFloatPos(pos: { x: number; y: number }) {
+  try { localStorage.setItem('gori-float-pos', JSON.stringify(pos)); } catch { /* noop */ }
+}
+
+function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): React.CSSProperties {
+  const base: React.CSSProperties = {
+    position: 'fixed', background: '#ffffff',
+    zIndex: 10000, display: 'flex', flexDirection: 'column',
+    fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
+    overflow: 'hidden',
+  };
+  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid #e2e8f0', boxShadow: '-4px 0 20px rgba(15,23,42,0.08)' };
+  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid #e2e8f0', boxShadow: '4px 0 20px rgba(15,23,42,0.08)' };
+  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid #e2e8f0', boxShadow: '0 -4px 20px rgba(15,23,42,0.08)' };
+  return { ...base, top: floatPos.y, left: floatPos.x, width: SIDEBAR_W, maxHeight: '85vh', borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 8px 32px rgba(15,23,42,0.18)' };
+}
+
+// 독 위치 아이콘
+function DockIcon({ pos, active, onClick }: { pos: DockPosition; active: boolean; onClick: () => void }) {
+  const c = active ? '#3b82f6' : '#94a3b8';
+  const bg = active ? '#eff6ff' : 'transparent';
+  const icons: Record<DockPosition, React.ReactNode> = {
+    left: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+        <rect x="1" y="1" width="5" height="12" rx="2" fill={c} opacity="0.3"/>
+        <rect x="1" y="1" width="5" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+      </svg>
+    ),
+    bottom: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+        <rect x="1" y="8" width="12" height="5" rx="2" fill={c} opacity="0.3"/>
+        <rect x="1" y="8" width="12" height="5" rx="2" stroke={c} strokeWidth="1.2"/>
+      </svg>
+    ),
+    right: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="1" width="12" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+        <rect x="8" y="1" width="5" height="12" rx="2" fill={c} opacity="0.3"/>
+        <rect x="8" y="1" width="5" height="12" rx="2" stroke={c} strokeWidth="1.2"/>
+      </svg>
+    ),
+    float: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="3" y="1" width="10" height="9" rx="2" stroke={c} strokeWidth="1.2"/>
+        <rect x="1" y="4" width="10" height="9" rx="2" fill={active ? '#eff6ff' : '#fff'} stroke={c} strokeWidth="1.2"/>
+      </svg>
+    ),
+  };
+  return (
+    <button
+      type="button" onClick={onClick}
+      title={{ left: '왼쪽 고정', bottom: '하단 고정', right: '오른쪽 고정', float: '플로팅' }[pos]}
+      style={{
+        width: 24, height: 24, borderRadius: 4, border: active ? '1px solid #bfdbfe' : '1px solid transparent',
+        background: bg, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 100ms',
+      }}
+      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
+      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = bg; }}
+    >
+      {icons[pos]}
+    </button>
+  );
+}
 
 // ─── 유틸 ─────────────────────────────────────────────────────────────────────
 function isVisible(rect: DOMRect): boolean {
@@ -264,14 +347,6 @@ function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }
     </svg>
   );
 }
-function VsCodeIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 100 100" fill="none">
-      <path d="M74.8 5.3L24.2 52.5 5.7 38.1 0 41.8v16.4l5.7 3.7 18.5-14.4 50.6 47.2L100 85V15L74.8 5.3z" fill="#007ACC" />
-      <path d="M74.8 94.7L24.2 47.5 5.7 61.9 0 58.2V41.8l5.7-3.7L74.8 5.3 100 15v70l-25.2 9.7z" fill="#007ACC" opacity="0.6" />
-    </svg>
-  );
-}
 
 function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
   const color = isSelected ? '#3b82f6' : isHovered ? '#f59e0b' : '#cbd5e1';
@@ -372,77 +447,106 @@ function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
   fetch(`/__gori-open?${params.toString()}`).catch(() => {});
 }
 
-function EntryDetail({ entry, loc }: { entry: DocEntry; loc?: string | null; }) {
+export function EntryDetail({ entry, loc, onNavigate }: {
+  entry: DocEntry;
+  loc?: string | null;
+  onNavigate?: ((name: string) => void) | undefined;
+}) {
   const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
+
   return (
-    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {entry.name}
-        </span>
-        <span style={{ padding: '1px 6px', borderRadius: 4, background: cat.bg, color: cat.color, fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
-          {cat.label}
-        </span>
-      </div>
-      {entry.filePath && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-            {shortenPath(entry.filePath)}{loc ? `:${loc}` : ''}
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* 헤더 섹션 */}
+      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.3, wordBreak: 'break-word' }}>
+            {entry.name}
           </span>
+          <span style={{
+            padding: '2px 7px', borderRadius: 4, background: cat.bg, color: cat.color,
+            fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2,
+          }}>
+            {cat.label}
+          </span>
+        </div>
+
+        {entry.filePath && (
           <button
             type="button"
             onClick={() => openInEditor(entry.filePath!, entry.symbolId, loc)}
-            title="VS Code에서 열기"
+            title="에디터에서 열기"
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '2px 7px', borderRadius: 4, border: '1px solid #e2e8f0',
-              background: '#fff', cursor: 'pointer', flexShrink: 0,
-              fontSize: 10, fontWeight: 600, color: '#475569',
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 8px', borderRadius: 5,
+              border: '1px solid #e2e8f0', background: '#f8fafc',
+              cursor: 'pointer', width: '100%', textAlign: 'left',
               transition: 'all 100ms',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = '#eff6ff';
+              el.style.borderColor = '#bfdbfe';
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = '#f8fafc';
+              el.style.borderColor = '#e2e8f0';
+            }}
           >
-            <VsCodeIcon />
-            Open
+            <span style={{ fontSize: 10, color: '#3b82f6', flexShrink: 0 }}>↗</span>
+            <span style={{
+              fontSize: 10, color: '#64748b', fontFamily: 'monospace',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+            }}>
+              {shortenPath(entry.filePath)}{loc ? `:${loc}` : ''}
+            </span>
           </button>
-        </div>
-      )}
-      {entry.renders.length > 0 && (
-        <DetailSection label="Renders">
-          <ChipList items={entry.renders.map(r => r.name)} />
-        </DetailSection>
-      )}
-      {entry.renderedBy.length > 0 && (
-        <DetailSection label="Rendered by">
-          <ChipList items={entry.renderedBy.map(r => r.name)} />
-        </DetailSection>
-      )}
-      {entry.uses.length > 0 && (
-        <DetailSection label="Uses">
-          <ChipList items={entry.uses.map(r => r.name)} color="purple" />
-        </DetailSection>
-      )}
-      {entry.apiCalls.length > 0 && (
-        <DetailSection label="API Calls">
-          {entry.apiCalls.map((api) => {
-            const s = HTTP_STYLE[api.method] ?? { bg: '#f1f5f9', color: '#64748b' };
-            return (
-              <div key={api.apiId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ padding: '1px 5px', borderRadius: 3, background: s.bg, color: s.color, fontSize: 9, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0 }}>
-                  {api.method}
-                </span>
-                <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {api.path}
-                </span>
-              </div>
-            );
-          })}
-        </DetailSection>
-      )}
-      {!entry.renders.length && !entry.renderedBy.length && !entry.uses.length && !entry.apiCalls.length && (
-        <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>연결된 관계 없음</p>
-      )}
+        )}
+      </div>
+
+      {/* 미니 관계 그래프 */}
+      <div style={{ padding: '16px 14px', borderBottom: entry.apiCalls.length > 0 ? '1px solid #f1f5f9' : 'none' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 12 }}>
+          Relations
+        </span>
+        <MiniRelationGraph entry={entry} onNavigate={onNavigate} />
+      </div>
+
+      {/* API Calls */}
+      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {entry.apiCalls.length > 0 && (
+          <DetailSection label="API Calls">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {entry.apiCalls.map((api) => {
+                const s = HTTP_STYLE[api.method] ?? { bg: '#f1f5f9', color: '#64748b' };
+                return (
+                  <div
+                    key={api.apiId}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 7,
+                      padding: '5px 8px', borderRadius: 5,
+                      border: '1px solid #e2e8f0', background: '#f8fafc',
+                    }}
+                  >
+                    <span style={{
+                      padding: '1px 5px', borderRadius: 3, background: s.bg, color: s.color,
+                      fontSize: 9, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0,
+                    }}>
+                      {api.method}
+                    </span>
+                    <span style={{
+                      fontSize: 11, color: '#334155', fontFamily: 'monospace',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {api.path}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </DetailSection>
+        )}
+      </div>
     </div>
   );
 }
@@ -455,17 +559,236 @@ function DetailSection({ label, children }: { label: string; children: React.Rea
     </div>
   );
 }
-function ChipList({ items, color = 'default' }: { items: string[]; color?: 'default' | 'purple' }) {
-  const s = color === 'purple'
-    ? { bg: '#faf5ff', border: '#e9d5ff', text: '#6d28d9' }
-    : { bg: '#f8fafc', border: '#e2e8f0', text: '#334155' };
+
+// ─── 미니 관계 그래프 ──────────────────────────────────────────────────────────
+function GraphNode({ name, isCenter, hasApi, onClick }: {
+  name: string;
+  isCenter?: boolean;
+  hasApi?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-      {items.map(item => (
-        <span key={item} style={{ padding: '1px 6px', borderRadius: 4, border: `1px solid ${s.border}`, background: s.bg, fontSize: 11, color: s.text }}>
-          {item}
-        </span>
+    <div style={{ position: 'relative', display: 'inline-flex', maxWidth: 120 }}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isCenter}
+        title={name}
+        style={{
+          padding: '4px 10px', borderRadius: 6,
+          border: isCenter ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+          background: isCenter ? '#eff6ff' : '#f8fafc',
+          color: isCenter ? '#1d4ed8' : '#475569',
+          fontSize: 11, fontWeight: isCenter ? 700 : 500,
+          cursor: isCenter ? 'default' : 'pointer',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          maxWidth: 120, transition: 'all 80ms',
+        }}
+        onMouseEnter={e => { if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#eff6ff'; }}
+        onMouseLeave={e => { if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+      >
+        {name}
+      </button>
+      {hasApi && (
+        <span style={{
+          position: 'absolute', top: -3, right: -3,
+          width: 8, height: 8, borderRadius: '50%',
+          background: '#f59e0b', border: '2px solid #fff',
+        }} title="API 호출 있음" />
+      )}
+    </div>
+  );
+}
+
+function GraphConnector() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ width: 1.5, height: 10, background: '#cbd5e1' }} />
+      <div style={{
+        width: 0, height: 0,
+        borderLeft: '4px solid transparent',
+        borderRight: '4px solid transparent',
+        borderTop: '5px solid #cbd5e1',
+      }} />
+    </div>
+  );
+}
+
+function NodeRow({ names, onNavigate }: { names: string[]; onNavigate?: ((n: string) => void) | undefined }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+      {names.map(name => (
+        <GraphNode key={name} name={name} onClick={() => onNavigate?.(name)} />
       ))}
+    </div>
+  );
+}
+
+function MiniRelationGraph({ entry, onNavigate }: {
+  entry: DocEntry;
+  onNavigate?: ((name: string) => void) | undefined;
+}) {
+  const parents  = entry.renderedBy.map(r => r.name);
+  const children = entry.renders.map(r => r.name);
+  const hasApi   = entry.apiCalls.length > 0;
+  const noRelations = !parents.length && !children.length && !hasApi;
+
+  if (noRelations) {
+    return (
+      <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
+        아직 기록된 관계가 없습니다.<br />
+        <span style={{ fontSize: 10 }}>앱을 조작하면 관계가 쌓입니다.</span>
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      {/* 부모 레이어 */}
+      {parents.length > 0 && (
+        <>
+          <NodeRow names={parents} onNavigate={onNavigate} />
+          <GraphConnector />
+        </>
+      )}
+
+      {/* 현재 컴포넌트 */}
+      <GraphNode name={entry.name} isCenter hasApi={hasApi} />
+
+      {/* 자식 레이어 */}
+      {children.length > 0 && (
+        <>
+          <GraphConnector />
+          <NodeRow names={children} onNavigate={onNavigate} />
+        </>
+      )}
+
+    </div>
+  );
+}
+
+function _ChipList({ items, color = 'default', onNavigate }: {
+  items: string[];
+  color?: 'default' | 'purple';
+  onNavigate?: ((name: string) => void) | undefined;
+}) {
+  const s = color === 'purple'
+    ? { bg: '#faf5ff', border: '#e9d5ff', text: '#6d28d9', hover: '#f3e8ff' }
+    : { bg: '#f8fafc', border: '#e2e8f0', text: '#334155', hover: '#eff6ff' };
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {items.map(item => (
+        <button
+          key={item}
+          type="button"
+          onClick={() => onNavigate?.(item)}
+          style={{
+            padding: '3px 8px', borderRadius: 4,
+            border: `1px solid ${s.border}`, background: s.bg,
+            fontSize: 11, color: s.text,
+            cursor: onNavigate ? 'pointer' : 'default',
+            transition: 'all 80ms',
+          }}
+          onMouseEnter={e => { if (onNavigate) (e.currentTarget as HTMLElement).style.background = s.hover; }}
+          onMouseLeave={e => { if (onNavigate) (e.currentTarget as HTMLElement).style.background = s.bg; }}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── 브레드크럼 ───────────────────────────────────────────────────────────────
+function BreadcrumbBar({
+  stack, onSelect,
+}: {
+  stack: FoundComp[];
+  onSelect: (symbolId: string, el: HTMLElement) => void;
+}) {
+  const all = [...stack].reverse(); // outermost → innermost
+  const MAX_VISIBLE = 3;
+  const hiddenCount = all.length > MAX_VISIBLE ? all.length - MAX_VISIBLE : 0;
+  const items = hiddenCount > 0 ? all.slice(-MAX_VISIBLE) : all;
+
+  if (all.length === 0) {
+    return (
+      <div style={{
+        height: 30, minHeight: 30,
+        display: 'flex', alignItems: 'center',
+        padding: '0 12px',
+        borderBottom: '1px solid #f1f5f9',
+        background: '#fafafa',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>마우스를 컴포넌트 위로 이동</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      height: 30, minHeight: 30,
+      display: 'flex', alignItems: 'center',
+      padding: '0 8px',
+      borderBottom: '1px solid #f1f5f9',
+      background: '#fffbeb',
+      flexShrink: 0,
+      gap: 2,
+      overflow: 'hidden',
+    }}>
+      {hiddenCount > 0 && (
+        <>
+          <span
+            title={all.slice(0, hiddenCount).map(c => c.symbolId.split('#').at(-1)).join(' › ')}
+            style={{
+              fontSize: 10, color: '#d97706', flexShrink: 0,
+              padding: '1px 4px', borderRadius: 3,
+              background: 'rgba(245,158,11,0.10)',
+              cursor: 'default', userSelect: 'none',
+            }}
+          >
+            ···
+          </span>
+          <span style={{ fontSize: 10, color: '#d97706', flexShrink: 0, userSelect: 'none' }}>›</span>
+        </>
+      )}
+      {items.map((comp, i) => {
+        const name = comp.symbolId.split('#').at(-1) ?? comp.symbolId;
+        const isLast = i === items.length - 1;
+        return (
+          <Fragment key={`${comp.symbolId}-${i}`}>
+            <button
+              type="button"
+              onClick={() => onSelect(comp.symbolId, comp.el)}
+              style={{
+                padding: '1px 4px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                borderRadius: 3,
+                fontSize: 11,
+                fontWeight: isLast ? 600 : 400,
+                color: isLast ? '#92400e' : '#b45309',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                transition: 'background 80ms',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 90,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.12)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              title={name}
+            >
+              {name}
+            </button>
+            {!isLast && (
+              <span style={{ fontSize: 10, color: '#d97706', flexShrink: 0, userSelect: 'none' }}>›</span>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -473,19 +796,50 @@ function ChipList({ items, color = 'default' }: { items: string[]; color?: 'defa
 // ─── 플로팅 사이드바 ──────────────────────────────────────────────────────────
 function FloatingSidebar({
   stack, selectedId, selectedLoc, allEntries, onSelect, onClose,
+  dockPosition, floatPos, onDockChange, onFloatMove,
 }: {
   stack: FoundComp[];
   selectedId: string;
   selectedLoc: string | null;
   allEntries: DocEntry[];
-  onSelect: (symbolId: string) => void;
+  onSelect: (symbolId: string, el?: HTMLElement) => void;
   onClose: () => void;
+  dockPosition: DockPosition;
+  floatPos: { x: number; y: number };
+  onDockChange: (pos: DockPosition) => void;
+  onFloatMove: (pos: { x: number; y: number }) => void;
 }) {
   const [renderedOnly, setRenderedOnly] = useState(false);
+  const [view, setView] = useState<'tree' | 'detail'>('tree');
+
+  // 플로팅 드래그
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  function onHeaderMouseDown(e: React.MouseEvent) {
+    if (dockPosition !== 'float') return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: floatPos.x, origY: floatPos.y };
+    function onMouseMove(ev: MouseEvent) {
+      if (!dragRef.current) return;
+      const nx = dragRef.current.origX + (ev.clientX - dragRef.current.startX);
+      const ny = dragRef.current.origY + (ev.clientY - dragRef.current.startY);
+      onFloatMove({ x: Math.max(0, nx), y: Math.max(0, ny) });
+    }
+    function onMouseUp() {
+      dragRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  // 선택 시 자동으로 detail 뷰로 전환
+  useEffect(() => {
+    if (selectedId) setView('detail');
+  }, [selectedId]);
 
   const hoveredIds = useMemo(() => new Set(stack.map(c => c.symbolId)), [stack]);
 
-  // Rendered 모드: 현재 DOM에 data-gori-id가 있는 항목만
   const displayEntries = useMemo(() => {
     if (!renderedOnly) return allEntries;
     const domIds = new Set(
@@ -500,35 +854,28 @@ function FloatingSidebar({
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [selectedId]);
-
-  const hoveredName = stack[0]?.symbolId.split('#').at(-1);
+    if (view === 'tree') selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedId, view]);
 
   return (
     <div
       data-gori-overlay
-      style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: SIDEBAR_W,
-        background: '#ffffff',
-        borderLeft: '1px solid #e2e8f0',
-        boxShadow: '-4px 0 20px rgba(15,23,42,0.08)',
-        zIndex: 10000,
-        display: 'flex', flexDirection: 'column',
-        fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
-        overflow: 'hidden',
-      }}
+      style={sidebarStyle(dockPosition, floatPos)}
     >
       {/* 헤더 */}
-      <div style={{
-        height: 44, minHeight: 44,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 12px',
-        borderBottom: '1px solid #f1f5f9',
-        background: '#fafafa',
-        flexShrink: 0,
-      }}>
+      <div
+        onMouseDown={onHeaderMouseDown}
+        style={{
+          height: 44, minHeight: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 8px 0 12px',
+          borderBottom: '1px solid #f1f5f9',
+          background: '#fafafa',
+          flexShrink: 0,
+          cursor: dockPosition === 'float' ? 'grab' : 'default',
+          userSelect: 'none',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 18, height: 18, borderRadius: 4,
@@ -538,82 +885,97 @@ function FloatingSidebar({
           }}>G</div>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Inspector</span>
         </div>
-        <button type="button" onClick={onClose} style={{
-          width: 24, height: 24, borderRadius: 5, border: '1px solid #e2e8f0',
-          background: 'transparent', color: '#94a3b8', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-        }}>✕</button>
-      </div>
-
-      {/* All / Rendered 토글 */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid #f1f5f9',
-        flexShrink: 0,
-      }}>
-        <ToggleTab label="All" active={!renderedOnly} onClick={() => setRenderedOnly(false)} />
-        <ToggleTab label="Rendered" active={renderedOnly}  onClick={() => setRenderedOnly(true)}  accent />
-      </div>
-
-      {/* 현재 호버 표시 */}
-      <div style={{
-        height: 30, minHeight: 30,
-        display: 'flex', alignItems: 'center',
-        padding: '0 12px', gap: 6,
-        borderBottom: '1px solid #f1f5f9',
-        background: hoveredName ? '#fffbeb' : '#fafafa',
-        flexShrink: 0,
-        transition: 'background 120ms',
-      }}>
-        <div style={{
-          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-          background: hoveredName ? '#f59e0b' : '#e2e8f0',
-          transition: 'background 120ms',
-        }} />
-        <span style={{
-          fontSize: 11, fontWeight: hoveredName ? 500 : 400,
-          color: hoveredName ? '#92400e' : '#94a3b8',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-        }}>
-          {hoveredName ?? '마우스를 컴포넌트 위로 이동'}
-        </span>
-        {stack.length > 1 && (
-          <span style={{ fontSize: 10, color: '#d97706', flexShrink: 0 }}>
-            +{stack.length - 1}
-          </span>
-        )}
-      </div>
-
-      {/* 폴더 트리 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        {displayEntries.length === 0 ? (
-          <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
-            {renderedOnly
-              ? '현재 화면에 렌더된 컴포넌트가 없습니다'
-              : '컴포넌트 데이터가 없습니다'}
-          </p>
-        ) : (
-          <TreeNodeView
-            node={tree}
-            depth={0}
-            hoveredIds={hoveredIds}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            selectedRef={selectedRef}
-          />
-        )}
-      </div>
-
-      {/* 선택된 컴포넌트 상세 */}
-      {selectedEntry && (
-        <div style={{
-          borderTop: '1px solid #e2e8f0',
-          maxHeight: 220, overflowY: 'auto',
-          flexShrink: 0,
-          background: '#fafafa',
-        }}>
-          <EntryDetail entry={selectedEntry} loc={selectedLoc} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
+            <DockIcon key={pos} pos={pos} active={dockPosition === pos} onClick={() => onDockChange(pos)} />
+          ))}
+          <div style={{ width: 1, height: 16, background: '#e2e8f0', margin: '0 4px' }} />
+          <button type="button" onClick={onClose} style={{
+            width: 24, height: 24, borderRadius: 5, border: '1px solid #e2e8f0',
+            background: 'transparent', color: '#94a3b8', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+          }}>✕</button>
         </div>
+      </div>
+
+      {/* 브레드크럼 — 항상 표시 */}
+      <BreadcrumbBar stack={stack} onSelect={onSelect} />
+
+      {view === 'tree' ? (
+        <>
+          {/* All / Rendered 토글 */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+            <ToggleTab label="All"      active={!renderedOnly} onClick={() => setRenderedOnly(false)} />
+            <ToggleTab label="Rendered" active={renderedOnly}  onClick={() => setRenderedOnly(true)} accent />
+          </div>
+
+          {/* 폴더 트리 */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+            {displayEntries.length === 0 ? (
+              <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                {renderedOnly ? '현재 화면에 렌더된 컴포넌트가 없습니다' : '컴포넌트 데이터가 없습니다'}
+              </p>
+            ) : (
+              <TreeNodeView
+                node={tree}
+                depth={0}
+                hoveredIds={hoveredIds}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                selectedRef={selectedRef}
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* 뒤로가기 바 */}
+          <div style={{
+            height: 36, minHeight: 36,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '0 8px',
+            borderBottom: '1px solid #f1f5f9',
+            background: '#fafafa',
+            flexShrink: 0,
+          }}>
+            <button
+              type="button"
+              onClick={() => setView('tree')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '3px 7px', borderRadius: 4,
+                border: '1px solid #e2e8f0', background: '#fff',
+                cursor: 'pointer', fontSize: 11, color: '#475569',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+            >
+              ← 목록
+            </button>
+            <span style={{
+              fontSize: 12, fontWeight: 600, color: '#0f172a',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+            }}>
+              {selectedEntry?.name ?? selectedId.split('#').at(-1)}
+            </span>
+          </div>
+
+          {/* 상세 — 전체 높이 사용 */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {selectedEntry
+              ? <EntryDetail
+                  entry={selectedEntry}
+                  loc={selectedLoc}
+                  onNavigate={(name) => {
+                    const target = allEntries.find(e => e.name === name);
+                    if (target) onSelect(target.symbolId);
+                  }}
+                />
+              : <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8' }}>데이터 없음</p>
+            }
+          </div>
+        </>
       )}
     </div>
   );
@@ -646,7 +1008,32 @@ function ToggleTab({
 }
 
 // ─── 플로팅 Inspect 버튼 ──────────────────────────────────────────────────────
-export function InspectButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+export function InspectButton({
+  active, onClick, dockPosition = 'right',
+}: {
+  active: boolean;
+  onClick: () => void;
+  dockPosition?: DockPosition;
+}) {
+  let btnRight: number | undefined;
+  let btnLeft: number | undefined;
+  let btnBottom: number;
+
+  if (dockPosition === 'right') {
+    btnRight  = active ? SIDEBAR_W + 12 : 20;
+    btnBottom = 20;
+  } else if (dockPosition === 'left') {
+    btnLeft   = active ? SIDEBAR_W + 12 : 20;
+    btnBottom = 20;
+  } else if (dockPosition === 'bottom') {
+    btnRight  = 20;
+    btnBottom = active ? BOTTOM_H + 12 : 20;
+  } else {
+    // float
+    btnRight  = 20;
+    btnBottom = 20;
+  }
+
   return (
     <button
       data-gori-overlay
@@ -654,8 +1041,10 @@ export function InspectButton({ active, onClick }: { active: boolean; onClick: (
       onClick={onClick}
       title={active ? 'Inspect 종료 (Esc)' : '컴포넌트 Inspect'}
       style={{
-        position: 'fixed', bottom: 20,
-        right: active ? SIDEBAR_W + 12 : 20,
+        position: 'fixed',
+        bottom: btnBottom,
+        ...(btnRight  !== undefined ? { right: btnRight }  : {}),
+        ...(btnLeft   !== undefined ? { left:  btnLeft  }  : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
         background: active ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : '#0f172a',
         color: '#ffffff', cursor: 'pointer',
@@ -673,12 +1062,14 @@ export function InspectButton({ active, onClick }: { active: boolean; onClick: (
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 export function ComponentOverlay({
-  graph, active, onDeactivate,
+  graph, active, onDeactivate, onToggle,
 }: {
-  graph: GoriGraph; active: boolean; onDeactivate: () => void;
+  graph: GoriGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
 }) {
   const [stack,      setStack]      = useState<FoundComp[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
+  const [floatPos,     setFloatPos]     = useState(loadFloatPos);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
   const selectedElRef = useRef<HTMLElement | null>(null);
 
@@ -793,7 +1184,11 @@ export function ComponentOverlay({
   const hoveredLabel   = hoveredComp?.symbolId.split('#').at(-1) ?? '';
   const selectedLabel  = selectedId.split('#').at(-1) ?? '';
 
-  if (!active) return null;
+  if (!active) {
+    return onToggle ? (
+      <InspectButton active={false} onClick={onToggle} dockPosition={dockPosition} />
+    ) : null;
+  }
 
   return (
     <>
@@ -807,13 +1202,49 @@ export function ComponentOverlay({
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
 
+      {onToggle && (
+        <InspectButton active={true} onClick={onToggle} dockPosition={dockPosition} />
+      )}
+
       {/* 플로팅 사이드바 */}
       <FloatingSidebar
         stack={stack}
         selectedId={selectedId}
         selectedLoc={selectedLoc}
         allEntries={allEntries}
-        onSelect={(id) => { setSelectedId(id); selectedElRef.current = null; }}
+        dockPosition={dockPosition}
+        floatPos={floatPos}
+        onDockChange={(pos) => { setDockPosition(pos); saveDock(pos); }}
+        onFloatMove={(pos) => { setFloatPos(pos); saveFloatPos(pos); }}
+        onSelect={(id, el) => {
+          setSelectedId(id);
+          if (el) {
+            selectedElRef.current = el;
+          } else {
+            // element 없이 navigate할 때 (상세 뷰 칩 클릭):
+            // 1) 서브트리 안에서 탐색 (자식 방향)
+            // 2) 없으면 조상에서 탐색 (부모 방향) → n번째 인스턴스 유지
+            const currentEl = selectedElRef.current;
+            if (currentEl) {
+              const inSubtree = currentEl.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null;
+              if (inSubtree) {
+                selectedElRef.current = inSubtree;
+              } else {
+                let ancestor: Element | null = currentEl.parentElement;
+                while (ancestor) {
+                  if (ancestor.getAttribute('data-gori-id') === id) {
+                    selectedElRef.current = ancestor as HTMLElement;
+                    break;
+                  }
+                  ancestor = ancestor.parentElement;
+                }
+                if (!ancestor) selectedElRef.current = null;
+              }
+            } else {
+              selectedElRef.current = null;
+            }
+          }
+        }}
         onClose={onDeactivate}
       />
     </>

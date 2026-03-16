@@ -4,7 +4,7 @@ import { buildGraph } from '../../src/core/graph/graph-builder';
 import type { GoriGraph } from '../../src/core/types/graph';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
-import { ComponentOverlay, InspectButton } from './component-overlay';
+import { ComponentOverlay } from './component-overlay';
 import { HomePage } from './pages/home-page';
 import { ProductPage } from './pages/product-page';
 import { CartPage } from './pages/cart-page';
@@ -269,8 +269,13 @@ export function App() {
       </div>
 
       {/* ── 오버레이 ────────────────────────────────────────────────── */}
-      <ComponentOverlay graph={graph} active={inspectMode} onDeactivate={() => setInspectMode(false)} />
-      <InspectButton active={inspectMode} onClick={() => setInspectMode(p => !p)} />
+      <ComponentOverlay
+        graph={graph}
+        active={inspectMode}
+        onDeactivate={() => setInspectMode(false)}
+        onToggle={() => setInspectMode(p => !p)}
+      />
+
     </div>
   );
 }
