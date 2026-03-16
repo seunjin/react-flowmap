@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Folder, FileCode, Component, Crosshair, X, Search, ChevronLeft } from 'lucide-react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
@@ -212,7 +212,7 @@ function primitiveColor(value: unknown): string {
   return '#64748b';
 }
 
-function isPrimitive(value: unknown): boolean {
+function _isPrimitive(value: unknown): boolean {
   return value === null || value === undefined ||
     typeof value === 'string' || typeof value === 'number' ||
     typeof value === 'boolean' || typeof value === 'function';
@@ -252,9 +252,6 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
 
   const typeName = typeEntry?.type ?? null;
 
-  const entries: [string, unknown][] = isArr
-    ? (value as unknown[]).map((v, i) => [String(i), v])
-    : isObj ? Object.entries(value as Record<string, unknown>) : [];
 
   const mono: React.CSSProperties = { fontFamily: 'monospace', fontSize: 11 };
 
@@ -1228,8 +1225,9 @@ function FloatingSidebar({
           {/* 뒤로가기 바 */}
           <div style={{
             height: 36, minHeight: 36,
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '0 8px',
+            display: 'grid', gridTemplateColumns: '32px 1fr 32px',
+            alignItems: 'center',
+            padding: '0 6px',
             borderBottom: '1px solid rgba(226,232,240,0.6)',
             background: 'rgba(248,250,252,0.5)',
             flexShrink: 0,
@@ -1238,23 +1236,24 @@ function FloatingSidebar({
               type="button"
               onClick={() => setView('tree')}
               style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                padding: '3px 7px', borderRadius: 4,
-                border: '1px solid rgba(226,232,240,0.8)', background: 'rgba(255,255,255,0.7)',
-                cursor: 'pointer', fontSize: 11, color: '#475569',
-                flexShrink: 0,
+                width: 28, height: 28, borderRadius: 5,
+                border: '1px solid rgba(226,232,240,0.8)', background: 'transparent',
+                cursor: 'pointer', color: '#64748b',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <ChevronLeft size={12} />목록
+              <ChevronLeft size={14} />
             </button>
             <span style={{
               fontSize: 12, fontWeight: 600, color: '#0f172a',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              textAlign: 'center',
             }}>
               {selectedEntry?.name ?? selectedId.split('#').at(-1)}
             </span>
+            <div />
           </div>
 
           {/* 상세 — 전체 높이 사용 */}
