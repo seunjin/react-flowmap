@@ -5,10 +5,10 @@ import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 const CAT_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  page:      { bg: '#f1f5f9', color: '#0f172a', label: 'Page'      },
-  component: { bg: '#f1f5f9', color: '#0f172a', label: 'Component' },
-  hook:      { bg: '#f8fafc', color: '#475569', label: 'Hook'      },
-  function:  { bg: '#fff7ed', color: '#c2410c', label: 'Fn'        },
+  page:      { bg: '#eff6ff', color: '#1e40af', label: 'Page'      },
+  component: { bg: '#eff6ff', color: '#1e40af', label: 'Component' },
+  hook:      { bg: '#f3f4f6', color: '#4b5563', label: 'Hook'      },
+  function:  { bg: '#f3f4f6', color: '#4b5563', label: 'Fn'        },
 };
 
 const SIDEBAR_W = 320;
@@ -43,17 +43,17 @@ function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: number }): R
     fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
     overflow: 'hidden',
   };
-  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(226,232,240,0.7)', boxShadow: '-4px 0 32px rgba(15,23,42,0.08)' };
-  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(226,232,240,0.7)', boxShadow: '4px 0 32px rgba(15,23,42,0.08)' };
-  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(226,232,240,0.7)', boxShadow: '0 -4px 32px rgba(15,23,42,0.08)' };
+  if (dock === 'right')  return { ...base, top: 0, right: 0, bottom: 0, width: SIDEBAR_W, borderLeft: '1px solid rgba(219,234,254,0.7)', boxShadow: '-4px 0 32px rgba(23,37,84,0.08)' };
+  if (dock === 'left')   return { ...base, top: 0, left: 0, bottom: 0, width: SIDEBAR_W, borderRight: '1px solid rgba(219,234,254,0.7)', boxShadow: '4px 0 32px rgba(23,37,84,0.08)' };
+  if (dock === 'bottom') return { ...base, left: 0, right: 0, bottom: 0, height: BOTTOM_H, borderTop: '1px solid rgba(219,234,254,0.7)', boxShadow: '0 -4px 32px rgba(23,37,84,0.08)' };
   // float
   return {
     ...base,
     top: floatPos.y, left: floatPos.x,
     width: SIDEBAR_W, maxHeight: '80vh',
     borderRadius: 14,
-    border: '1px solid rgba(226,232,240,0.8)',
-    boxShadow: '0 4px 6px rgba(15,23,42,0.04), 0 12px 32px rgba(15,23,42,0.10), 0 32px 64px rgba(15,23,42,0.06)',
+    border: '1px solid rgba(219,234,254,0.8)',
+    boxShadow: '0 4px 6px rgba(23,37,84,0.04), 0 12px 32px rgba(23,37,84,0.10), 0 32px 64px rgba(23,37,84,0.06)',
   };
 }
 
@@ -111,13 +111,13 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
         title="패널 위치 변경"
         style={{
           width: 26, height: 26, borderRadius: 5,
-          border: '1px solid rgba(226,232,240,0.8)',
-          background: open ? 'rgba(241,245,249,0.9)' : 'transparent',
+          border: '1px solid rgba(219,234,254,0.8)',
+          background: open ? 'rgba(239,246,255,0.9)' : 'transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 3, transition: 'background 100ms',
         }}
       >
-        <DockSvg pos={current} color="#64748b" />
+        <DockSvg pos={current} color="#6b7280" />
       </button>
       {open && (
         <div
@@ -127,8 +127,8 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(226,232,240,0.8)',
-            borderRadius: 8, boxShadow: '0 4px 16px rgba(15,23,42,0.1)',
+            border: '1px solid rgba(219,234,254,0.8)',
+            borderRadius: 8, boxShadow: '0 4px 16px rgba(23,37,84,0.1)',
             padding: 4, zIndex: 10001, minWidth: 110,
           }}
         >
@@ -142,15 +142,15 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
                 display: 'flex', alignItems: 'center', gap: 8,
                 width: '100%', padding: '6px 8px', borderRadius: 5,
                 border: 'none', cursor: 'pointer', textAlign: 'left',
-                background: current === pos ? 'rgba(241,245,249,0.9)' : 'transparent',
-                color: current === pos ? '#0f172a' : '#475569',
+                background: current === pos ? 'rgba(239,246,255,0.9)' : 'transparent',
+                color: current === pos ? '#111827' : '#6b7280',
                 fontSize: 11, fontWeight: current === pos ? 600 : 400,
                 transition: 'background 80ms',
               }}
-              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
+              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; }}
               onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <DockSvg pos={pos} color={current === pos ? '#0f172a' : '#94a3b8'} />
+              <DockSvg pos={pos} color={current === pos ? '#111827' : '#9ca3af'} />
               {DOCK_LABELS[pos]}
             </button>
           ))}
@@ -211,7 +211,7 @@ function primitiveColor(value: unknown): string {
   if (typeof value === 'string')  return '#16a34a';
   if (typeof value === 'number')  return '#2563eb';
   if (typeof value === 'boolean') return '#dc2626';
-  return '#64748b';
+  return '#6b7280';
 }
 
 function _isPrimitive(value: unknown): boolean {
@@ -243,17 +243,17 @@ function TypeFieldsView({ fields, depth = 0 }: { fields: Record<string, PropType
       {Object.entries(fields).map(([fname, field]) => (
         <div key={fname} style={{ paddingLeft: depth * 10 }}>
           <div>
-            <span style={{ ...s, color: '#475569', fontWeight: 500 }}>{fname}{field.optional ? '?' : ''}</span>
-            <span style={{ ...s, color: '#cbd5e1' }}>: </span>
+            <span style={{ ...s, color: '#374151', fontWeight: 500 }}>{fname}{field.optional ? '?' : ''}</span>
+            <span style={{ ...s, color: '#9ca3af' }}>: </span>
             {field.fields
-              ? <span style={{ ...s, color: '#94a3b8' }}>{'{'}</span>
-              : <span style={{ ...s, color: '#64748b' }}>{field.type}</span>
+              ? <span style={{ ...s, color: '#9ca3af' }}>{'{'}</span>
+              : <span style={{ ...s, color: '#6b7280' }}>{field.type}</span>
             }
           </div>
           {field.fields && (
             <>
               <TypeFieldsView fields={field.fields} depth={depth + 1} />
-              <span style={{ ...s, color: '#94a3b8', paddingLeft: depth * 10 }}>{'}'}</span>
+              <span style={{ ...s, color: '#9ca3af', paddingLeft: depth * 10 }}>{'}'}</span>
             </>
           )}
         </div>
@@ -274,27 +274,27 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
 
   return (
     <div style={{
-      borderRadius: 5, border: '1px solid rgba(226,232,240,0.7)', overflow: 'hidden',
+      borderRadius: 5, border: '1px solid rgba(219,234,254,0.7)', overflow: 'hidden',
       background: 'rgba(255,255,255,0.5)',
     }}>
       {/* 헤더: name? : TypeName */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '4px 8px', background: 'rgba(241,245,249,0.7)',
-        borderBottom: '1px solid rgba(226,232,240,0.6)',
+        padding: '4px 8px', background: 'rgba(239,246,255,0.7)',
+        borderBottom: '1px solid rgba(219,234,254,0.6)',
       }}>
-        <span style={{ ...mono, color: '#0f172a', fontWeight: 600 }}>{name}</span>
-        {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
+        <span style={{ ...mono, color: '#111827', fontWeight: 600 }}>{name}</span>
+        {typeEntry?.optional && <span style={{ ...mono, color: '#9ca3af' }}>?</span>}
         {typeName && (
           <>
-            <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>:</span>
+            <span style={{ ...mono, fontSize: 10, color: '#9ca3af' }}>:</span>
             {hasTypeDef ? (
               <button
                 type="button"
                 onClick={() => setTypeOpen(o => !o)}
                 style={{
-                  ...mono, fontSize: 10, color: typeOpen ? '#334155' : '#94a3b8',
-                  background: typeOpen ? 'rgba(226,232,240,0.6)' : 'transparent',
+                  ...mono, fontSize: 10, color: typeOpen ? '#1e40af' : '#9ca3af',
+                  background: typeOpen ? 'rgba(219,234,254,0.6)' : 'transparent',
                   border: typeOpen ? '1px solid rgba(203,213,225,0.8)' : '1px solid transparent',
                   borderRadius: 3, padding: '0 4px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 2, transition: 'all 80ms',
@@ -304,7 +304,7 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
                 <span style={{ fontSize: 7, opacity: 0.7 }}>{typeOpen ? '▾' : '▸'}</span>
               </button>
             ) : (
-              <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>{typeName}</span>
+              <span style={{ ...mono, fontSize: 10, color: '#9ca3af' }}>{typeName}</span>
             )}
           </>
         )}
@@ -314,12 +314,12 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
       {typeOpen && (typeEntry?.fields || typeEntry?.resolvedType) && (
         <div style={{
           padding: '6px 8px 8px',
-          borderBottom: '1px solid rgba(226,232,240,0.6)',
-          background: 'rgba(248,250,252,0.4)',
+          borderBottom: '1px solid rgba(219,234,254,0.6)',
+          background: 'rgba(240,249,255,0.4)',
         }}>
           {typeEntry.fields
             ? <TypeFieldsView fields={typeEntry.fields} />
-            : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b' }}>{typeEntry.resolvedType}</span>
+            : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#6b7280' }}>{typeEntry.resolvedType}</span>
           }
         </div>
       )}
@@ -333,8 +333,8 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
         ) : (
           <pre style={{
             margin: 0, padding: '4px 6px',
-            background: 'rgba(248,250,252,0.6)', border: '1px solid rgba(226,232,240,0.6)', borderRadius: 3,
-            ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
+            background: 'rgba(243,244,246,0.6)', border: '1px solid rgba(229,231,235,0.6)', borderRadius: 3,
+            ...mono, fontSize: 10, lineHeight: 1.6, color: '#374151',
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}>
             {JSON.stringify(value, (_k, v) => typeof v === 'function' ? primitiveLabel(v) : v, 2)}
@@ -505,14 +505,14 @@ function TreeNodeView({
             }}
           >
             <span style={{
-              fontSize: 7, color: '#94a3b8', display: 'inline-block',
+              fontSize: 7, color: '#9ca3af', display: 'inline-block',
               transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
               transition: 'transform 120ms', flexShrink: 0,
             }}>▶</span>
             <FolderIcon hovered={hasHovered} />
             <span style={{
               fontSize: 11, fontWeight: hasHovered ? 600 : 500,
-              color: hasHovered ? '#334155' : '#64748b',
+              color: hasHovered ? '#374151' : '#6b7280',
             }}>
               {node.name}
             </span>
@@ -547,13 +547,13 @@ function TreeNodeView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: `4px 10px 3px ${10 + depth * 14}px`,
-        background: fileSelected ? '#f1f5f9' : fileHovered ? '#f8fafc' : 'transparent',
+        background: fileSelected ? '#eff6ff' : fileHovered ? '#f0f9ff' : 'transparent',
       }}>
         <FileIcon hovered={fileHovered} selected={fileSelected} />
         <span style={{
           fontSize: 11,
           fontWeight: fileSelected ? 600 : fileHovered ? 500 : 400,
-          color: fileSelected ? '#0f172a' : fileHovered ? '#475569' : '#94a3b8',
+          color: fileSelected ? '#111827' : fileHovered ? '#374151' : '#9ca3af',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
         }}>
           {node.name}
@@ -580,14 +580,14 @@ function TreeNodeView({
               width: '100%', padding: `4px 10px 4px ${10 + (depth + 1) * 14}px`,
               border: 'none',
               borderLeft: isSelected
-                ? '2px solid #334155'
+                ? '2px solid #1e40af'
                 : isFocused
-                  ? '2px solid #cbd5e1'
+                  ? '2px solid #bfdbfe'
                   : isHovered
-                    ? '2px solid #94a3b8'
+                    ? '2px solid #9ca3af'
                     : '2px solid transparent',
               textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#e2e8f0' : isFocused ? '#f1f5f9' : isHovered ? '#f1f5f9' : 'transparent',
+              background: isSelected ? '#dbeafe' : isFocused ? '#eff6ff' : isHovered ? '#eff6ff' : 'transparent',
               outline: 'none',
               transition: 'background 60ms',
             }}
@@ -596,7 +596,7 @@ function TreeNodeView({
             <span style={{
               fontSize: 12,
               fontWeight: isSelected ? 700 : isHovered ? 500 : 400,
-              color: isSelected ? '#0f172a' : isHovered ? '#475569' : '#94a3b8',
+              color: isSelected ? '#111827' : isHovered ? '#374151' : '#9ca3af',
               flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {entry.name}
@@ -604,8 +604,8 @@ function TreeNodeView({
             {(isSelected || isHovered) && (
               <span style={{
                 padding: '1px 5px', borderRadius: 3,
-                background: isSelected ? '#cbd5e1' : '#e2e8f0',
-                color: isSelected ? '#0f172a' : '#475569',
+                background: isSelected ? '#bfdbfe' : '#dbeafe',
+                color: isSelected ? '#1e40af' : '#3b82f6',
                 fontSize: 9, fontWeight: 700, flexShrink: 0,
               }}>
                 {cat.label}
@@ -620,13 +620,13 @@ function TreeNodeView({
 
 // ─── 아이콘 ───────────────────────────────────────────────────────────────────
 function FolderIcon({ hovered }: { hovered: boolean }) {
-  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#475569' : '#94a3b8' }} />;
+  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#374151' : '#9ca3af' }} />;
 }
 function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#334155' : hovered ? '#475569' : '#94a3b8' }} />;
+  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#1e40af' : hovered ? '#374151' : '#9ca3af' }} />;
 }
 function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#334155' : isHovered ? '#475569' : '#cbd5e1' }} />;
+  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#1e40af' : isHovered ? '#374151' : '#d1d5db' }} />;
 }
 
 // ─── 커서 아래 컴포넌트 스택 ──────────────────────────────────────────────────
@@ -659,8 +659,8 @@ function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string }) {
   return (
     <div style={{
       position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '1.5px dashed #94a3b8',
-      background: 'rgba(100,116,139,0.04)',
+      border: '1.5px dashed #9ca3af',
+      background: 'rgba(59,130,246,0.04)',
       boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9998,
     }}>
       <div style={{
@@ -668,7 +668,7 @@ function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string }) {
         ...(labelAbove
           ? { top: -1, left: -1, transform: 'translateY(-100%)' }
           : { top: 3, left: 3 }),
-        background: '#64748b',
+        background: '#3b82f6',
         borderRadius: labelAbove ? '4px 4px 0 0' : 4,
         padding: '1px 7px', fontSize: 10, fontWeight: 600,
         color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
@@ -689,8 +689,8 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
   return (
     <div style={{
       position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '2px solid #334155',
-      background: 'rgba(51,65,85,0.05)',
+      border: '2px solid #1e40af',
+      background: 'rgba(30,64,175,0.05)',
       boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9999,
     }}>
       <div style={{
@@ -698,7 +698,7 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
         ...(labelAbove
           ? { top: -1, left: -1, transform: 'translateY(-100%)' }
           : { top: 3, left: 3 }),
-        background: '#334155',
+        background: '#1e40af',
         borderRadius: labelAbove ? '4px 4px 0 0' : 4,
         padding: '1px 7px', fontSize: 11, fontWeight: 600,
         color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
@@ -731,9 +731,9 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 섹션 */}
-      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #eff6ff' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.3, wordBreak: 'break-word' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
             {entry.name}
           </span>
           <span style={{
@@ -752,24 +752,24 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '5px 8px', borderRadius: 5,
-              border: '1px solid #e2e8f0', background: '#f8fafc',
+              border: '1px solid #dbeafe', background: '#f0f9ff',
               cursor: 'pointer', width: '100%', textAlign: 'left',
               transition: 'all 100ms',
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#f1f5f9';
-              el.style.borderColor = '#cbd5e1';
+              el.style.background = '#eff6ff';
+              el.style.borderColor = '#bfdbfe';
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#f8fafc';
-              el.style.borderColor = '#e2e8f0';
+              el.style.background = '#f0f9ff';
+              el.style.borderColor = '#dbeafe';
             }}
           >
-            <ExternalLink size={11} style={{ color: '#334155', flexShrink: 0 }} />
+            <ExternalLink size={11} style={{ color: '#1e40af', flexShrink: 0 }} />
             <span style={{
-              fontSize: 10, color: '#64748b', fontFamily: 'monospace',
+              fontSize: 10, color: '#6b7280', fontFamily: 'monospace',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
             }}>
               {shortenPath(entry.filePath)}{loc ? `:${loc}` : ''}
@@ -780,7 +780,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
 
       {/* 미니 관계 그래프 */}
       <div style={{ padding: '16px 14px' }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 12 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 12 }}>
           Relations
         </span>
         <MiniRelationGraph
@@ -802,7 +802,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
         const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, PropTypeEntry>> })
           .__goriPropTypes?.[entry.symbolId];
         return (
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid #eff6ff' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {entries.map(([k, v]) => (
@@ -821,7 +821,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
 function DetailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 9, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
       {children}
     </div>
   );
@@ -844,28 +844,28 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
         title={name}
         style={{
           padding: '5px 12px', borderRadius: 7,
-          border: isCenter ? '1.5px solid #334155' : '1px solid rgba(226,232,240,0.9)',
-          background: isCenter ? 'rgba(241,245,249,0.9)' : 'rgba(248,250,252,0.7)',
-          color: isCenter ? '#0f172a' : '#64748b',
+          border: isCenter ? '1.5px solid #1e40af' : '1px solid rgba(219,234,254,0.9)',
+          background: isCenter ? 'rgba(239,246,255,0.9)' : 'rgba(240,249,255,0.7)',
+          color: isCenter ? '#111827' : '#6b7280',
           fontSize: 11, fontWeight: isCenter ? 700 : 500,
           cursor: isCenter ? 'default' : 'pointer',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           maxWidth: 130, transition: 'all 80ms',
-          boxShadow: isCenter ? '0 0 0 3px rgba(51,65,85,0.1)' : 'none',
+          boxShadow: isCenter ? '0 0 0 3px rgba(30,64,175,0.1)' : 'none',
         }}
         onMouseEnter={e => {
           if (!isCenter) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.9)';
-            (e.currentTarget as HTMLElement).style.borderColor = '#94a3b8';
-            (e.currentTarget as HTMLElement).style.color = '#0f172a';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.9)';
+            (e.currentTarget as HTMLElement).style.borderColor = '#9ca3af';
+            (e.currentTarget as HTMLElement).style.color = '#111827';
           }
           onHover?.();
         }}
         onMouseLeave={e => {
           if (!isCenter) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(248,250,252,0.7)';
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,232,240,0.9)';
-            (e.currentTarget as HTMLElement).style.color = '#64748b';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(240,249,255,0.7)';
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(219,234,254,0.9)';
+            (e.currentTarget as HTMLElement).style.color = '#6b7280';
           }
           onHoverEnd?.();
         }}
@@ -879,12 +879,12 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
 function GraphConnector() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, margin: '6px 0' }}>
-      <div style={{ width: 1, height: 16, background: '#cbd5e1' }} />
+      <div style={{ width: 1, height: 16, background: '#bfdbfe' }} />
       <div style={{
         width: 0, height: 0,
         borderLeft: '3.5px solid transparent',
         borderRight: '3.5px solid transparent',
-        borderTop: '4.5px solid #cbd5e1',
+        borderTop: '4.5px solid #bfdbfe',
       }} />
     </div>
   );
@@ -924,7 +924,7 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
 
   if (noRelations) {
     return (
-      <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
+      <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>
         관계가 없습니다.
       </p>
     );
@@ -1086,8 +1086,8 @@ function FloatingSidebar({
           height: 44, minHeight: 44,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 8px 0 12px',
-          borderBottom: '1px solid rgba(226,232,240,0.5)',
-          background: dockPosition === 'float' ? 'rgba(248,250,252,0.5)' : 'rgba(248,250,252,0.6)',
+          borderBottom: '1px solid rgba(219,234,254,0.5)',
+          background: dockPosition === 'float' ? 'rgba(240,249,255,0.5)' : 'rgba(240,249,255,0.6)',
           flexShrink: 0,
           cursor: dockPosition === 'float' ? 'grab' : 'default',
           userSelect: 'none',
@@ -1095,25 +1095,32 @@ function FloatingSidebar({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
-            width: 18, height: 18, borderRadius: 4,
-            background: 'linear-gradient(135deg, #64748b, #334155)',
+            width: 18, height: 18,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 800, color: '#fff', flexShrink: 0,
-          }}>G</div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Inspector</span>
-          <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
+            flexShrink: 0,
+          }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M 9 2 L 15 5.5 L 15 12.5 L 9 16 L 3 12.5 L 3 5.5 Z"
+                stroke="#1e40af" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
+              <line x1="9" y1="9" x2="15" y2="5.5" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
+              <line x1="9" y1="9" x2="9" y2="16" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
+              <line x1="9" y1="9" x2="3" y2="5.5" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>Inspector</span>
+          <div style={{ width: 1, height: 14, background: '#dbeafe' }} />
           {/* 요소 선택 픽 버튼 (DevTools 스타일) */}
           <button
             type="button"
             onClick={onPickToggle}
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
-            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1'; } }}
-            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; } }}
+            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.borderColor = '#bfdbfe'; } }}
+            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = '#dbeafe'; } }}
             style={{
               width: 26, height: 26, borderRadius: 5, border: '1px solid',
-              borderColor: picking ? '#334155' : '#e2e8f0',
-              background: picking ? '#f1f5f9' : 'transparent',
-              color: picking ? '#334155' : '#64748b',
+              borderColor: picking ? '#1e40af' : '#dbeafe',
+              background: picking ? '#eff6ff' : 'transparent',
+              color: picking ? '#1e40af' : '#3b82f6',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 120ms',
@@ -1124,13 +1131,13 @@ function FloatingSidebar({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <DockDropdown current={dockPosition} onChange={onDockChange} />
-          <div style={{ width: 1, height: 16, background: 'rgba(226,232,240,0.8)', margin: '0 2px' }} />
+          <div style={{ width: 1, height: 16, background: 'rgba(219,234,254,0.8)', margin: '0 2px' }} />
           <button type="button" onClick={onClose}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; (e.currentTarget as HTMLElement).style.color = '#475569'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#94a3b8'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; }}
             style={{
-              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
-              background: 'transparent', color: '#94a3b8', cursor: 'pointer',
+              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(219,234,254,0.8)',
+              background: 'transparent', color: '#9ca3af', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 100ms',
             }}><X size={13} /></button>
@@ -1142,9 +1149,9 @@ function FloatingSidebar({
         <>
 
           {/* 검색 */}
-          <div style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+          <div style={{ padding: '6px 8px', borderBottom: '1px solid #eff6ff', flexShrink: 0 }}>
             <div style={{ position: 'relative' }}>
-              <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }} />
+              <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
               <input
                 type="text"
                 placeholder="컴포넌트 검색..."
@@ -1153,12 +1160,12 @@ function FloatingSidebar({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '5px 26px 5px 26px',
-                  borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
-                  background: 'rgba(248,250,252,0.6)', fontSize: 11, color: '#0f172a',
+                  borderRadius: 5, border: '1px solid rgba(219,234,254,0.8)',
+                  background: 'rgba(240,249,255,0.6)', fontSize: 11, color: '#111827',
                   outline: 'none', fontFamily: 'inherit',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(226,232,240,0.8)'; e.currentTarget.style.background = 'rgba(248,250,252,0.6)'; }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(219,234,254,0.8)'; e.currentTarget.style.background = 'rgba(240,249,255,0.6)'; }}
               />
               {searchQuery && (
                 <button
@@ -1167,7 +1174,7 @@ function FloatingSidebar({
                   style={{
                     position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
                     width: 16, height: 16, borderRadius: '50%', border: 'none',
-                    background: '#cbd5e1', color: '#fff', cursor: 'pointer',
+                    background: '#bfdbfe', color: '#fff', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 0,
                   }}
@@ -1179,7 +1186,7 @@ function FloatingSidebar({
           {/* 폴더 트리 */}
           <div ref={treeScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {filteredEntries.length === 0 ? (
-              <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+              <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>
                 {searchQuery ? `"${searchQuery}" 검색 결과 없음` : '현재 화면에 렌더된 컴포넌트가 없습니다'}
               </p>
             ) : (
@@ -1207,8 +1214,8 @@ function FloatingSidebar({
             display: 'grid', gridTemplateColumns: '32px 1fr 32px',
             alignItems: 'center',
             padding: '0 6px',
-            borderBottom: '1px solid rgba(226,232,240,0.6)',
-            background: 'rgba(248,250,252,0.5)',
+            borderBottom: '1px solid rgba(219,234,254,0.6)',
+            background: 'rgba(240,249,255,0.5)',
             flexShrink: 0,
           }}>
             <button
@@ -1216,17 +1223,17 @@ function FloatingSidebar({
               onClick={() => setView('tree')}
               style={{
                 width: 28, height: 28, borderRadius: 5,
-                border: '1px solid rgba(226,232,240,0.8)', background: 'transparent',
-                cursor: 'pointer', color: '#64748b',
+                border: '1px solid rgba(219,234,254,0.8)', background: 'transparent',
+                cursor: 'pointer', color: '#9ca3af',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <ChevronLeft size={14} />
             </button>
             <span style={{
-              fontSize: 12, fontWeight: 600, color: '#0f172a',
+              fontSize: 12, fontWeight: 600, color: '#111827',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               textAlign: 'center',
             }}>
@@ -1249,7 +1256,7 @@ function FloatingSidebar({
                   onHover={(symbolId) => onHighlight(symbolId)}
                   onHoverEnd={onHighlightEnd}
                 />
-              : <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8' }}>데이터 없음</p>
+              : <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#9ca3af' }}>데이터 없음</p>
             }
           </div>
         </>
@@ -1290,14 +1297,21 @@ export function InspectButton({
         ...(right !== undefined ? { right } : {}),
         ...(left  !== undefined ? { left  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: '#0f172a',
+        background: '#1d4ed8',
         color: '#ffffff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 10px rgba(15,23,42,0.3)',
+        boxShadow: '0 2px 10px rgba(29,78,216,0.4)',
         transition: 'all 180ms', zIndex: 10001,
       }}
     >
-      <span style={{ fontSize: 18 }}>⬡</span>
+      <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+        {/* 3D 입체 육각형 */}
+        <path d="M 11 3 L 18 7 L 18 15 L 11 19 L 4 15 L 4 7 Z"
+          stroke="white" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"/>
+        <line x1="11" y1="11" x2="18" y2="7" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+        <line x1="11" y1="11" x2="11" y2="19" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+        <line x1="11" y1="11" x2="4" y2="7" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
     </button>
   );
 }
