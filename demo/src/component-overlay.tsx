@@ -173,26 +173,6 @@ function primitiveLabel(value: unknown): string {
   return String(value);
 }
 
-/** 중첩 객체/배열을 한 줄 compact 문자열로 (key: value 포함) */
-function inlineValue(value: unknown): string {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'string') return `"${value}"`;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (typeof value === 'function') return primitiveLabel(value);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '[]';
-    const items = value.slice(0, 3).map(v => inlineValue(v));
-    return `[${items.join(', ')}${value.length > 3 ? `, …+${value.length - 3}` : ''}]`;
-  }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) return '{}';
-    const items = entries.slice(0, 4).map(([k, v]) => `${k}: ${inlineValue(v)}`);
-    return `{ ${items.join(', ')}${entries.length > 4 ? ', …' : ''} }`;
-  }
-  return String(value);
-}
 
 /** 완전 나열식 Props 행
  *
@@ -241,39 +221,21 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
       </div>
 
       {/* 본문 */}
-      <div style={{ padding: '4px 8px 6px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <div style={{ padding: '4px 8px 6px' }}>
         {!isExpandable ? (
-          /* primitive / function — 값 한 줄 */
           <span style={{ ...mono, color: primitiveColor(value) }}>
             {primitiveLabel(value)}
           </span>
         ) : (
-          /* object / array — key: type \n value 나열 */
-          entries.map(([k, v]) => {
-            const isNestedObj = v !== null && typeof v === 'object';
-            return (
-              <div key={k} style={{ marginTop: 4 }}>
-                {/* key 행 */}
-                <div style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>{k}</div>
-                {/* value 행 */}
-                {isNestedObj ? (
-                  <pre style={{
-                    margin: '2px 0 0', padding: '4px 6px',
-                    background: '#f8fafc', border: '1px solid #e8edf2', borderRadius: 3,
-                    ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                    overflowX: 'auto',
-                  }}>
-                    {JSON.stringify(v, null, 2)}
-                  </pre>
-                ) : (
-                  <span style={{ ...mono, color: primitiveColor(v) }}>
-                    {primitiveLabel(v)}
-                  </span>
-                )}
-              </div>
-            );
-          })
+          <pre style={{
+            margin: 0, padding: '4px 6px',
+            background: '#f8fafc', border: '1px solid #e8edf2', borderRadius: 3,
+            ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            overflowX: 'auto', maxHeight: 200, overflowY: 'auto',
+          }}>
+            {JSON.stringify(value, (_k, v) => typeof v === 'function' ? primitiveLabel(v) : v, 2)}
+          </pre>
         )}
       </div>
     </div>
