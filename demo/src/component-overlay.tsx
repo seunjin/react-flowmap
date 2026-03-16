@@ -607,25 +607,37 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
           ? Object.entries(props).filter(([k]) => k !== 'children')
           : [];
         if (entries.length === 0) return null;
+        // Vite 플러그인이 주입한 TypeScript 타입 정보 (있을 경우)
+        const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, string>> })
+          .__goriPropTypes?.[entry.symbolId];
         return (
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {entries.map(([k, v]) => (
-                  <div key={k} style={{
-                    display: 'flex', gap: 0, alignItems: 'baseline',
-                    padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
-                    border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
-                    overflow: 'hidden',
-                  }}>
-                    <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
-                    <span style={{ color: '#94a3b8', margin: '0 3px', flexShrink: 0 }}>=</span>
-                    <span style={{
-                      color: typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#334155',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{formatPropValue(v)}</span>
-                  </div>
-                ))}
+                {entries.map(([k, v]) => {
+                  const typeStr = propTypes?.[k];
+                  return (
+                    <div key={k} style={{
+                      display: 'flex', flexDirection: 'column', gap: 1,
+                      padding: '4px 7px', borderRadius: 4, background: '#f8fafc',
+                      border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, overflow: 'hidden' }}>
+                        <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
+                        {typeStr && (
+                          <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
+                            : {typeStr}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        color: typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#334155',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        paddingLeft: 2,
+                      }}>{formatPropValue(v)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </DetailSection>
           </div>

@@ -129,6 +129,64 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
   });
 }
 
+// ─── Prop 타입 추출 ───────────────────────────────────────────────────────────
+
+/** TSTypeLiteral 멤버 배열 → { propName: 'typeString' } */
+function membersToRecord(members: unknown[], code: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const m of members as Array<{ type: string; key?: { name?: string; value?: string }; typeAnnotation?: { typeAnnotation?: { start: number; end: number } } }>) {
+    if (m.type !== 'TSPropertySignature') continue;
+    const key = m.key?.name ?? m.key?.value;
+    if (!key) continue;
+    const typeAnn = m.typeAnnotation?.typeAnnotation;
+    result[key] = typeAnn ? code.slice(typeAnn.start, typeAnn.end) : 'unknown';
+  }
+  return result;
+}
+
+/** AST에서 type/interface 이름으로 타입 멤버 탐색 */
+function findTypeDef(name: string, ast: unknown, traverse_: typeof traverse): Record<string, string> | null {
+  let found: Record<string, string> | null = null;
+  traverse_(ast, {
+    TSTypeAliasDeclaration(path: { node: { id?: { name?: string }; typeAnnotation: unknown }; stop: () => void }) {
+      if (path.node.id?.name !== name) return;
+      const ta = path.node.typeAnnotation as { type?: string; members?: unknown[] };
+      if (ta?.type === 'TSTypeLiteral' && ta.members) {
+        found = membersToRecord(ta.members, '');
+      }
+      path.stop();
+    },
+    TSInterfaceDeclaration(path: { node: { id?: { name?: string }; body: { body: unknown[] } }; stop: () => void }) {
+      if (path.node.id?.name !== name) return;
+      found = membersToRecord(path.node.body.body, '');
+      path.stop();
+    },
+  });
+  return found;
+}
+
+/** 컴포넌트 함수 노드에서 props 타입 추출 */
+function extractPropTypes(
+  fnNode: { params?: Array<{ type: string; typeAnnotation?: { typeAnnotation?: { type?: string; typeName?: { name?: string }; members?: unknown[]; start: number; end: number } } }> },
+  ast: unknown,
+  code: string,
+  traverse_: typeof traverse,
+): Record<string, string> | null {
+  const firstParam = fnNode.params?.[0];
+  if (!firstParam || firstParam.type !== 'ObjectPattern' || !firstParam.typeAnnotation) return null;
+
+  const typeNode = firstParam.typeAnnotation.typeAnnotation;
+  if (!typeNode) return null;
+
+  if (typeNode.type === 'TSTypeLiteral' && typeNode.members) {
+    return membersToRecord(typeNode.members, code);
+  }
+  if (typeNode.type === 'TSTypeReference' && typeNode.typeName?.name) {
+    return findTypeDef(typeNode.typeName.name, ast, traverse_);
+  }
+  return null;
+}
+
 // ─── 에디터 열기 ──────────────────────────────────────────────────────────────
 function openInEditor(absPath: string, line: number, editor: string): void {
   const target = `${absPath}:${line}`;
@@ -251,6 +309,8 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       }
 
       let modified = false;
+      // 이 파일에서 수집된 symbolId → prop types
+      const propTypesRegistry = new Map<string, Record<string, string>>();
 
       traverse(ast, {
         // 변환이 발생한 경우 파일 상단에 import 주입
@@ -275,13 +335,16 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
         },
 
         // function MyComponent() { ... }
-        FunctionDeclaration(path: { node: { id: { name: string } | null; loc?: { start: { line: number } } } }) {
+        FunctionDeclaration(path: { node: { id: { name: string } | null; loc?: { start: { line: number } }; params?: unknown[] } }) {
           const name = path.node.id?.name;
           if (!name || !/^[A-Z]/.test(name)) return;
           const line = path.node.loc?.start.line ?? 1;
           const symbolId = `symbol:${relPath}#${name}`;
           symbolLocMap.set(symbolId, line);
           injectIntoFn(path, symbolId, line, `file:${relPath}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const props = extractPropTypes(path.node as any, ast, code, traverse);
+          if (props && Object.keys(props).length > 0) propTypesRegistry.set(symbolId, props);
           modified = true;
         },
 
@@ -312,6 +375,9 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
           symbolLocMap.set(symbolId, line);
           const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
           injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const props = extractPropTypes((path.node.init as any), ast, code, traverse);
+          if (props && Object.keys(props).length > 0) propTypesRegistry.set(symbolId, props);
           modified = true;
         },
       });
@@ -324,7 +390,17 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
         code
       ) as { code: string; map: string };
 
-      return { code: newCode, map };
+      // prop types 레지스트리 주입
+      let finalCode = newCode;
+      if (propTypesRegistry.size > 0) {
+        const lines: string[] = ['\n// __gori prop types', '(globalThis.__goriPropTypes??={});'];
+        for (const [sid, props] of propTypesRegistry) {
+          lines.push(`globalThis.__goriPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
+        }
+        finalCode += lines.join('\n');
+      }
+
+      return { code: finalCode, map };
     },
   };
 }
