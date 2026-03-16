@@ -173,17 +173,23 @@ function primitiveLabel(value: unknown): string {
   return String(value);
 }
 
-/** 중첩 객체/배열을 한 줄 compact 문자열로 */
+/** 중첩 객체/배열을 한 줄 compact 문자열로 (key: value 포함) */
 function inlineValue(value: unknown): string {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'string') return `"${value}"`;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (typeof value === 'function') return primitiveLabel(value);
-  if (Array.isArray(value)) return value.length === 0 ? '[]' : `[…${value.length}]`;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    const items = value.slice(0, 3).map(v => inlineValue(v));
+    return `[${items.join(', ')}${value.length > 3 ? `, …+${value.length - 3}` : ''}]`;
+  }
   if (typeof value === 'object') {
-    const keys = Object.keys(value as object);
-    return keys.length === 0 ? '{}' : `{ ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', …' : ''} }`;
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return '{}';
+    const items = entries.slice(0, 4).map(([k, v]) => `${k}: ${inlineValue(v)}`);
+    return `{ ${items.join(', ')}${entries.length > 4 ? ', …' : ''} }`;
   }
   return String(value);
 }
