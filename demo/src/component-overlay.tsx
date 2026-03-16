@@ -196,7 +196,7 @@ function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | nul
   return null;
 }
 
-type PropTypeEntry = { type: string; optional: boolean; fields?: Record<string, PropTypeEntry> };
+type PropTypeEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, PropTypeEntry> };
 
 function primitiveColor(value: unknown): string {
   if (typeof value === 'string')  return '#16a34a';
@@ -259,7 +259,7 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
   const isArr = Array.isArray(value);
   const isExpandable = isObj || isArr;
   const typeName = typeEntry?.type ?? null;
-  const hasTypeDef = !!typeEntry?.fields;
+  const hasTypeDef = !!(typeEntry?.fields || typeEntry?.resolvedType);
 
   const mono: React.CSSProperties = { fontFamily: 'monospace', fontSize: 11 };
 
@@ -277,24 +277,27 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
         <span style={{ ...mono, color: '#0f172a', fontWeight: 600 }}>{name}</span>
         {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
         {typeName && (
-          hasTypeDef ? (
-            <button
-              type="button"
-              onClick={() => setTypeOpen(o => !o)}
-              style={{
-                ...mono, fontSize: 10, color: typeOpen ? '#334155' : '#94a3b8',
-                background: typeOpen ? 'rgba(226,232,240,0.6)' : 'transparent',
-                border: typeOpen ? '1px solid rgba(203,213,225,0.8)' : '1px solid transparent',
-                borderRadius: 3, padding: '0 4px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 2, transition: 'all 80ms',
-              }}
-            >
-              <span>: {typeName}</span>
-              <span style={{ fontSize: 7, opacity: 0.7 }}>{typeOpen ? '▾' : '▸'}</span>
-            </button>
-          ) : (
-            <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>: {typeName}</span>
-          )
+          <>
+            <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>:</span>
+            {hasTypeDef ? (
+              <button
+                type="button"
+                onClick={() => setTypeOpen(o => !o)}
+                style={{
+                  ...mono, fontSize: 10, color: typeOpen ? '#334155' : '#94a3b8',
+                  background: typeOpen ? 'rgba(226,232,240,0.6)' : 'transparent',
+                  border: typeOpen ? '1px solid rgba(203,213,225,0.8)' : '1px solid transparent',
+                  borderRadius: 3, padding: '0 4px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 2, transition: 'all 80ms',
+                }}
+              >
+                <span>{typeName}</span>
+                <span style={{ fontSize: 7, opacity: 0.7 }}>{typeOpen ? '▾' : '▸'}</span>
+              </button>
+            ) : (
+              <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>{typeName}</span>
+            )}
+          </>
         )}
       </div>
 
@@ -317,13 +320,16 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
       </div>
 
       {/* 타입 정의 (펼쳤을 때) */}
-      {typeOpen && typeEntry?.fields && (
+      {typeOpen && (typeEntry?.fields || typeEntry?.resolvedType) && (
         <div style={{
           padding: '6px 8px 8px',
           borderTop: '1px solid rgba(226,232,240,0.6)',
           background: 'rgba(248,250,252,0.4)',
         }}>
-          <TypeFieldsView fields={typeEntry.fields} />
+          {typeEntry.fields
+            ? <TypeFieldsView fields={typeEntry.fields} />
+            : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b' }}>{typeEntry.resolvedType}</span>
+          }
         </div>
       )}
     </div>

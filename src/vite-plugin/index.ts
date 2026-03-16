@@ -131,12 +131,14 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
 }
 
 // ─── ts-morph Props 타입 추출 ─────────────────────────────────────────────────
-export type TypeFieldEntry = { type: string; optional: boolean; fields?: Record<string, TypeFieldEntry> };
+export type TypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, TypeFieldEntry> };
 export type PropTypeEntry  = TypeFieldEntry;
 export type PropTypesMap   = Record<string, PropTypeEntry>;
 
 function isFromProject(type: import('ts-morph').Type): boolean {
-  const decls = type.getSymbol()?.getDeclarations() ?? [];
+  // union 같은 합성 타입은 getSymbol()이 null → getAliasSymbol()로 fallback
+  const sym = type.getSymbol() ?? type.getAliasSymbol();
+  const decls = sym?.getDeclarations() ?? [];
   return decls.some(d => {
     const fp = d.getSourceFile().getFilePath();
     return !fp.includes('node_modules') && !fp.includes('/typescript/lib/');
@@ -207,14 +209,28 @@ function extractPropsViaTsMorph(
       const typeStr = propType.getText(firstParam, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
 
       let fields: Record<string, TypeFieldEntry> | undefined;
-      const isExpandable =
+      let resolvedType: string | undefined;
+      const isObjectExpandable =
         propType.isObject() &&
         !propType.isArray() &&
         propType.getCallSignatures().length === 0 &&
         isFromProject(propType);
-      if (isExpandable) fields = resolveFields(propType, firstParam, 0);
 
-      result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}) };
+      if (isObjectExpandable) {
+        fields = resolveFields(propType, firstParam, 0);
+      } else if (isFromProject(propType)) {
+        // union 타입 — 멤버를 직접 펼쳐서 저장
+        if (propType.isUnion()) {
+          resolvedType = propType.getUnionTypes()
+            .map(t => t.getText(firstParam))
+            .join(' | ');
+        } else {
+          const resolved = propType.getText(firstParam);
+          if (resolved !== typeStr) resolvedType = resolved;
+        }
+      }
+
+      result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}), ...(resolvedType ? { resolvedType } : {}) };
     }
     return Object.keys(result).length > 0 ? result : null;
   } catch {
