@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { CartItem as CartItemType } from '../shared/types';
 import { fetchCart, updateCartItem, removeCartItem } from '../shared/api/cart-api';
+import { Spinner } from '../shared/ui/spinner';
+import { EmptyState } from '../shared/ui/empty-state';
+import { Button } from '../shared/ui/button';
 import { CartItem } from '../entities/cart/cart-item';
 
 type Props = { refreshKey: number };
@@ -31,40 +34,37 @@ export function CartSummary({ refreshKey }: Props) {
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8', fontSize: 13 }}>불러오는 중...</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '48px' }}>
+        <Spinner size={28} />
+      </div>
+    );
   }
 
   if (items.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '48px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-        <div style={{ fontSize: 48 }}>🛒</div>
-        <p style={{ margin: 0, fontSize: 14, color: '#94a3b8' }}>장바구니가 비었습니다</p>
-      </div>
+      <EmptyState
+        emoji="🛒"
+        title="장바구니가 비었습니다"
+        description="홈에서 마음에 드는 상품을 담아보세요"
+      />
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* 상품 목록 */}
       {items.map(item => (
         <CartItem key={item.id} item={item} onChangeQty={handleQtyChange} onRemove={handleRemove} />
       ))}
 
-      {/* 합계 */}
-      <div style={{ marginTop: 20, padding: '16px', borderRadius: 10, background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ marginTop: 20, padding: '16px', borderRadius: 10, background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#64748b' }}>상품 {items.length}종</span>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>₩{total.toLocaleString()}</span>
         </div>
-        <button
-          type="button"
-          style={{
-            width: '100%', padding: '12px', borderRadius: 8, border: 'none',
-            background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-          }}
-        >
+        <Button variant="primary" size="lg" fullWidth>
           결제하기
-        </button>
+        </Button>
       </div>
     </div>
   );

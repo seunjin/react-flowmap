@@ -199,6 +199,11 @@ function sortTreeRecursive(node: FolderTreeNode): void {
   }
 }
 
+function flattenTreeEntries(node: FolderTreeNode | FileTreeNode): DocEntry[] {
+  if (node.kind === 'file') return node.entries;
+  return node.children.flatMap(flattenTreeEntries);
+}
+
 function buildFolderTree(entries: DocEntry[]): FolderTreeNode {
   const root: FolderTreeNode = { kind: 'folder', name: '', fullPath: '', children: [] };
 
@@ -250,12 +255,13 @@ function folderHasHovered(node: FolderTreeNode, hoveredIds: Set<string>): boolea
 
 // ─── 트리 렌더 ────────────────────────────────────────────────────────────────
 function TreeNodeView({
-  node, depth, hoveredIds, selectedId, onSelect, selectedRef,
+  node, depth, hoveredIds, selectedId, focusedSymbolId, onSelect, selectedRef,
 }: {
   node: AnyTreeNode;
   depth: number;
   hoveredIds: Set<string>;
   selectedId: string;
+  focusedSymbolId: string;
   onSelect: (symbolId: string) => void;
   selectedRef: React.MutableRefObject<HTMLButtonElement | null>;
 }) {
@@ -284,6 +290,7 @@ function TreeNodeView({
             depth={node.name !== '' ? depth + 1 : depth}
             hoveredIds={hoveredIds}
             selectedId={selectedId}
+            focusedSymbolId={focusedSymbolId}
             onSelect={onSelect}
             selectedRef={selectedRef}
           />
@@ -317,11 +324,13 @@ function TreeNodeView({
       {node.entries.map((entry) => {
         const isHovered  = hoveredIds.has(entry.symbolId);
         const isSelected = entry.symbolId === selectedId;
+        const isFocused  = entry.symbolId === focusedSymbolId && !isSelected;
         const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
 
         return (
           <button
             key={entry.symbolId}
+            data-tree-entry
             type="button"
             ref={isSelected ? (el) => { selectedRef.current = el; } : undefined}
             onClick={() => onSelect(entry.symbolId)}
@@ -331,11 +340,14 @@ function TreeNodeView({
               border: 'none',
               borderLeft: isSelected
                 ? '2px solid #3b82f6'
-                : isHovered
-                  ? '2px solid #f59e0b'
-                  : '2px solid transparent',
+                : isFocused
+                  ? '2px solid #a5b4fc'
+                  : isHovered
+                    ? '2px solid #f59e0b'
+                    : '2px solid transparent',
               textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#dbeafe' : isHovered ? '#fef3c7' : 'transparent',
+              background: isSelected ? '#dbeafe' : isFocused ? '#f5f3ff' : isHovered ? '#fef3c7' : 'transparent',
+              outline: 'none',
               transition: 'background 60ms',
             }}
           >
@@ -891,6 +903,8 @@ function FloatingSidebar({
 }) {
   const [renderedOnly, setRenderedOnly] = useState(false);
   const [view, setView] = useState<'tree' | 'detail'>('tree');
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 플로팅 드래그
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -930,12 +944,56 @@ function FloatingSidebar({
   }, [allEntries, renderedOnly]);
 
   const tree = useMemo(() => buildFolderTree(displayEntries), [displayEntries]);
+  // 트리 시각 순서 기준 플랫 리스트 (키보드 nav 용)
+  const treeOrderedEntries = useMemo(() => flattenTreeEntries(tree), [tree]);
   const selectedEntry = allEntries.find(e => e.symbolId === selectedId) ?? null;
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (view === 'tree') selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selectedId, view]);
+
+  // 트리 뷰에서 선택된 항목 인덱스 동기화
+  useEffect(() => {
+    if (view !== 'tree') return;
+    const idx = treeOrderedEntries.findIndex(e => e.symbolId === selectedId);
+    setFocusedIdx(idx);
+  }, [selectedId, view, treeOrderedEntries]);
+
+  // 키보드 네비게이션
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.target as HTMLElement).closest('input, textarea, select')) return;
+
+      if (view === 'detail') {
+        if (e.key === 'Escape') { e.stopPropagation(); setView('tree'); }
+        return;
+      }
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocusedIdx(prev => {
+          const next = e.key === 'ArrowDown'
+            ? Math.min(prev + 1, treeOrderedEntries.length - 1)
+            : Math.max(prev - 1, 0);
+          const btns = treeScrollRef.current?.querySelectorAll<HTMLButtonElement>('[data-tree-entry]');
+          btns?.[next]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return next;
+        });
+      }
+
+      if (e.key === 'Enter' && focusedIdx >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const entry = treeOrderedEntries[focusedIdx];
+        if (entry) onSelect(entry.symbolId);
+      }
+    }
+
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [view, treeOrderedEntries, focusedIdx, onSelect]);
 
   return (
     <div
@@ -990,7 +1048,7 @@ function FloatingSidebar({
           </div>
 
           {/* 폴더 트리 */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+          <div ref={treeScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {displayEntries.length === 0 ? (
               <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
                 {renderedOnly ? '현재 화면에 렌더된 컴포넌트가 없습니다' : '컴포넌트 데이터가 없습니다'}
@@ -1001,6 +1059,7 @@ function FloatingSidebar({
                 depth={0}
                 hoveredIds={hoveredIds}
                 selectedId={selectedId}
+                focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
                 onSelect={onSelect}
                 selectedRef={selectedRef}
               />
@@ -1200,12 +1259,16 @@ export function ComponentOverlay({
 
     document.body.style.cursor = 'crosshair';
 
+    let rafId = 0;
     function onMove(e: MouseEvent) {
       if ((e.target as HTMLElement).closest('[data-gori-overlay]')) return;
-      const found = findComponentsAt(e.clientX, e.clientY);
-      // 화면에 있는 컴포넌트의 loc을 캐시에 저장
-      found.forEach(c => { if (c.loc) locCacheRef.current.set(c.symbolId, c.loc); });
-      setStack(found);
+      const x = e.clientX, y = e.clientY;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const found = findComponentsAt(x, y);
+        found.forEach(c => { if (c.loc) locCacheRef.current.set(c.symbolId, c.loc); });
+        setStack(found);
+      });
     }
 
     // 앱 클릭 → 호버 중인 컴포넌트를 액티브로 확정
@@ -1229,6 +1292,7 @@ export function ComponentOverlay({
     document.addEventListener('keydown',   onKeyDown);
     return () => {
       document.body.style.cursor = '';
+      cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('click',     onClickApp, true);
       document.removeEventListener('keydown',   onKeyDown);

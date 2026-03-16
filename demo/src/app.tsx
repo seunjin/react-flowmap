@@ -5,6 +5,7 @@ import type { GoriGraph } from '../../src/core/types/graph';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
 import { ComponentOverlay } from './component-overlay';
+import { NotificationToast } from './features/notification-toast';
 import { HomePage } from './pages/home-page';
 import { ProductPage } from './pages/product-page';
 import { CartPage } from './pages/cart-page';
@@ -20,15 +21,17 @@ const globalStyle = `
   *, *::before, *::after { box-sizing: border-box; scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
   html, body, #root { margin: 0; padding: 0; height: 100%; width: 100%; }
+  @keyframes gori-spin { to { transform: rotate(360deg); } }
+  @keyframes gori-fadein { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 `;
 
 const MOCK_PRODUCTS: Product[] = [
-  { id: '1', name: '무선 노이즈캔슬링 헤드폰', price: 79000, originalPrice: 129000, category: 'Electronics', badge: 'sale', emoji: '🎧', description: '최고급 ANC 기술로 주변 소음을 차단하고 몰입감 있는 음악 경험을 제공합니다.' },
-  { id: '2', name: '기계식 키보드 TKL', price: 149000, category: 'Electronics', badge: 'new', emoji: '⌨️', description: '체리 MX 스위치 탑재, 컴팩트한 TKL 레이아웃으로 책상 공간을 효율적으로 사용하세요.' },
-  { id: '3', name: '코튼 베이직 티셔츠', price: 29000, category: 'Clothing', emoji: '👕', description: '100% 유기농 면으로 제작된 부드럽고 편안한 베이직 티셔츠입니다.' },
-  { id: '4', name: '러닝화 에어쿠션', price: 89000, originalPrice: 110000, category: 'Sports', badge: 'sale', emoji: '👟', description: '경량 에어쿠션 밑창으로 장거리 러닝에도 피로감을 최소화합니다.' },
-  { id: '5', name: '더블월 보온 텀블러', price: 34000, category: 'Kitchen', badge: 'hot', emoji: '☕', description: '12시간 보온, 24시간 보냉 기능의 스테인리스 더블월 진공 텀블러입니다.' },
-  { id: '6', name: 'A5 무선 노트북', price: 12000, category: 'Stationery', emoji: '📓', description: '120g 고급 무지 용지, 실 제본 방식으로 완전히 펼쳐지는 노트북입니다.' },
+  { id: '1', name: '무선 노이즈캔슬링 헤드폰', price: 79000, originalPrice: 129000, category: 'Electronics', badge: 'sale', emoji: '🎧', description: '최고급 ANC 기술로 주변 소음을 차단하고 몰입감 있는 음악 경험을 제공합니다.', rating: { score: 4.5, count: 2341 } },
+  { id: '2', name: '기계식 키보드 TKL', price: 149000, category: 'Electronics', badge: 'new', emoji: '⌨️', description: '체리 MX 스위치 탑재, 컴팩트한 TKL 레이아웃으로 책상 공간을 효율적으로 사용하세요.', rating: { score: 4.8, count: 892 } },
+  { id: '3', name: '코튼 베이직 티셔츠', price: 29000, category: 'Clothing', emoji: '👕', description: '100% 유기농 면으로 제작된 부드럽고 편안한 베이직 티셔츠입니다.', rating: { score: 4.2, count: 5127 } },
+  { id: '4', name: '러닝화 에어쿠션', price: 89000, originalPrice: 110000, category: 'Sports', badge: 'sale', emoji: '👟', description: '경량 에어쿠션 밑창으로 장거리 러닝에도 피로감을 최소화합니다.', rating: { score: 4.6, count: 1803 } },
+  { id: '5', name: '더블월 보온 텀블러', price: 34000, category: 'Kitchen', badge: 'hot', emoji: '☕', description: '12시간 보온, 24시간 보냉 기능의 스테인리스 더블월 진공 텀블러입니다.', rating: { score: 4.9, count: 3456 } },
+  { id: '6', name: 'A5 무선 노트북', price: 12000, category: 'Stationery', emoji: '📓', description: '120g 고급 무지 용지, 실 제본 방식으로 완전히 펼쳐지는 노트북입니다.', rating: { score: 3.9, count: 412 } },
 ];
 
 type Page = 'home' | 'product' | 'cart';
@@ -45,6 +48,7 @@ export function App() {
   const [cartCount, setCartCount] = useState(0);
   const [inspectMode, setInspectMode] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [toast, setToast] = useState<string>('');
 
   const styleRef = useRef<HTMLStyleElement | null>(null);
   useEffect(() => {
@@ -185,6 +189,7 @@ export function App() {
 
   function handleCartUpdated() {
     setCartRefreshKey(k => k + 1);
+    setToast('장바구니에 추가됐습니다');
   }
 
   // ── 렌더 ────────────────────────────────────────────────────────────────
@@ -269,6 +274,7 @@ export function App() {
       </div>
 
       {/* ── 오버레이 ────────────────────────────────────────────────── */}
+      {toast && <NotificationToast message={toast} onDismiss={() => setToast('')} />}
       <ComponentOverlay
         graph={graph}
         active={inspectMode}

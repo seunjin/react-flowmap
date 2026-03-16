@@ -1,4 +1,5 @@
 import type { CartItem as CartItemType } from '../../shared/types';
+import { Button } from '../../shared/ui/button';
 import { QuantityControl } from '../../features/quantity-control';
 
 type Props = {
@@ -34,13 +35,9 @@ export function CartItem({ item, onChangeQty, onRemove }: Props) {
       <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', minWidth: 60, textAlign: 'right' }}>
         ₩{(item.price * item.quantity).toLocaleString()}
       </div>
-      <button
-        type="button"
-        onClick={() => onRemove(item.id)}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16, padding: 4 }}
-      >
+      <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)}>
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

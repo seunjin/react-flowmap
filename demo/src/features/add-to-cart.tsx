@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Product } from '../shared/types';
 import { addToCart } from '../shared/api/cart-api';
+import { Button } from '../shared/ui/button';
 import { QuantityControl } from './quantity-control';
 
 type Props = { product: Product; onAdded: () => void };
@@ -22,20 +23,15 @@ export function AddToCart({ product, onAdded }: Props) {
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <QuantityControl quantity={qty} onChange={setQty} />
-      <button
-        type="button"
-        onClick={handleAdd}
-        disabled={loading || added}
-        style={{
-          flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none',
-          background: added ? '#dcfce7' : '#3b82f6',
-          color: added ? '#15803d' : '#fff',
-          fontWeight: 700, fontSize: 13, cursor: loading ? 'wait' : 'pointer',
-          transition: 'all 200ms',
-        }}
-      >
-        {added ? '✓ 추가됨' : loading ? '추가 중...' : '장바구니 담기'}
-      </button>
+      {added ? (
+        <Button variant="secondary" size="lg" fullWidth disabled>
+          ✓ 추가됨
+        </Button>
+      ) : (
+        <Button variant="primary" size="lg" fullWidth loading={loading} onClick={handleAdd}>
+          장바구니 담기
+        </Button>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ export type Product = {
   badge?: 'sale' | 'new' | 'hot';
   description: string;
   emoji: string;
+  rating?: { score: number; count: number };
 };
 
 export type CartItem = {

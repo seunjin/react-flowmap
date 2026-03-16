@@ -1,3 +1,5 @@
+import { Button } from '../shared/ui/button';
+
 type Props = {
   categories: string[];
   active: string;
@@ -6,7 +8,7 @@ type Props = {
 
 export function CategoryFilter({ categories, active, onChange }: Props) {
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
       {categories.map((cat) => (
         <button
           key={cat}
@@ -18,11 +20,17 @@ export function CategoryFilter({ categories, active, onChange }: Props) {
             background: active === cat ? '#eff6ff' : '#fff',
             color: active === cat ? '#1d4ed8' : '#64748b',
             fontSize: 12, fontWeight: active === cat ? 600 : 400, cursor: 'pointer',
+            fontFamily: 'inherit',
           }}
         >
           {cat}
         </button>
       ))}
+      {active !== 'All' && (
+        <Button variant="ghost" size="sm" onClick={() => onChange('All')}>
+          초기화
+        </Button>
+      )}
     </div>
   );
 }
