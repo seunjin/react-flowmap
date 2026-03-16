@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Folder, FileCode, Component, Crosshair, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
+import { Folder, FileCode, Component, MousePointer2, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
@@ -1094,19 +1094,17 @@ function FloatingSidebar({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {/* 포지션 버튼 */}
-          <DockDropdown current={dockPosition} onChange={onDockChange} />
-          <div style={{ width: 1, height: 14, background: 'rgba(219,234,254,0.8)' }} />
           {/* 요소 선택 픽 버튼 */}
           <button
             type="button"
             onClick={onPickToggle}
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
-            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.borderColor = '#bfdbfe'; } }}
-            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; } }}
+            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; } }}
+            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
             style={{
-              width: 26, height: 26, borderRadius: 5, border: '1px solid',
-              borderColor: picking ? '#1e40af' : 'transparent',
+              width: 26, height: 26, borderRadius: 5,
+              border: '1px solid',
+              borderColor: picking ? '#1e40af' : 'rgba(219,234,254,0.8)',
               background: picking ? '#eff6ff' : 'transparent',
               color: picking ? '#1e40af' : '#9ca3af',
               cursor: 'pointer',
@@ -1114,8 +1112,11 @@ function FloatingSidebar({
               transition: 'all 120ms',
             }}
           >
-            <Crosshair size={14} />
+            <MousePointer2 size={14} />
           </button>
+          <div style={{ width: 1, height: 14, background: 'rgba(219,234,254,0.8)' }} />
+          {/* 포지션 버튼 */}
+          <DockDropdown current={dockPosition} onChange={onDockChange} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button type="button" onClick={onClose}
