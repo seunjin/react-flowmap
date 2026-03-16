@@ -564,7 +564,6 @@ function TreeNodeView({
         const isHovered  = hoveredIds.has(entry.symbolId) || treeHoveredId === entry.symbolId;
         const isSelected = entry.symbolId === selectedId;
         const isFocused  = entry.symbolId === focusedSymbolId && !isSelected;
-        const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
 
         return (
           <button
@@ -601,16 +600,6 @@ function TreeNodeView({
             }}>
               {entry.name}
             </span>
-            {(isSelected || isHovered) && entry.category === 'page' && (
-              <span style={{
-                padding: '1px 5px', borderRadius: 3,
-                background: isSelected ? '#bfdbfe' : '#dbeafe',
-                color: isSelected ? '#1e40af' : '#3b82f6',
-                fontSize: 9, fontWeight: 700, flexShrink: 0,
-              }}>
-                {cat.label}
-              </span>
-            )}
           </button>
         );
       })}
