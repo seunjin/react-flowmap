@@ -221,30 +221,27 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
   );
 }
 
-/** Props 한 행 — 런타임 값 우선, 타입은 흐린 힌트로 */
+/** Props 한 행 — 이름은 상단 레이블, 값이 전체 너비 사용 */
 function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6,
-      padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
+      display: 'flex', flexDirection: 'column', gap: 2,
+      padding: '5px 7px', borderRadius: 4, background: '#f8fafc',
       border: '1px solid #f1f5f9', fontFamily: 'monospace', fontSize: 11,
     }}>
-      {/* 좌: 이름 + optional 힌트 */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 1, flexShrink: 0 }}>
-        <span style={{ color: '#7c3aed' }}>{name}</span>
+      {/* 레이블 행: 이름 + optional + 타입 힌트 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+        <span style={{ color: '#7c3aed', fontSize: 10 }}>{name}</span>
         {typeEntry?.optional && <span style={{ color: '#94a3b8', fontSize: 10 }}>?</span>}
-      </div>
-      {/* 우: 런타임 값 (주인공) + 타입 힌트 (조연) */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, minWidth: 0, overflow: 'hidden' }}>
-        <PropValueView value={value} />
         {typeEntry && (
-          <span style={{
-            color: '#cbd5e1', fontSize: 10,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
-          }}>
-            {typeEntry.type}
+          <span style={{ color: '#cbd5e1', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            : {typeEntry.type}
           </span>
         )}
+      </div>
+      {/* 값 행: 전체 너비 */}
+      <div style={{ overflow: 'hidden' }}>
+        <PropValueView value={value} />
       </div>
     </div>
   );
