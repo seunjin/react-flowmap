@@ -194,86 +194,88 @@ function inlineValue(value: unknown): string {
   return String(value);
 }
 
-/** D+E 스타일 Props 행
- *  - primitive / function: 이름  |  값  한 줄
- *  - object / array: 이름  |  타입이름(or compact)  클릭 → 하위 key-value 행 펼침
+/** 완전 나열식 Props 행
+ *
+ * primitive/function:
+ *   ┌─ name: type ──────────┐
+ *   │  "value"              │
+ *   └───────────────────────┘
+ *
+ * object/array:
+ *   ┌─ name: TypeName ──────┐
+ *   │  key: type            │
+ *   │  value                │
+ *   │  key2: type           │
+ *   │  value2               │
+ *   └───────────────────────┘
  */
 function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
-  const [open, setOpen] = useState(false);
-
   const isObj = value !== null && typeof value === 'object';
   const isArr = Array.isArray(value);
   const isExpandable = isObj || isArr;
 
-  // 타입 이름 or compact fallback
-  const typeName = typeEntry?.type ?? (isArr ? `Array(${(value as unknown[]).length})` : isObj ? `{ ${Object.keys(value as object).slice(0, 3).join(', ')}${Object.keys(value as object).length > 3 ? ', …' : ''} }` : null);
+  const typeName = typeEntry?.type ?? null;
 
   const entries: [string, unknown][] = isArr
     ? (value as unknown[]).map((v, i) => [String(i), v])
     : isObj ? Object.entries(value as Record<string, unknown>) : [];
 
-  const rowBase: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr)',
-    columnGap: 8, alignItems: 'baseline',
-    padding: '4px 7px', fontFamily: 'monospace', fontSize: 11,
-  };
+  const mono: React.CSSProperties = { fontFamily: 'monospace', fontSize: 11 };
 
   return (
-    <div style={{ borderRadius: 4, border: '1px solid #f1f5f9', overflow: 'hidden' }}>
-      {/* 메인 행 */}
-      <div
-        role={isExpandable ? 'button' : undefined}
-        tabIndex={isExpandable ? 0 : undefined}
-        onClick={isExpandable ? () => setOpen(o => !o) : undefined}
-        onKeyDown={isExpandable ? (e) => { if (e.key === 'Enter' || e.key === ' ') setOpen(o => !o); } : undefined}
-        style={{
-          ...rowBase,
-          background: open ? '#f1f5f9' : '#f8fafc',
-          cursor: isExpandable ? 'pointer' : 'default',
-          userSelect: 'none',
-        }}
-      >
-        {/* 키 */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, overflow: 'hidden', minWidth: 0 }}>
-          {isExpandable && (
-            <span style={{
-              fontSize: 7, marginRight: 4, display: 'inline-block', flexShrink: 0,
-              transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-              transition: 'transform 120ms', color: '#94a3b8',
-            }}>▶</span>
-          )}
-          <span style={{ color: '#7c3aed', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {name}
-          </span>
-          {typeEntry?.optional && <span style={{ color: '#94a3b8', marginLeft: 1 }}>?</span>}
-        </div>
-        {/* 값 */}
-        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-          {isExpandable ? (
-            <span style={{ color: '#64748b', fontSize: 10 }}>{typeName}</span>
-          ) : (
-            <span style={{ color: primitiveColor(value) }}>{primitiveLabel(value)}</span>
-          )}
-        </div>
+    <div style={{
+      borderRadius: 5, border: '1px solid #e8edf2', overflow: 'hidden',
+      background: '#ffffff',
+    }}>
+      {/* 헤더: name: TypeName */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '4px 8px', background: '#f1f5f9',
+        borderBottom: '1px solid #e8edf2',
+      }}>
+        <span style={{ ...mono, color: '#7c3aed', fontWeight: 600 }}>{name}</span>
+        {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
+        {typeName && (
+          <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>: {typeName}</span>
+        )}
       </div>
 
-      {/* 펼쳐진 key-value 행들 */}
-      {open && entries.map(([k, v]) => (
-        <div key={k} style={{
-          ...rowBase,
-          background: '#ffffff',
-          borderTop: '1px solid #f1f5f9',
-          paddingLeft: 22,
-        }}>
-          <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k}</span>
-          <span style={{
-            color: isPrimitive(v) ? primitiveColor(v) : '#64748b',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {isPrimitive(v) ? primitiveLabel(v) : inlineValue(v)}
+      {/* 본문 */}
+      <div style={{ padding: '4px 8px 6px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {!isExpandable ? (
+          /* primitive / function — 값 한 줄 */
+          <span style={{ ...mono, color: primitiveColor(value) }}>
+            {primitiveLabel(value)}
           </span>
-        </div>
-      ))}
+        ) : (
+          /* object / array — key: type \n value 나열 */
+          entries.map(([k, v]) => {
+            const isNestedObj = v !== null && typeof v === 'object';
+            return (
+              <div key={k} style={{ marginTop: 4 }}>
+                {/* key 행 */}
+                <div style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>{k}</div>
+                {/* value 행 */}
+                {isNestedObj ? (
+                  <pre style={{
+                    margin: '2px 0 0', padding: '4px 6px',
+                    background: '#f8fafc', border: '1px solid #e8edf2', borderRadius: 3,
+                    ...mono, fontSize: 10, lineHeight: 1.6, color: '#334155',
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                    overflowX: 'auto',
+                  }}>
+                    {JSON.stringify(v, null, 2)}
+                  </pre>
+                ) : (
+                  <span style={{ ...mono, color: primitiveColor(v) }}>
+                    {primitiveLabel(v)}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
