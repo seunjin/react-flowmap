@@ -379,13 +379,26 @@ function TreeNodeView({
 }) {
   if (node.kind === 'folder') {
     const hasHovered = node.name !== '' && folderHasHovered(node, hoveredIds);
+    const [collapsed, setCollapsed] = useState(false);
     return (
       <div>
         {node.name !== '' && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: `4px 10px 4px ${10 + depth * 14}px`,
-          }}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setCollapsed(c => !c)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCollapsed(c => !c); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: `4px 10px 4px ${10 + depth * 14}px`,
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
+            <span style={{
+              fontSize: 7, color: '#94a3b8', display: 'inline-block',
+              transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+              transition: 'transform 120ms', flexShrink: 0,
+            }}>▶</span>
             <FolderIcon hovered={hasHovered} />
             <span style={{
               fontSize: 11, fontWeight: hasHovered ? 600 : 500,
@@ -395,7 +408,7 @@ function TreeNodeView({
             </span>
           </div>
         )}
-        {node.children.map((child) => (
+        {!collapsed && node.children.map((child) => (
           <TreeNodeView
             key={child.fullPath || '__root__'}
             node={child}
