@@ -221,36 +221,30 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
   );
 }
 
-/** Props 한 행 — 타입 정보(ts-morph) + 런타임 값(fiber) */
+/** Props 한 행 — 런타임 값 우선, 타입은 흐린 힌트로 */
 function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
-  const isFunc = typeof value === 'function';
-  const isObj  = !isPrimitive(value);
-
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 0,
-      padding: '4px 7px', borderRadius: 4, background: '#f8fafc',
+      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6,
+      padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
       border: '1px solid #f1f5f9', fontFamily: 'monospace', fontSize: 11,
     }}>
-      {/* 첫 번째 줄: 이름 + optional + 타입 */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, overflow: 'hidden' }}>
-        <span style={{ color: '#7c3aed', flexShrink: 0 }}>{name}</span>
-        {typeEntry?.optional && <span style={{ color: '#f59e0b', flexShrink: 0 }}>?</span>}
-        {typeEntry && (
-          <>
-            <span style={{ color: '#94a3b8', flexShrink: 0 }}>:</span>
-            <span style={{
-              color: isFunc ? '#64748b' : '#0369a1',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, minWidth: 0,
-            }}>
-              {typeEntry.type}
-            </span>
-          </>
-        )}
+      {/* 좌: 이름 + optional 힌트 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 1, flexShrink: 0 }}>
+        <span style={{ color: '#7c3aed' }}>{name}</span>
+        {typeEntry?.optional && <span style={{ color: '#94a3b8', fontSize: 10 }}>?</span>}
       </div>
-      {/* 두 번째 줄: 런타임 값 (오브젝트/함수는 들여쓰기로 분리) */}
-      <div style={{ paddingLeft: isObj ? 0 : 8 }}>
+      {/* 우: 런타임 값 (주인공) + 타입 힌트 (조연) */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, minWidth: 0, overflow: 'hidden' }}>
         <PropValueView value={value} />
+        {typeEntry && (
+          <span style={{
+            color: '#cbd5e1', fontSize: 10,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
+          }}>
+            {typeEntry.type}
+          </span>
+        )}
       </div>
     </div>
   );

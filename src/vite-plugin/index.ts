@@ -169,7 +169,8 @@ function extractPropsViaTsMorph(
       const propType = prop.getTypeAtLocation(firstParam);
       const optional = prop.hasFlags(ts.SymbolFlags.Optional);
       result[name] = {
-        type: propType.getText(firstParam, TypeFormatFlags.NoTruncation | TypeFormatFlags.UseAliasDefinedOutsideCurrentScope),
+        // alias 이름 우선 (Product, CartItem 등) — 내부 shape 완전 전개 안 함
+        type: propType.getText(firstParam, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope),
         optional,
       };
     }
