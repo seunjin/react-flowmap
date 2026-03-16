@@ -173,129 +173,101 @@ function primitiveLabel(value: unknown): string {
   return String(value);
 }
 
-/** JSON을 사람이 읽기 좋은 형태로 포맷 (최대 2뎁스, 이후는 …) */
-function formatJson(value: unknown, depth = 0): string {
+/** 중첩 객체/배열을 한 줄 compact 문자열로 */
+function inlineValue(value: unknown): string {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'string') return `"${value}"`;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (typeof value === 'function') return primitiveLabel(value);
-  if (Array.isArray(value)) {
-    if (depth >= 2) return `[…${value.length}]`;
-    if (value.length === 0) return '[]';
-    const items = value.slice(0, 5).map(v => formatJson(v, depth + 1));
-    const truncated = value.length > 5 ? [...items, `…${value.length - 5} more`] : items;
-    return `[${truncated.join(', ')}]`;
-  }
+  if (Array.isArray(value)) return value.length === 0 ? '[]' : `[…${value.length}]`;
   if (typeof value === 'object') {
-    if (depth >= 2) return '{…}';
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) return '{}';
-    const items = entries.slice(0, 6).map(([k, v]) => `${k}: ${formatJson(v, depth + 1)}`);
-    const truncated = entries.length > 6 ? [...items, `…${entries.length - 6} more`] : items;
-    return `{ ${truncated.join(', ')} }`;
+    const keys = Object.keys(value as object);
+    return keys.length === 0 ? '{}' : `{ ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', …' : ''} }`;
   }
   return String(value);
 }
 
-/** Docs 스타일 prop 값 뷰어 — primitive는 인라인, object는 코드블록 */
-function PropValueView({ value }: { value: unknown }) {
-  const [expanded, setExpanded] = useState(false);
+/** D+E 스타일 Props 행
+ *  - primitive / function: 이름  |  값  한 줄
+ *  - object / array: 이름  |  타입이름(or compact)  클릭 → 하위 key-value 행 펼침
+ */
+function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
+  const [open, setOpen] = useState(false);
 
-  if (isPrimitive(value)) {
-    return (
-      <span style={{
-        color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11,
-      }}>
-        {primitiveLabel(value)}
-      </span>
-    );
-  }
-
+  const isObj = value !== null && typeof value === 'object';
   const isArr = Array.isArray(value);
-  const entries = isArr
-    ? (value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
-    : Object.entries(value as Record<string, unknown>);
+  const isExpandable = isObj || isArr;
 
-  // 한 줄 compact 미리보기
-  const oneLiner = formatJson(value, 0);
-  const isShort = oneLiner.length <= 60;
+  // 타입 이름 or compact fallback
+  const typeName = typeEntry?.type ?? (isArr ? `Array(${(value as unknown[]).length})` : isObj ? `{ ${Object.keys(value as object).slice(0, 3).join(', ')}${Object.keys(value as object).length > 3 ? ', …' : ''} }` : null);
 
-  if (isShort) {
-    return (
-      <span style={{
-        fontFamily: 'monospace', fontSize: 11, color: '#475569',
-        background: '#f1f5f9', borderRadius: 3, padding: '1px 4px',
-      }}>
-        {oneLiner}
-      </span>
-    );
-  }
+  const entries: [string, unknown][] = isArr
+    ? (value as unknown[]).map((v, i) => [String(i), v])
+    : isObj ? Object.entries(value as Record<string, unknown>) : [];
 
-  // 길면 펼칠 수 있는 코드블록
-  const multiLine = isArr
-    ? `[\n${entries.map(([, v]) => `  ${formatJson(v, 1)}`).join(',\n')}\n]`
-    : `{\n${entries.map(([k, v]) => `  ${k}: ${formatJson(v, 1)}`).join(',\n')}\n}`;
+  const rowBase: React.CSSProperties = {
+    display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr)',
+    columnGap: 8, alignItems: 'baseline',
+    padding: '4px 7px', fontFamily: 'monospace', fontSize: 11,
+  };
 
   return (
-    <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
-      <button
-        type="button"
-        onClick={() => setExpanded(o => !o)}
+    <div style={{ borderRadius: 4, border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+      {/* 메인 행 */}
+      <div
+        role={isExpandable ? 'button' : undefined}
+        tabIndex={isExpandable ? 0 : undefined}
+        onClick={isExpandable ? () => setOpen(o => !o) : undefined}
+        onKeyDown={isExpandable ? (e) => { if (e.key === 'Enter' || e.key === ' ') setOpen(o => !o); } : undefined}
         style={{
-          background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 3,
-          padding: '1px 6px', cursor: 'pointer', color: '#64748b',
-          fontFamily: 'monospace', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4,
+          ...rowBase,
+          background: open ? '#f1f5f9' : '#f8fafc',
+          cursor: isExpandable ? 'pointer' : 'default',
+          userSelect: 'none',
         }}
       >
-        <span style={{
-          fontSize: 7, display: 'inline-block',
-          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 120ms',
-        }}>▶</span>
-        <span style={{ color: '#94a3b8' }}>{isArr ? `Array(${entries.length})` : `Object(${entries.length})`}</span>
-      </button>
-      {expanded && (
-        <pre style={{
-          margin: '4px 0 0', padding: '6px 8px',
-          background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4,
-          fontSize: 10, lineHeight: 1.6, color: '#334155',
-          overflowX: 'auto', whiteSpace: 'pre', maxHeight: 180,
-          overflowY: 'auto',
-        }}>
-          {multiLine}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-/** Props 한 행 — 이름은 상단 레이블, 값이 전체 너비 사용 */
-function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 3,
-      padding: '5px 7px', borderRadius: 4, background: '#f8fafc',
-      border: '1px solid #f1f5f9',
-    }}>
-      {/* 레이블 행: 이름 + optional + 타입 힌트 (한 줄) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        <span style={{ color: '#7c3aed', fontSize: 10, fontFamily: 'monospace', flexShrink: 0 }}>{name}</span>
-        {typeEntry?.optional && <span style={{ color: '#94a3b8', fontSize: 10, flexShrink: 0 }}>?</span>}
-        {typeEntry && (
-          <span style={{
-            color: '#cbd5e1', fontSize: 10, fontFamily: 'monospace',
-            marginLeft: 2, overflow: 'hidden', textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 0',
-          }}>
-            : {typeEntry.type}
+        {/* 키 */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, overflow: 'hidden', minWidth: 0 }}>
+          {isExpandable && (
+            <span style={{
+              fontSize: 7, marginRight: 4, display: 'inline-block', flexShrink: 0,
+              transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 120ms', color: '#94a3b8',
+            }}>▶</span>
+          )}
+          <span style={{ color: '#7c3aed', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
           </span>
-        )}
+          {typeEntry?.optional && <span style={{ color: '#94a3b8', marginLeft: 1 }}>?</span>}
+        </div>
+        {/* 값 */}
+        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+          {isExpandable ? (
+            <span style={{ color: '#64748b', fontSize: 10 }}>{typeName}</span>
+          ) : (
+            <span style={{ color: primitiveColor(value) }}>{primitiveLabel(value)}</span>
+          )}
+        </div>
       </div>
-      {/* 값: 전체 너비 */}
-      <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
-        <PropValueView value={value} />
-      </div>
+
+      {/* 펼쳐진 key-value 행들 */}
+      {open && entries.map(([k, v]) => (
+        <div key={k} style={{
+          ...rowBase,
+          background: '#ffffff',
+          borderTop: '1px solid #f1f5f9',
+          paddingLeft: 22,
+        }}>
+          <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k}</span>
+          <span style={{
+            color: isPrimitive(v) ? primitiveColor(v) : '#64748b',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {isPrimitive(v) ? primitiveLabel(v) : inlineValue(v)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
