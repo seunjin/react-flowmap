@@ -6,15 +6,15 @@ import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 const HTTP_STYLE: Record<string, { bg: string; color: string }> = {
   GET:    { bg: '#dcfce7', color: '#15803d' },
-  POST:   { bg: '#dbeafe', color: '#1d4ed8' },
+  POST:   { bg: '#d1fae5', color: '#047857' },
   PUT:    { bg: '#fef9c3', color: '#b45309' },
   PATCH:  { bg: '#f3e8ff', color: '#7e22ce' },
   DELETE: { bg: '#fee2e2', color: '#b91c1c' },
 };
 const CAT_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  page:      { bg: '#eff6ff', color: '#1d4ed8', label: 'Page'      },
-  component: { bg: '#f0fdf4', color: '#15803d', label: 'Component' },
-  hook:      { bg: '#faf5ff', color: '#7c3aed', label: 'Hook'      },
+  page:      { bg: '#ecfdf5', color: '#047857', label: 'Page'      },
+  component: { bg: '#ecfdf5', color: '#065f46', label: 'Component' },
+  hook:      { bg: '#f0fdfa', color: '#0d9488', label: 'Hook'      },
   function:  { bg: '#fff7ed', color: '#c2410c', label: 'Fn'        },
 };
 
@@ -141,14 +141,14 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
                 width: '100%', padding: '6px 8px', borderRadius: 5,
                 border: 'none', cursor: 'pointer', textAlign: 'left',
                 background: current === pos ? 'rgba(239,246,255,0.9)' : 'transparent',
-                color: current === pos ? '#1d4ed8' : '#475569',
+                color: current === pos ? '#047857' : '#475569',
                 fontSize: 11, fontWeight: current === pos ? 600 : 400,
                 transition: 'background 80ms',
               }}
               onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
               onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <DockSvg pos={pos} color={current === pos ? '#1d4ed8' : '#94a3b8'} />
+              <DockSvg pos={pos} color={current === pos ? '#047857' : '#94a3b8'} />
               {DOCK_LABELS[pos]}
             </button>
           ))}
@@ -270,7 +270,7 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
         padding: '4px 8px', background: 'rgba(241,245,249,0.7)',
         borderBottom: '1px solid rgba(226,232,240,0.6)',
       }}>
-        <span style={{ ...mono, color: '#7c3aed', fontWeight: 600 }}>{name}</span>
+        <span style={{ ...mono, color: '#047857', fontWeight: 600 }}>{name}</span>
         {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
         {typeName && (
           <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>: {typeName}</span>
@@ -498,13 +498,13 @@ function TreeNodeView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: `4px 10px 3px ${10 + depth * 14}px`,
-        background: fileSelected ? '#eff6ff' : fileHovered ? '#fffbeb' : 'transparent',
+        background: fileSelected ? '#ecfdf5' : fileHovered ? '#fffbeb' : 'transparent',
       }}>
         <FileIcon hovered={fileHovered} selected={fileSelected} />
         <span style={{
           fontSize: 11,
           fontWeight: fileSelected ? 600 : fileHovered ? 500 : 400,
-          color: fileSelected ? '#1e40af' : fileHovered ? '#92400e' : '#94a3b8',
+          color: fileSelected ? '#065f46' : fileHovered ? '#92400e' : '#94a3b8',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
         }}>
           {node.name}
@@ -531,14 +531,14 @@ function TreeNodeView({
               width: '100%', padding: `4px 10px 4px ${10 + (depth + 1) * 14}px`,
               border: 'none',
               borderLeft: isSelected
-                ? '2px solid #3b82f6'
+                ? '2px solid #10b981'
                 : isFocused
                   ? '2px solid #a5b4fc'
                   : isHovered
                     ? '2px solid #f59e0b'
                     : '2px solid transparent',
               textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#dbeafe' : isFocused ? '#f5f3ff' : isHovered ? '#fef3c7' : 'transparent',
+              background: isSelected ? '#d1fae5' : isFocused ? '#f5f3ff' : isHovered ? '#fef3c7' : 'transparent',
               outline: 'none',
               transition: 'background 60ms',
             }}
@@ -547,7 +547,7 @@ function TreeNodeView({
             <span style={{
               fontSize: 12,
               fontWeight: isSelected ? 700 : isHovered ? 500 : 400,
-              color: isSelected ? '#1d4ed8' : isHovered ? '#b45309' : '#94a3b8',
+              color: isSelected ? '#047857' : isHovered ? '#b45309' : '#94a3b8',
               flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {entry.name}
@@ -555,8 +555,8 @@ function TreeNodeView({
             {(isSelected || isHovered) && (
               <span style={{
                 padding: '1px 5px', borderRadius: 3,
-                background: isSelected ? '#bfdbfe' : '#fde68a',
-                color: isSelected ? '#1d4ed8' : '#92400e',
+                background: isSelected ? '#a7f3d0' : '#fde68a',
+                color: isSelected ? '#047857' : '#92400e',
                 fontSize: 9, fontWeight: 700, flexShrink: 0,
               }}>
                 {cat.label}
@@ -574,10 +574,10 @@ function FolderIcon({ hovered }: { hovered: boolean }) {
   return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#f59e0b' : '#94a3b8' }} />;
 }
 function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#3b82f6' : hovered ? '#f59e0b' : '#94a3b8' }} />;
+  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#10b981' : hovered ? '#f59e0b' : '#94a3b8' }} />;
 }
 function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#3b82f6' : isHovered ? '#f59e0b' : '#cbd5e1' }} />;
+  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#10b981' : isHovered ? '#f59e0b' : '#cbd5e1' }} />;
 }
 
 // ─── 커서 아래 컴포넌트 스택 ──────────────────────────────────────────────────
@@ -640,7 +640,7 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
   return (
     <div style={{
       position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '2px solid #3b82f6',
+      border: '2px solid #10b981',
       background: 'rgba(59,130,246,0.07)',
       boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9999,
     }}>
@@ -649,7 +649,7 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
         ...(labelAbove
           ? { top: -1, left: -1, transform: 'translateY(-100%)' }
           : { top: 3, left: 3 }),
-        background: '#3b82f6',
+        background: '#10b981',
         borderRadius: labelAbove ? '4px 4px 0 0' : 4,
         padding: '1px 7px', fontSize: 11, fontWeight: 600,
         color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
@@ -709,8 +709,8 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#eff6ff';
-              el.style.borderColor = '#bfdbfe';
+              el.style.background = '#ecfdf5';
+              el.style.borderColor = '#a7f3d0';
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLElement;
@@ -718,7 +718,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
               el.style.borderColor = '#e2e8f0';
             }}
           >
-            <ExternalLink size={11} style={{ color: '#3b82f6', flexShrink: 0 }} />
+            <ExternalLink size={11} style={{ color: '#10b981', flexShrink: 0 }} />
             <span style={{
               fontSize: 10, color: '#64748b', fontFamily: 'monospace',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
@@ -831,9 +831,9 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
         title={name}
         style={{
           padding: '5px 12px', borderRadius: 7,
-          border: isCenter ? '1.5px solid #3b82f6' : '1px solid rgba(226,232,240,0.9)',
+          border: isCenter ? '1.5px solid #10b981' : '1px solid rgba(226,232,240,0.9)',
           background: isCenter ? 'rgba(239,246,255,0.9)' : 'rgba(248,250,252,0.7)',
-          color: isCenter ? '#1d4ed8' : '#64748b',
+          color: isCenter ? '#047857' : '#64748b',
           fontSize: 11, fontWeight: isCenter ? 700 : 500,
           cursor: isCenter ? 'default' : 'pointer',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -843,8 +843,8 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
         onMouseEnter={e => {
           if (!isCenter) {
             (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.9)';
-            (e.currentTarget as HTMLElement).style.borderColor = '#93c5fd';
-            (e.currentTarget as HTMLElement).style.color = '#1d4ed8';
+            (e.currentTarget as HTMLElement).style.borderColor = '#6ee7b7';
+            (e.currentTarget as HTMLElement).style.color = '#047857';
           }
           onHover?.();
         }}
@@ -1090,7 +1090,7 @@ function FloatingSidebar({
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 18, height: 18, borderRadius: 4,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #34d399, #059669)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 800, color: '#fff', flexShrink: 0,
           }}>G</div>
@@ -1103,9 +1103,9 @@ function FloatingSidebar({
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
             style={{
               width: 26, height: 26, borderRadius: 5, border: '1px solid',
-              borderColor: picking ? '#3b82f6' : '#e2e8f0',
-              background: picking ? '#eff6ff' : 'transparent',
-              color: picking ? '#3b82f6' : '#64748b',
+              borderColor: picking ? '#10b981' : '#e2e8f0',
+              background: picking ? '#ecfdf5' : 'transparent',
+              color: picking ? '#10b981' : '#64748b',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 120ms',
@@ -1145,7 +1145,7 @@ function FloatingSidebar({
                   background: 'rgba(248,250,252,0.6)', fontSize: 11, color: '#0f172a',
                   outline: 'none', fontFamily: 'inherit',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#6ee7b7'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'rgba(226,232,240,0.8)'; e.currentTarget.style.background = 'rgba(248,250,252,0.6)'; }}
               />
               {searchQuery && (
@@ -1284,7 +1284,7 @@ export function InspectButton({
         ...(btnRight !== undefined ? { right: btnRight } : {}),
         ...(btnLeft  !== undefined ? { left:  btnLeft  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: open ? '#1e40af' : '#0f172a',
+        background: open ? '#065f46' : '#0f172a',
         color: '#ffffff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: open
