@@ -1454,7 +1454,9 @@ export function ComponentOverlay({
                 if (!ancestor) selectedElRef.current = null;
               }
             } else {
-              selectedElRef.current = null;
+              // currentEl이 없을 때 (트리에서 직접 선택): DOM 쿼리로 첫 번째 인스턴스 사용
+              selectedElRef.current =
+                (document.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null) ?? null;
             }
           }
         }}
