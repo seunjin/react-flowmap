@@ -4,17 +4,10 @@ import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
-const HTTP_STYLE: Record<string, { bg: string; color: string }> = {
-  GET:    { bg: '#dcfce7', color: '#15803d' },
-  POST:   { bg: '#d1fae5', color: '#047857' },
-  PUT:    { bg: '#fef9c3', color: '#b45309' },
-  PATCH:  { bg: '#f3e8ff', color: '#7e22ce' },
-  DELETE: { bg: '#fee2e2', color: '#b91c1c' },
-};
 const CAT_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  page:      { bg: '#ecfdf5', color: '#047857', label: 'Page'      },
-  component: { bg: '#ecfdf5', color: '#065f46', label: 'Component' },
-  hook:      { bg: '#f0fdfa', color: '#0d9488', label: 'Hook'      },
+  page:      { bg: '#f1f5f9', color: '#0f172a', label: 'Page'      },
+  component: { bg: '#f1f5f9', color: '#0f172a', label: 'Component' },
+  hook:      { bg: '#f8fafc', color: '#475569', label: 'Hook'      },
   function:  { bg: '#fff7ed', color: '#c2410c', label: 'Fn'        },
 };
 
@@ -140,15 +133,15 @@ function DockDropdown({ current, onChange }: { current: DockPosition; onChange: 
                 display: 'flex', alignItems: 'center', gap: 8,
                 width: '100%', padding: '6px 8px', borderRadius: 5,
                 border: 'none', cursor: 'pointer', textAlign: 'left',
-                background: current === pos ? 'rgba(239,246,255,0.9)' : 'transparent',
-                color: current === pos ? '#047857' : '#475569',
+                background: current === pos ? 'rgba(241,245,249,0.9)' : 'transparent',
+                color: current === pos ? '#0f172a' : '#475569',
                 fontSize: 11, fontWeight: current === pos ? 600 : 400,
                 transition: 'background 80ms',
               }}
               onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; }}
               onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <DockSvg pos={pos} color={current === pos ? '#047857' : '#94a3b8'} />
+              <DockSvg pos={pos} color={current === pos ? '#0f172a' : '#94a3b8'} />
               {DOCK_LABELS[pos]}
             </button>
           ))}
@@ -203,7 +196,7 @@ function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | nul
   return null;
 }
 
-type PropTypeEntry = { type: string; optional: boolean };
+type PropTypeEntry = { type: string; optional: boolean; fields?: Record<string, PropTypeEntry> };
 
 function primitiveColor(value: unknown): string {
   if (typeof value === 'string')  return '#16a34a';
@@ -234,28 +227,39 @@ function primitiveLabel(value: unknown): string {
 }
 
 
-/** 완전 나열식 Props 행
- *
- * primitive/function:
- *   ┌─ name: type ──────────┐
- *   │  "value"              │
- *   └───────────────────────┘
- *
- * object/array:
- *   ┌─ name: TypeName ──────┐
- *   │  key: type            │
- *   │  value                │
- *   │  key2: type           │
- *   │  value2               │
- *   └───────────────────────┘
- */
+function TypeFieldsView({ fields, depth = 0 }: { fields: Record<string, PropTypeEntry>; depth?: number }) {
+  const s = { fontFamily: 'monospace', fontSize: 10 } as React.CSSProperties;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {Object.entries(fields).map(([fname, field]) => (
+        <div key={fname} style={{ paddingLeft: depth * 10 }}>
+          <div>
+            <span style={{ ...s, color: '#475569', fontWeight: 500 }}>{fname}{field.optional ? '?' : ''}</span>
+            <span style={{ ...s, color: '#cbd5e1' }}>: </span>
+            {field.fields
+              ? <span style={{ ...s, color: '#94a3b8' }}>{'{'}</span>
+              : <span style={{ ...s, color: '#64748b' }}>{field.type}</span>
+            }
+          </div>
+          {field.fields && (
+            <>
+              <TypeFieldsView fields={field.fields} depth={depth + 1} />
+              <span style={{ ...s, color: '#94a3b8', paddingLeft: depth * 10 }}>{'}'}</span>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
+  const [typeOpen, setTypeOpen] = useState(false);
   const isObj = value !== null && typeof value === 'object';
   const isArr = Array.isArray(value);
   const isExpandable = isObj || isArr;
-
   const typeName = typeEntry?.type ?? null;
-
+  const hasTypeDef = !!typeEntry?.fields;
 
   const mono: React.CSSProperties = { fontFamily: 'monospace', fontSize: 11 };
 
@@ -264,20 +268,37 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
       borderRadius: 5, border: '1px solid rgba(226,232,240,0.7)', overflow: 'hidden',
       background: 'rgba(255,255,255,0.5)',
     }}>
-      {/* 헤더: name: TypeName */}
+      {/* 헤더: name? : TypeName */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '4px 8px', background: 'rgba(241,245,249,0.7)',
         borderBottom: '1px solid rgba(226,232,240,0.6)',
       }}>
-        <span style={{ ...mono, color: '#047857', fontWeight: 600 }}>{name}</span>
+        <span style={{ ...mono, color: '#0f172a', fontWeight: 600 }}>{name}</span>
         {typeEntry?.optional && <span style={{ ...mono, color: '#94a3b8' }}>?</span>}
         {typeName && (
-          <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>: {typeName}</span>
+          hasTypeDef ? (
+            <button
+              type="button"
+              onClick={() => setTypeOpen(o => !o)}
+              style={{
+                ...mono, fontSize: 10, color: typeOpen ? '#334155' : '#94a3b8',
+                background: typeOpen ? 'rgba(226,232,240,0.6)' : 'transparent',
+                border: typeOpen ? '1px solid rgba(203,213,225,0.8)' : '1px solid transparent',
+                borderRadius: 3, padding: '0 4px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 2, transition: 'all 80ms',
+              }}
+            >
+              <span>: {typeName}</span>
+              <span style={{ fontSize: 7, opacity: 0.7 }}>{typeOpen ? '▾' : '▸'}</span>
+            </button>
+          ) : (
+            <span style={{ ...mono, fontSize: 10, color: '#94a3b8' }}>: {typeName}</span>
+          )
         )}
       </div>
 
-      {/* 본문 */}
+      {/* 런타임 값 */}
       <div style={{ padding: '4px 8px 6px' }}>
         {!isExpandable ? (
           <span style={{ ...mono, color: primitiveColor(value) }}>
@@ -294,6 +315,17 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
           </pre>
         )}
       </div>
+
+      {/* 타입 정의 (펼쳤을 때) */}
+      {typeOpen && typeEntry?.fields && (
+        <div style={{
+          padding: '6px 8px 8px',
+          borderTop: '1px solid rgba(226,232,240,0.6)',
+          background: 'rgba(248,250,252,0.4)',
+        }}>
+          <TypeFieldsView fields={typeEntry.fields} />
+        </div>
+      )}
     </div>
   );
 }
@@ -465,7 +497,7 @@ function TreeNodeView({
             <FolderIcon hovered={hasHovered} />
             <span style={{
               fontSize: 11, fontWeight: hasHovered ? 600 : 500,
-              color: hasHovered ? '#92400e' : '#64748b',
+              color: hasHovered ? '#334155' : '#64748b',
             }}>
               {node.name}
             </span>
@@ -500,13 +532,13 @@ function TreeNodeView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: `4px 10px 3px ${10 + depth * 14}px`,
-        background: fileSelected ? '#ecfdf5' : fileHovered ? '#fffbeb' : 'transparent',
+        background: fileSelected ? '#f1f5f9' : fileHovered ? '#f8fafc' : 'transparent',
       }}>
         <FileIcon hovered={fileHovered} selected={fileSelected} />
         <span style={{
           fontSize: 11,
           fontWeight: fileSelected ? 600 : fileHovered ? 500 : 400,
-          color: fileSelected ? '#065f46' : fileHovered ? '#92400e' : '#94a3b8',
+          color: fileSelected ? '#0f172a' : fileHovered ? '#475569' : '#94a3b8',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
         }}>
           {node.name}
@@ -533,14 +565,14 @@ function TreeNodeView({
               width: '100%', padding: `4px 10px 4px ${10 + (depth + 1) * 14}px`,
               border: 'none',
               borderLeft: isSelected
-                ? '2px solid #10b981'
+                ? '2px solid #334155'
                 : isFocused
-                  ? '2px solid #a5b4fc'
+                  ? '2px solid #cbd5e1'
                   : isHovered
-                    ? '2px solid #f59e0b'
+                    ? '2px solid #94a3b8'
                     : '2px solid transparent',
               textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#d1fae5' : isFocused ? '#f5f3ff' : isHovered ? '#fef3c7' : 'transparent',
+              background: isSelected ? '#e2e8f0' : isFocused ? '#f1f5f9' : isHovered ? '#f1f5f9' : 'transparent',
               outline: 'none',
               transition: 'background 60ms',
             }}
@@ -549,7 +581,7 @@ function TreeNodeView({
             <span style={{
               fontSize: 12,
               fontWeight: isSelected ? 700 : isHovered ? 500 : 400,
-              color: isSelected ? '#047857' : isHovered ? '#b45309' : '#94a3b8',
+              color: isSelected ? '#0f172a' : isHovered ? '#475569' : '#94a3b8',
               flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {entry.name}
@@ -557,8 +589,8 @@ function TreeNodeView({
             {(isSelected || isHovered) && (
               <span style={{
                 padding: '1px 5px', borderRadius: 3,
-                background: isSelected ? '#a7f3d0' : '#fde68a',
-                color: isSelected ? '#047857' : '#92400e',
+                background: isSelected ? '#cbd5e1' : '#e2e8f0',
+                color: isSelected ? '#0f172a' : '#475569',
                 fontSize: 9, fontWeight: 700, flexShrink: 0,
               }}>
                 {cat.label}
@@ -573,13 +605,13 @@ function TreeNodeView({
 
 // ─── 아이콘 ───────────────────────────────────────────────────────────────────
 function FolderIcon({ hovered }: { hovered: boolean }) {
-  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#f59e0b' : '#94a3b8' }} />;
+  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#475569' : '#94a3b8' }} />;
 }
 function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#10b981' : hovered ? '#f59e0b' : '#94a3b8' }} />;
+  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#334155' : hovered ? '#475569' : '#94a3b8' }} />;
 }
 function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#10b981' : isHovered ? '#f59e0b' : '#cbd5e1' }} />;
+  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#334155' : isHovered ? '#475569' : '#cbd5e1' }} />;
 }
 
 // ─── 커서 아래 컴포넌트 스택 ──────────────────────────────────────────────────
@@ -612,8 +644,8 @@ function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string }) {
   return (
     <div style={{
       position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '1.5px dashed #f59e0b',
-      background: 'rgba(245,158,11,0.04)',
+      border: '1.5px dashed #94a3b8',
+      background: 'rgba(100,116,139,0.04)',
       boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9998,
     }}>
       <div style={{
@@ -621,7 +653,7 @@ function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string }) {
         ...(labelAbove
           ? { top: -1, left: -1, transform: 'translateY(-100%)' }
           : { top: 3, left: 3 }),
-        background: '#f59e0b',
+        background: '#64748b',
         borderRadius: labelAbove ? '4px 4px 0 0' : 4,
         padding: '1px 7px', fontSize: 10, fontWeight: 600,
         color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
@@ -642,8 +674,8 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
   return (
     <div style={{
       position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '2px solid #10b981',
-      background: 'rgba(59,130,246,0.07)',
+      border: '2px solid #334155',
+      background: 'rgba(51,65,85,0.05)',
       boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9999,
     }}>
       <div style={{
@@ -651,7 +683,7 @@ function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string }) {
         ...(labelAbove
           ? { top: -1, left: -1, transform: 'translateY(-100%)' }
           : { top: 3, left: 3 }),
-        background: '#10b981',
+        background: '#334155',
         borderRadius: labelAbove ? '4px 4px 0 0' : 4,
         padding: '1px 7px', fontSize: 11, fontWeight: 600,
         color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
@@ -711,8 +743,8 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = '#ecfdf5';
-              el.style.borderColor = '#a7f3d0';
+              el.style.background = '#f1f5f9';
+              el.style.borderColor = '#cbd5e1';
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLElement;
@@ -720,7 +752,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
               el.style.borderColor = '#e2e8f0';
             }}
           >
-            <ExternalLink size={11} style={{ color: '#10b981', flexShrink: 0 }} />
+            <ExternalLink size={11} style={{ color: '#334155', flexShrink: 0 }} />
             <span style={{
               fontSize: 10, color: '#64748b', fontFamily: 'monospace',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
@@ -732,7 +764,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
       </div>
 
       {/* 미니 관계 그래프 */}
-      <div style={{ padding: '16px 14px', borderBottom: entry.apiCalls.length > 0 ? '1px solid #f1f5f9' : 'none' }}>
+      <div style={{ padding: '16px 14px' }}>
         <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 12 }}>
           Relations
         </span>
@@ -767,41 +799,6 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
         );
       })()}
 
-      {/* API Calls */}
-      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {entry.apiCalls.length > 0 && (
-          <DetailSection label="API Calls">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {entry.apiCalls.map((api) => {
-                const s = HTTP_STYLE[api.method] ?? { bg: '#f1f5f9', color: '#64748b' };
-                return (
-                  <div
-                    key={api.apiId}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '5px 8px', borderRadius: 5,
-                      border: '1px solid #e2e8f0', background: '#f8fafc',
-                    }}
-                  >
-                    <span style={{
-                      padding: '1px 5px', borderRadius: 3, background: s.bg, color: s.color,
-                      fontSize: 9, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0,
-                    }}>
-                      {api.method}
-                    </span>
-                    <span style={{
-                      fontSize: 11, color: '#334155', fontFamily: 'monospace',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {api.path}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </DetailSection>
-        )}
-      </div>
     </div>
   );
 }
@@ -816,10 +813,9 @@ function DetailSection({ label, children }: { label: string; children: React.Rea
 }
 
 // ─── 미니 관계 그래프 ──────────────────────────────────────────────────────────
-function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
+function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
   name: string;
   isCenter?: boolean;
-  hasApi?: boolean;
   onClick?: (() => void) | undefined;
   onHover?: (() => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
@@ -833,20 +829,20 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
         title={name}
         style={{
           padding: '5px 12px', borderRadius: 7,
-          border: isCenter ? '1.5px solid #10b981' : '1px solid rgba(226,232,240,0.9)',
-          background: isCenter ? 'rgba(239,246,255,0.9)' : 'rgba(248,250,252,0.7)',
-          color: isCenter ? '#047857' : '#64748b',
+          border: isCenter ? '1.5px solid #334155' : '1px solid rgba(226,232,240,0.9)',
+          background: isCenter ? 'rgba(241,245,249,0.9)' : 'rgba(248,250,252,0.7)',
+          color: isCenter ? '#0f172a' : '#64748b',
           fontSize: 11, fontWeight: isCenter ? 700 : 500,
           cursor: isCenter ? 'default' : 'pointer',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           maxWidth: 130, transition: 'all 80ms',
-          boxShadow: isCenter ? '0 0 0 3px rgba(59,130,246,0.1)' : 'none',
+          boxShadow: isCenter ? '0 0 0 3px rgba(51,65,85,0.1)' : 'none',
         }}
         onMouseEnter={e => {
           if (!isCenter) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.9)';
-            (e.currentTarget as HTMLElement).style.borderColor = '#6ee7b7';
-            (e.currentTarget as HTMLElement).style.color = '#047857';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.9)';
+            (e.currentTarget as HTMLElement).style.borderColor = '#94a3b8';
+            (e.currentTarget as HTMLElement).style.color = '#0f172a';
           }
           onHover?.();
         }}
@@ -861,13 +857,6 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
       >
         {name}
       </button>
-      {hasApi && (
-        <span style={{
-          position: 'absolute', top: -3, right: -3,
-          width: 7, height: 7, borderRadius: '50%',
-          background: '#f59e0b', border: '1.5px solid white',
-        }} title="API 호출 있음" />
-      )}
     </div>
   );
 }
@@ -916,8 +905,7 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
   const connectedEl = selectedEl?.isConnected ? selectedEl : null;
   const parent   = connectedEl ? findDomParent(connectedEl)   : null;
   const children = connectedEl ? findDomChildren(connectedEl) : [];
-  const hasApi   = entry.apiCalls.length > 0;
-  const noRelations = !parent && children.length === 0 && !hasApi;
+  const noRelations = !parent && children.length === 0;
 
   if (noRelations) {
     return (
@@ -935,7 +923,7 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
           <GraphConnector />
         </>
       )}
-      <GraphNode name={entry.name} isCenter hasApi={hasApi} />
+      <GraphNode name={entry.name} isCenter />
       {children.length > 0 && (
         <>
           <GraphConnector />
@@ -1093,7 +1081,7 @@ function FloatingSidebar({
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 18, height: 18, borderRadius: 4,
-            background: 'linear-gradient(135deg, #34d399, #059669)',
+            background: 'linear-gradient(135deg, #64748b, #334155)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 800, color: '#fff', flexShrink: 0,
           }}>G</div>
@@ -1104,11 +1092,13 @@ function FloatingSidebar({
             type="button"
             onClick={onPickToggle}
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
+            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1'; } }}
+            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; } }}
             style={{
               width: 26, height: 26, borderRadius: 5, border: '1px solid',
-              borderColor: picking ? '#10b981' : '#e2e8f0',
-              background: picking ? '#ecfdf5' : 'transparent',
-              color: picking ? '#10b981' : '#64748b',
+              borderColor: picking ? '#334155' : '#e2e8f0',
+              background: picking ? '#f1f5f9' : 'transparent',
+              color: picking ? '#334155' : '#64748b',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 120ms',
@@ -1120,11 +1110,15 @@ function FloatingSidebar({
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <DockDropdown current={dockPosition} onChange={onDockChange} />
           <div style={{ width: 1, height: 16, background: 'rgba(226,232,240,0.8)', margin: '0 2px' }} />
-          <button type="button" onClick={onClose} style={{
-            width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
-            background: 'transparent', color: '#94a3b8', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}><X size={13} /></button>
+          <button type="button" onClick={onClose}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(241,245,249,0.8)'; (e.currentTarget as HTMLElement).style.color = '#475569'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#94a3b8'; }}
+            style={{
+              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(226,232,240,0.8)',
+              background: 'transparent', color: '#94a3b8', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 100ms',
+            }}><X size={13} /></button>
         </div>
       </div>
 
@@ -1148,7 +1142,7 @@ function FloatingSidebar({
                   background: 'rgba(248,250,252,0.6)', fontSize: 11, color: '#0f172a',
                   outline: 'none', fontFamily: 'inherit',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#6ee7b7'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'rgba(226,232,240,0.8)'; e.currentTarget.style.background = 'rgba(248,250,252,0.6)'; }}
               />
               {searchQuery && (
@@ -1288,11 +1282,11 @@ export function InspectButton({
         ...(btnRight !== undefined ? { right: btnRight } : {}),
         ...(btnLeft  !== undefined ? { left:  btnLeft  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: open ? '#065f46' : '#0f172a',
+        background: open ? '#0f172a' : '#0f172a',
         color: '#ffffff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: open
-          ? '0 0 0 2px rgba(59,130,246,0.3), 0 2px 10px rgba(15,23,42,0.2)'
+          ? '0 0 0 2px rgba(51,65,85,0.25), 0 2px 10px rgba(15,23,42,0.2)'
           : '0 2px 10px rgba(15,23,42,0.3)',
         transition: 'all 180ms', zIndex: 10001,
       }}

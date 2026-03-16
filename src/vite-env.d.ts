@@ -1,3 +1,4 @@
 declare module '*.css';
 
-declare var __goriPropTypes: Record<string, Record<string, { type: string; optional: boolean }>> | undefined;
+type GoriTypeFieldEntry = { type: string; optional: boolean; fields?: Record<string, GoriTypeFieldEntry> };
+declare var __goriPropTypes: Record<string, Record<string, GoriTypeFieldEntry>> | undefined;

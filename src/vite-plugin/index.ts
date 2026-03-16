@@ -131,8 +131,47 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
 }
 
 // ─── ts-morph Props 타입 추출 ─────────────────────────────────────────────────
-export type PropTypeEntry = { type: string; optional: boolean };
-export type PropTypesMap  = Record<string, PropTypeEntry>;
+export type TypeFieldEntry = { type: string; optional: boolean; fields?: Record<string, TypeFieldEntry> };
+export type PropTypeEntry  = TypeFieldEntry;
+export type PropTypesMap   = Record<string, PropTypeEntry>;
+
+function isFromProject(type: import('ts-morph').Type): boolean {
+  const decls = type.getSymbol()?.getDeclarations() ?? [];
+  return decls.some(d => {
+    const fp = d.getSourceFile().getFilePath();
+    return !fp.includes('node_modules') && !fp.includes('/typescript/lib/');
+  });
+}
+
+function resolveFields(
+  type: import('ts-morph').Type,
+  locationNode: import('ts-morph').Node,
+  depth: number,
+): Record<string, TypeFieldEntry> | undefined {
+  if (depth >= 2) return undefined;
+  const props = type.getProperties();
+  if (props.length === 0) return undefined;
+
+  const result: Record<string, TypeFieldEntry> = {};
+  for (const sym of props) {
+    const name = sym.getName();
+    const propType = sym.getTypeAtLocation(locationNode);
+    const optional = sym.hasFlags(ts.SymbolFlags.Optional);
+    const typeStr = propType.getText(locationNode, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
+
+    // 프로젝트 내 plain object 타입만 재귀 전개 (배열·함수·외부 타입 제외)
+    let fields: Record<string, TypeFieldEntry> | undefined;
+    const isExpandable =
+      propType.isObject() &&
+      !propType.isArray() &&
+      propType.getCallSignatures().length === 0 &&
+      isFromProject(propType);
+    if (isExpandable) fields = resolveFields(propType, locationNode, depth + 1);
+
+    result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}) };
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
 
 function extractPropsViaTsMorph(
   tsProject: Project,
@@ -140,18 +179,15 @@ function extractPropsViaTsMorph(
   componentName: string,
 ): PropTypesMap | null {
   try {
-    // 파일이 없으면 추가, 있으면 재사용 (캐싱)
     let sf = tsProject.getSourceFile(absPath);
     if (!sf) sf = tsProject.addSourceFileAtPathIfExists(absPath);
     if (!sf) return null;
 
-    // 함수 선언 또는 변수 선언에서 컴포넌트 찾기
     const fnDecl = sf.getFunction(componentName);
     const varDecl = sf.getVariableDeclaration(componentName);
     const node = fnDecl ?? varDecl;
     if (!node) return null;
 
-    // 첫 번째 파라미터 타입 취득
     const params = fnDecl
       ? fnDecl.getParameters()
       : varDecl?.getInitializerIfKind(ts.SyntaxKind.ArrowFunction)?.getParameters()
@@ -168,11 +204,17 @@ function extractPropsViaTsMorph(
       if (name === 'children') continue;
       const propType = prop.getTypeAtLocation(firstParam);
       const optional = prop.hasFlags(ts.SymbolFlags.Optional);
-      result[name] = {
-        // alias 이름 우선 (Product, CartItem 등) — 내부 shape 완전 전개 안 함
-        type: propType.getText(firstParam, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope),
-        optional,
-      };
+      const typeStr = propType.getText(firstParam, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
+
+      let fields: Record<string, TypeFieldEntry> | undefined;
+      const isExpandable =
+        propType.isObject() &&
+        !propType.isArray() &&
+        propType.getCallSignatures().length === 0 &&
+        isFromProject(propType);
+      if (isExpandable) fields = resolveFields(propType, firstParam, 0);
+
+      result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}) };
     }
     return Object.keys(result).length > 0 ? result : null;
   } catch {
