@@ -1093,34 +1093,22 @@ function FloatingSidebar({
           userSelect: 'none',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{
-            width: 18, height: 18,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M 9 2 L 15 5.5 L 15 12.5 L 9 16 L 3 12.5 L 3 5.5 Z"
-                stroke="#1e40af" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
-              <line x1="9" y1="9" x2="15" y2="5.5" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
-              <line x1="9" y1="9" x2="9" y2="16" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
-              <line x1="9" y1="9" x2="3" y2="5.5" stroke="#1e40af" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>Inspector</span>
-          <div style={{ width: 1, height: 14, background: '#dbeafe' }} />
-          {/* 요소 선택 픽 버튼 (DevTools 스타일) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* 포지션 버튼 */}
+          <DockDropdown current={dockPosition} onChange={onDockChange} />
+          <div style={{ width: 1, height: 14, background: 'rgba(219,234,254,0.8)' }} />
+          {/* 요소 선택 픽 버튼 */}
           <button
             type="button"
             onClick={onPickToggle}
             title={picking ? '선택 취소 (Escape)' : '요소 선택'}
             onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.borderColor = '#bfdbfe'; } }}
-            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = '#dbeafe'; } }}
+            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; } }}
             style={{
               width: 26, height: 26, borderRadius: 5, border: '1px solid',
-              borderColor: picking ? '#1e40af' : '#dbeafe',
+              borderColor: picking ? '#1e40af' : 'transparent',
               background: picking ? '#eff6ff' : 'transparent',
-              color: picking ? '#1e40af' : '#3b82f6',
+              color: picking ? '#1e40af' : '#9ca3af',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 120ms',
@@ -1130,8 +1118,6 @@ function FloatingSidebar({
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <DockDropdown current={dockPosition} onChange={onDockChange} />
-          <div style={{ width: 1, height: 16, background: 'rgba(219,234,254,0.8)', margin: '0 2px' }} />
           <button type="button" onClick={onClose}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.8)'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; }}
