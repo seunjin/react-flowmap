@@ -310,6 +310,20 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
         )}
       </div>
 
+      {/* 타입 정의 (펼쳤을 때) */}
+      {typeOpen && (typeEntry?.fields || typeEntry?.resolvedType) && (
+        <div style={{
+          padding: '6px 8px 8px',
+          borderBottom: '1px solid rgba(226,232,240,0.6)',
+          background: 'rgba(248,250,252,0.4)',
+        }}>
+          {typeEntry.fields
+            ? <TypeFieldsView fields={typeEntry.fields} />
+            : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b' }}>{typeEntry.resolvedType}</span>
+          }
+        </div>
+      )}
+
       {/* 런타임 값 */}
       <div style={{ padding: '4px 8px 6px' }}>
         {!isExpandable ? (
@@ -327,20 +341,6 @@ function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typ
           </pre>
         )}
       </div>
-
-      {/* 타입 정의 (펼쳤을 때) */}
-      {typeOpen && (typeEntry?.fields || typeEntry?.resolvedType) && (
-        <div style={{
-          padding: '6px 8px 8px',
-          borderTop: '1px solid rgba(226,232,240,0.6)',
-          background: 'rgba(248,250,252,0.4)',
-        }}>
-          {typeEntry.fields
-            ? <TypeFieldsView fields={typeEntry.fields} />
-            : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b' }}>{typeEntry.resolvedType}</span>
-          }
-        </div>
-      )}
     </div>
   );
 }
