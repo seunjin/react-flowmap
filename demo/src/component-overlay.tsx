@@ -601,7 +601,7 @@ function TreeNodeView({
             }}>
               {entry.name}
             </span>
-            {(isSelected || isHovered) && (
+            {(isSelected || isHovered) && entry.category === 'page' && (
               <span style={{
                 padding: '1px 5px', borderRadius: 3,
                 background: isSelected ? '#bfdbfe' : '#dbeafe',
@@ -1335,7 +1335,7 @@ export function ComponentOverlay({
   useEffect(() => { onDeactivateRef.current = onDeactivate; }, [onDeactivate]);
 
   const index      = useMemo(() => buildDocIndex(graph), [graph]);
-  const graphEntries = useMemo(() => [...index.pages, ...index.components, ...index.hooks], [index]);
+  const graphEntries = useMemo(() => [...index.pages, ...index.components], [index]);
 
   // symbolId → loc(줄번호) 캐시: 한 번 DOM에서 본 loc은 계속 기억
   const locCacheRef = useRef(new Map<string, string>());
