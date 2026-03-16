@@ -773,8 +773,9 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
-  const parent   = selectedEl ? findDomParent(selectedEl)   : null;
-  const children = selectedEl ? findDomChildren(selectedEl) : [];
+  const connectedEl = selectedEl?.isConnected ? selectedEl : null;
+  const parent   = connectedEl ? findDomParent(connectedEl)   : null;
+  const children = connectedEl ? findDomChildren(connectedEl) : [];
   const hasApi   = entry.apiCalls.length > 0;
   const noRelations = !parent && children.length === 0 && !hasApi;
 
@@ -1354,6 +1355,8 @@ export function ComponentOverlay({
   const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(loadFloatPos);
+  // ref 교체 후 re-render 강제용 (setSelectedId가 동일값이면 React가 스킵하므로)
+  const [, forceRender] = useState(0);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
   const selectedElRef = useRef<HTMLElement | null>(null);
   // MutationObserver 콜백에서 최신 selectedId 참조용
@@ -1413,9 +1416,9 @@ export function ComponentOverlay({
         ? (document.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null)
         : null;
       if (fallback) {
-        // 같은 컴포넌트의 다른 인스턴스가 남아 있으면 교체
+        // 같은 컴포넌트의 다른 인스턴스가 남아 있으면 교체 후 re-render 강제
         selectedElRef.current = fallback;
-        setSelectedId(prev => prev); // re-render
+        forceRender(n => n + 1);
       } else {
         // 인스턴스가 전혀 없으면 선택 해제 → 트리 뷰로
         selectedElRef.current = null;
