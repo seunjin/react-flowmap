@@ -13,13 +13,6 @@ type DockPosition = 'right' | 'left' | 'bottom' | 'float';
 function loadDock(): DockPosition {
   try { return (localStorage.getItem('gori-dock') as DockPosition) ?? 'float'; } catch { return 'float'; }
 }
-function loadFloatPos() {
-  try {
-    const s = localStorage.getItem('gori-float-pos');
-    if (s) return JSON.parse(s) as { x: number; y: number };
-    return { x: Math.max(20, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 360), y: 80 };
-  } catch { return { x: 900, y: 80 }; }
-}
 function saveDock(pos: DockPosition) {
   try { localStorage.setItem('gori-dock', pos); } catch { /* noop */ }
 }
@@ -206,12 +199,6 @@ function primitiveColor(value: unknown): string {
   if (typeof value === 'number')  return '#2563eb';
   if (typeof value === 'boolean') return '#dc2626';
   return '#6b7280';
-}
-
-function _isPrimitive(value: unknown): boolean {
-  return value === null || value === undefined ||
-    typeof value === 'string' || typeof value === 'number' ||
-    typeof value === 'boolean' || typeof value === 'function';
 }
 
 function primitiveLabel(value: unknown): string {
@@ -475,7 +462,7 @@ function TreeNodeView({
   selectedId: string;
   focusedSymbolId: string;
   onSelect: (symbolId: string) => void;
-  selectedRef: React.MutableRefObject<HTMLButtonElement | null>;
+  selectedRef: React.RefObject<HTMLButtonElement | null>;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
   forceExpanded: boolean;
