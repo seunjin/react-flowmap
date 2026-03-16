@@ -129,6 +129,35 @@ function normalizePath(filePath: string): string {
   return filePath.replace(/^demo\//, '');
 }
 
+// ─── React Fiber Props ────────────────────────────────────────────────────────
+function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | null {
+  const key = Object.keys(el).find(k =>
+    k.startsWith('__reactFiber$') ||
+    k.startsWith('__reactInternalInstance$')
+  );
+  if (!key) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fiber = (el as any)[key];
+  while (fiber) {
+    if (typeof fiber.type === 'function' && fiber.memoizedProps) {
+      return fiber.memoizedProps as Record<string, unknown>;
+    }
+    fiber = fiber.return;
+  }
+  return null;
+}
+
+function formatPropValue(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'function') return 'ƒ()';
+  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return `[…${value.length}]`;
+  if (typeof value === 'object') return '{…}';
+  return String(value);
+}
+
 // ─── DOM 기반 직접 부모/자식 탐색 ─────────────────────────────────────────────
 type DomRelNode = { name: string; symbolId: string };
 
@@ -571,6 +600,38 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
         />
       </div>
 
+      {/* Props */}
+      {selectedEl && (() => {
+        const props = getComponentPropsFromEl(selectedEl);
+        const entries = props
+          ? Object.entries(props).filter(([k]) => k !== 'children')
+          : [];
+        if (entries.length === 0) return null;
+        return (
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
+            <DetailSection label="Props">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {entries.map(([k, v]) => (
+                  <div key={k} style={{
+                    display: 'flex', gap: 0, alignItems: 'baseline',
+                    padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
+                    border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
+                    overflow: 'hidden',
+                  }}>
+                    <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
+                    <span style={{ color: '#94a3b8', margin: '0 3px', flexShrink: 0 }}>=</span>
+                    <span style={{
+                      color: typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#334155',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>{formatPropValue(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </DetailSection>
+          </div>
+        );
+      })()}
+
       {/* API Calls */}
       <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {entry.apiCalls.length > 0 && (
@@ -907,6 +968,7 @@ function FloatingSidebar({
   const [renderedOnly, setRenderedOnly] = useState(false);
   const [view, setView] = useState<'tree' | 'detail'>('tree');
   const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [searchQuery, setSearchQuery] = useState('');
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 플로팅 드래그
@@ -946,7 +1008,13 @@ function FloatingSidebar({
     return allEntries.filter(e => domIds.has(e.symbolId));
   }, [allEntries, renderedOnly]);
 
-  const tree = useMemo(() => buildFolderTree(displayEntries), [displayEntries]);
+  const filteredEntries = useMemo(() => {
+    if (!searchQuery) return displayEntries;
+    const q = searchQuery.toLowerCase();
+    return displayEntries.filter(e => e.name.toLowerCase().includes(q));
+  }, [displayEntries, searchQuery]);
+
+  const tree = useMemo(() => buildFolderTree(filteredEntries), [filteredEntries]);
   // 트리 시각 순서 기준 플랫 리스트 (키보드 nav 용)
   const treeOrderedEntries = useMemo(() => flattenTreeEntries(tree), [tree]);
   const selectedEntry = allEntries.find(e => e.symbolId === selectedId) ?? null;
@@ -1075,11 +1143,52 @@ function FloatingSidebar({
             <ToggleTab label="Rendered" active={renderedOnly}  onClick={() => setRenderedOnly(true)} accent />
           </div>
 
+          {/* 검색 */}
+          <div style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+            <div style={{ position: 'relative' }}>
+              <svg
+                width="12" height="12" viewBox="0 0 20 20" fill="none"
+                style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }}
+              >
+                <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="2" />
+                <line x1="13.5" y1="13.5" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <input
+                type="text"
+                placeholder="컴포넌트 검색..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '5px 26px 5px 26px',
+                  borderRadius: 5, border: '1px solid #e2e8f0',
+                  background: '#f8fafc', fontSize: 11, color: '#0f172a',
+                  outline: 'none', fontFamily: 'inherit',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = '#fff'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                    width: 16, height: 16, borderRadius: '50%', border: 'none',
+                    background: '#cbd5e1', color: '#fff', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                    padding: 0,
+                  }}
+                >✕</button>
+              )}
+            </div>
+          </div>
+
           {/* 폴더 트리 */}
           <div ref={treeScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-            {displayEntries.length === 0 ? (
+            {filteredEntries.length === 0 ? (
               <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
-                {renderedOnly ? '현재 화면에 렌더된 컴포넌트가 없습니다' : '컴포넌트 데이터가 없습니다'}
+                {searchQuery ? `"${searchQuery}" 검색 결과 없음` : renderedOnly ? '현재 화면에 렌더된 컴포넌트가 없습니다' : '컴포넌트 데이터가 없습니다'}
               </p>
             ) : (
               <TreeNodeView
