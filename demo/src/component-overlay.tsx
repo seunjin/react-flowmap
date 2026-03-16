@@ -368,6 +368,7 @@ function folderHasHovered(node: FolderTreeNode, hoveredIds: Set<string>): boolea
 // ─── 트리 렌더 ────────────────────────────────────────────────────────────────
 function TreeNodeView({
   node, depth, hoveredIds, selectedId, focusedSymbolId, onSelect, selectedRef,
+  onHover, onHoverEnd, forceExpanded,
 }: {
   node: AnyTreeNode;
   depth: number;
@@ -376,10 +377,14 @@ function TreeNodeView({
   focusedSymbolId: string;
   onSelect: (symbolId: string) => void;
   selectedRef: React.MutableRefObject<HTMLButtonElement | null>;
+  onHover: (symbolId: string) => void;
+  onHoverEnd: () => void;
+  forceExpanded: boolean;
 }) {
   if (node.kind === 'folder') {
     const hasHovered = node.name !== '' && folderHasHovered(node, hoveredIds);
     const [collapsed, setCollapsed] = useState(false);
+    const isCollapsed = forceExpanded ? false : collapsed;
     return (
       <div>
         {node.name !== '' && (
@@ -396,7 +401,7 @@ function TreeNodeView({
           >
             <span style={{
               fontSize: 7, color: '#94a3b8', display: 'inline-block',
-              transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+              transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
               transition: 'transform 120ms', flexShrink: 0,
             }}>▶</span>
             <FolderIcon hovered={hasHovered} />
@@ -408,7 +413,7 @@ function TreeNodeView({
             </span>
           </div>
         )}
-        {!collapsed && node.children.map((child) => (
+        {!isCollapsed && node.children.map((child) => (
           <TreeNodeView
             key={child.fullPath || '__root__'}
             node={child}
@@ -418,6 +423,9 @@ function TreeNodeView({
             focusedSymbolId={focusedSymbolId}
             onSelect={onSelect}
             selectedRef={selectedRef}
+            onHover={onHover}
+            onHoverEnd={onHoverEnd}
+            forceExpanded={forceExpanded}
           />
         ))}
       </div>
@@ -459,6 +467,8 @@ function TreeNodeView({
             type="button"
             ref={isSelected ? (el) => { selectedRef.current = el; } : undefined}
             onClick={() => onSelect(entry.symbolId)}
+            onMouseEnter={() => onHover(entry.symbolId)}
+            onMouseLeave={onHoverEnd}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               width: '100%', padding: `4px 10px 4px ${10 + (depth + 1) * 14}px`,
@@ -1185,6 +1195,9 @@ function FloatingSidebar({
                 focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
                 onSelect={onSelect}
                 selectedRef={selectedRef}
+                onHover={onHighlight}
+                onHoverEnd={onHighlightEnd}
+                forceExpanded={searchQuery.length > 0}
               />
             )}
           </div>
