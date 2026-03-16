@@ -179,9 +179,12 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
 
   if (isPrimitive(value)) {
     return (
-      <span style={{ color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>
+      <div style={{
+        color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
         {primitiveLabel(value)}
-      </span>
+      </div>
     );
   }
 
@@ -194,7 +197,7 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
     : `{${entries.slice(0, 3).map(([k]) => k).join(', ')}${entries.length > 3 ? ', …' : ''}}`;
 
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+    <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -213,19 +216,21 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
       </button>
       {open && depth < 3 && (
         <div style={{
-          marginTop: 4, marginLeft: 8,
+          marginTop: 4,
+          paddingLeft: 8,
+          borderLeft: '1.5px solid #e2e8f0',
           display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)',
           columnGap: 10, rowGap: 3,
         }}>
           {entries.map(([k, v]) => (
             <Fragment key={k}>
-              <span style={{ color: '#7c3aed', fontFamily: 'monospace', fontSize: 11, paddingTop: 1 }}>{k}</span>
+              <span style={{ color: '#7c3aed', fontFamily: 'monospace', fontSize: 11, alignSelf: 'start', paddingTop: 1 }}>{k}</span>
               <PropValueView value={v} depth={depth + 1} />
             </Fragment>
           ))}
         </div>
       )}
-    </span>
+    </div>
   );
 }
 
