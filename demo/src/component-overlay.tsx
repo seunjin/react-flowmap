@@ -947,7 +947,6 @@ function FloatingSidebar({
   picking: boolean;
   onPickToggle: () => void;
 }) {
-  const [renderedOnly, setRenderedOnly] = useState(false);
   const [view, setView] = useState<'tree' | 'detail'>('tree');
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -982,13 +981,12 @@ function FloatingSidebar({
   const hoveredIds = useMemo(() => new Set(stack.map(c => c.symbolId)), [stack]);
 
   const displayEntries = useMemo(() => {
-    if (!renderedOnly) return allEntries;
     const domIds = new Set(
       [...document.querySelectorAll('[data-gori-id]')]
         .map(el => el.getAttribute('data-gori-id')!)
     );
     return allEntries.filter(e => domIds.has(e.symbolId));
-  }, [allEntries, renderedOnly]);
+  }, [allEntries]);
 
   const filteredEntries = useMemo(() => {
     if (!searchQuery) return displayEntries;
@@ -1117,11 +1115,6 @@ function FloatingSidebar({
 
       {view === 'tree' ? (
         <>
-          {/* All / Rendered 토글 */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-            <ToggleTab label="All"      active={!renderedOnly} onClick={() => setRenderedOnly(false)} />
-            <ToggleTab label="Rendered" active={renderedOnly}  onClick={() => setRenderedOnly(true)} accent />
-          </div>
 
           {/* 검색 */}
           <div style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
@@ -1168,7 +1161,7 @@ function FloatingSidebar({
           <div ref={treeScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {filteredEntries.length === 0 ? (
               <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
-                {searchQuery ? `"${searchQuery}" 검색 결과 없음` : renderedOnly ? '현재 화면에 렌더된 컴포넌트가 없습니다' : '컴포넌트 데이터가 없습니다'}
+                {searchQuery ? `"${searchQuery}" 검색 결과 없음` : '현재 화면에 렌더된 컴포넌트가 없습니다'}
               </p>
             ) : (
               <TreeNodeView
@@ -1240,31 +1233,6 @@ function FloatingSidebar({
   );
 }
 
-function ToggleTab({
-  label, active, onClick, accent,
-}: {
-  label: string; active: boolean; onClick: () => void; accent?: boolean;
-}) {
-  const activeColor = accent ? '#15803d' : '#1d4ed8';
-  const activeBg    = accent ? '#f0fdf4' : '#eff6ff';
-  return (
-    <button
-      data-gori-overlay
-      type="button"
-      onClick={onClick}
-      style={{
-        flex: 1, padding: '7px 0', fontSize: 11,
-        background: active ? activeBg : 'transparent',
-        color: active ? activeColor : '#94a3b8',
-        fontWeight: active ? 700 : 400,
-        border: 'none', borderBottom: active ? `2px solid ${activeColor}` : '2px solid transparent',
-        cursor: 'pointer', transition: 'all 100ms',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 // ─── 플로팅 Inspect 버튼 ──────────────────────────────────────────────────────
 export function InspectButton({
