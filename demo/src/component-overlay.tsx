@@ -601,40 +601,32 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
       </div>
 
       {/* Props */}
-      {selectedEl && (() => {
+      {selectedEl && selectedEl.isConnected && (() => {
         const props = getComponentPropsFromEl(selectedEl);
         const entries = props
           ? Object.entries(props).filter(([k]) => k !== 'children')
           : [];
         if (entries.length === 0) return null;
-        // Vite 플러그인이 주입한 TypeScript 타입 정보 (있을 경우)
         const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, string>> })
           .__goriPropTypes?.[entry.symbolId];
         return (
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
             <DetailSection label="Props">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {entries.map(([k, v]) => {
                   const typeStr = propTypes?.[k];
+                  const valColor = typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#64748b';
                   return (
                     <div key={k} style={{
-                      display: 'flex', flexDirection: 'column', gap: 1,
-                      padding: '4px 7px', borderRadius: 4, background: '#f8fafc',
+                      display: 'flex', alignItems: 'baseline', gap: 0,
+                      padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
                       border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
+                      overflow: 'hidden',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, overflow: 'hidden' }}>
-                        <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
-                        {typeStr && (
-                          <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
-                            : {typeStr}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{
-                        color: typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#334155',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        paddingLeft: 2,
-                      }}>{formatPropValue(v)}</span>
+                      <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
+                      {typeStr && <span style={{ color: '#94a3b8', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>: {typeStr}</span>}
+                      <span style={{ color: '#94a3b8', margin: '0 4px', flexShrink: 0 }}>=</span>
+                      <span style={{ color: valColor, flexShrink: 0 }}>{formatPropValue(v)}</span>
                     </div>
                   );
                 })}
@@ -1406,6 +1398,19 @@ export function ComponentOverlay({
       setSelectedId('');
       selectedElRef.current = null;
     }
+  }, [active]);
+
+  // 선택된 DOM 요소가 페이지 전환으로 unmount되면 ref 초기화
+  useEffect(() => {
+    if (!active) return;
+    const observer = new MutationObserver(() => {
+      if (selectedElRef.current && !selectedElRef.current.isConnected) {
+        selectedElRef.current = null;
+        setSelectedId(prev => prev); // re-render 유도
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [active]);
 
   // 피킹 모드 — 마우스/클릭 이벤트 (picking일 때만 활성)
