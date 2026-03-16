@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Folder, FileCode, Component, Crosshair, X, Search, ChevronLeft } from 'lucide-react';
+import { Folder, FileCode, Component, Crosshair, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
 import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
@@ -718,7 +718,7 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
               el.style.borderColor = '#e2e8f0';
             }}
           >
-            <span style={{ fontSize: 10, color: '#3b82f6', flexShrink: 0 }}>↗</span>
+            <ExternalLink size={11} style={{ color: '#3b82f6', flexShrink: 0 }} />
             <span style={{
               fontSize: 10, color: '#64748b', fontFamily: 'monospace',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
