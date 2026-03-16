@@ -147,15 +147,71 @@ function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | nul
   return null;
 }
 
-function formatPropValue(value: unknown): string {
-  if (value === null) return 'null';
+function primitiveColor(value: unknown): string {
+  if (typeof value === 'string')  return '#16a34a';
+  if (typeof value === 'number')  return '#2563eb';
+  if (typeof value === 'boolean') return '#dc2626';
+  return '#64748b';
+}
+
+function isPrimitive(value: unknown): boolean {
+  return value === null || value === undefined ||
+    typeof value === 'string' || typeof value === 'number' ||
+    typeof value === 'boolean' || typeof value === 'function';
+}
+
+function primitiveLabel(value: unknown): string {
+  if (value === null)      return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'function') return 'ƒ()';
-  if (typeof value === 'string') return `"${value}"`;
-  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
-  if (Array.isArray(value)) return `[…${value.length}]`;
-  if (typeof value === 'object') return '{…}';
+  if (typeof value === 'string')   return `"${value}"`;
   return String(value);
+}
+
+/** 재귀적으로 펼칠 수 있는 prop 값 뷰어 */
+function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  const [open, setOpen] = useState(false);
+
+  if (isPrimitive(value)) {
+    return (
+      <span style={{ color: primitiveColor(value), fontFamily: 'monospace', fontSize: 11 }}>
+        {primitiveLabel(value)}
+      </span>
+    );
+  }
+
+  const isArr = Array.isArray(value);
+  const entries = isArr
+    ? (value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
+    : Object.entries(value as Record<string, unknown>);
+  const preview = isArr ? `[${entries.length}]` : `{${entries.length > 3 ? '…' : entries.slice(0, 3).map(([k]) => k).join(', ')}}`;
+
+  return (
+    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          color: '#64748b', fontFamily: 'monospace', fontSize: 11,
+          display: 'inline-flex', alignItems: 'center', gap: 2,
+        }}
+      >
+        <span style={{ fontSize: 8, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 120ms' }}>▶</span>
+        <span>{preview}</span>
+      </button>
+      {open && depth < 3 && (
+        <div style={{ marginLeft: 12, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {entries.map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+              <span style={{ color: '#7c3aed', flexShrink: 0, fontFamily: 'monospace', fontSize: 11 }}>{k}:</span>
+              <PropValueView value={v} depth={depth + 1} />
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
+  );
 }
 
 // ─── DOM 기반 직접 부모/자식 탐색 ─────────────────────────────────────────────
@@ -611,21 +667,16 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {entries.map(([k, v]) => {
-                  const valColor = typeof v === 'string' ? '#16a34a' : typeof v === 'number' ? '#2563eb' : typeof v === 'boolean' ? '#dc2626' : '#64748b';
-                  return (
-                    <div key={k} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                      padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
-                      border: '1px solid #f1f5f9', fontSize: 11, fontFamily: 'monospace',
-                    }}>
-                      <span style={{ color: '#7c3aed', flexShrink: 0 }}>{k}</span>
-                      <span style={{ color: valColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textAlign: 'right' }}>
-                        {formatPropValue(v)}
-                      </span>
-                    </div>
-                  );
-                })}
+                {entries.map(([k, v]) => (
+                  <div key={k} style={{
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
+                    padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                  }}>
+                    <span style={{ color: '#7c3aed', flexShrink: 0, fontFamily: 'monospace', fontSize: 11 }}>{k}</span>
+                    <PropValueView value={v} />
+                  </div>
+                ))}
               </div>
             </DetailSection>
           </div>
