@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Project, TypeFormatFlags, ts } from 'ts-morph';
 import type { Plugin } from 'vite';
 
 const _require = createRequire(import.meta.url);
@@ -129,6 +130,55 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
   });
 }
 
+// ─── ts-morph Props 타입 추출 ─────────────────────────────────────────────────
+export type PropTypeEntry = { type: string; optional: boolean };
+export type PropTypesMap  = Record<string, PropTypeEntry>;
+
+function extractPropsViaTsMorph(
+  tsProject: Project,
+  absPath: string,
+  componentName: string,
+): PropTypesMap | null {
+  try {
+    // 파일이 없으면 추가, 있으면 재사용 (캐싱)
+    let sf = tsProject.getSourceFile(absPath);
+    if (!sf) sf = tsProject.addSourceFileAtPathIfExists(absPath);
+    if (!sf) return null;
+
+    // 함수 선언 또는 변수 선언에서 컴포넌트 찾기
+    const fnDecl = sf.getFunction(componentName);
+    const varDecl = sf.getVariableDeclaration(componentName);
+    const node = fnDecl ?? varDecl;
+    if (!node) return null;
+
+    // 첫 번째 파라미터 타입 취득
+    const params = fnDecl
+      ? fnDecl.getParameters()
+      : varDecl?.getInitializerIfKind(ts.SyntaxKind.ArrowFunction)?.getParameters()
+        ?? varDecl?.getInitializerIfKind(ts.SyntaxKind.FunctionExpression)?.getParameters()
+        ?? [];
+    if (params.length === 0) return null;
+
+    const firstParam = params[0]!;
+    const type = firstParam.getType();
+
+    const result: PropTypesMap = {};
+    for (const prop of type.getProperties()) {
+      const name = prop.getName();
+      if (name === 'children') continue;
+      const propType = prop.getTypeAtLocation(firstParam);
+      const optional = prop.hasFlags(ts.SymbolFlags.Optional);
+      result[name] = {
+        type: propType.getText(firstParam, TypeFormatFlags.NoTruncation | TypeFormatFlags.UseAliasDefinedOutsideCurrentScope),
+        optional,
+      };
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── 에디터 열기 ──────────────────────────────────────────────────────────────
 function openInEditor(absPath: string, line: number, editor: string): void {
   const target = `${absPath}:${line}`;
@@ -177,6 +227,8 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
   let isDev = false;
   // transform 시 수집: symbolId → 줄번호
   const symbolLocMap = new Map<string, number>();
+  // ts-morph Project (dev 서버 시작 시 초기화)
+  let tsProject: Project | null = null;
 
   const defaultExclude = [/component-overlay/, /vite-plugin/, /gori-context/];
   const excludePatterns = [...defaultExclude, ...(options.exclude ?? [])];
@@ -190,6 +242,18 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       isDev = config.command === 'serve';
       const fromEnv = (config.env as Record<string, string | undefined>)['VITE_EDITOR'];
       if (fromEnv) editorCmd = fromEnv;
+
+      if (isDev) {
+        const tsconfigPath = resolve(root, 'tsconfig.json');
+        try {
+          tsProject = new Project({
+            tsConfigFilePath: tsconfigPath,
+            skipAddingFilesFromTsConfig: true, // 필요한 파일만 on-demand 로드
+          });
+        } catch {
+          tsProject = null;
+        }
+      }
     },
 
     // ─── virtual:gori/context 모듈 제공 ──────────────────────────────────────
@@ -231,6 +295,14 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       });
     },
 
+    handleHotUpdate({ file }) {
+      // 파일 변경 시 ts-morph 캐시 무효화
+      if (tsProject && /\.[jt]sx?$/.test(file)) {
+        const sf = tsProject.getSourceFile(file);
+        if (sf) sf.refreshFromFileSystemSync();
+      }
+    },
+
     transform(code: string, id: string) {
       if (!isDev) return null;
       if (!/\.[jt]sx$/.test(id)) return null;
@@ -251,6 +323,7 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       }
 
       let modified = false;
+      const propTypesRegistry = new Map<string, PropTypesMap>();
 
       traverse(ast, {
         // 변환이 발생한 경우 파일 상단에 import 주입
@@ -282,6 +355,10 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
           const symbolId = `symbol:${relPath}#${name}`;
           symbolLocMap.set(symbolId, line);
           injectIntoFn(path, symbolId, line, `file:${relPath}`);
+          if (tsProject) {
+            const props = extractPropsViaTsMorph(tsProject, id, name);
+            if (props) propTypesRegistry.set(symbolId, props);
+          }
           modified = true;
         },
 
@@ -312,6 +389,10 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
           symbolLocMap.set(symbolId, line);
           const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
           injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
+          if (tsProject) {
+            const props = extractPropsViaTsMorph(tsProject, id, name);
+            if (props) propTypesRegistry.set(symbolId, props);
+          }
           modified = true;
         },
       });
@@ -324,7 +405,17 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
         code
       ) as { code: string; map: string };
 
-      return { code: newCode, map };
+      // prop types 레지스트리 주입
+      let finalCode = newCode;
+      if (propTypesRegistry.size > 0) {
+        const lines = ['\n// __gori prop types', '(globalThis.__goriPropTypes??={});'];
+        for (const [sid, props] of propTypesRegistry) {
+          lines.push(`globalThis.__goriPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
+        }
+        finalCode += lines.join('\n');
+      }
+
+      return { code: finalCode, map };
     },
   };
 }

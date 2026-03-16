@@ -147,6 +147,8 @@ function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | nul
   return null;
 }
 
+type PropTypeEntry = { type: string; optional: boolean };
+
 function primitiveColor(value: unknown): string {
   if (typeof value === 'string')  return '#16a34a';
   if (typeof value === 'number')  return '#2563eb';
@@ -163,8 +165,11 @@ function isPrimitive(value: unknown): boolean {
 function primitiveLabel(value: unknown): string {
   if (value === null)      return 'null';
   if (value === undefined) return 'undefined';
-  if (typeof value === 'function') return 'ƒ()';
-  if (typeof value === 'string')   return `"${value}"`;
+  if (typeof value === 'function') {
+    const name = (value as { name?: string }).name;
+    return name ? `${name} ƒ` : 'ƒ()';
+  }
+  if (typeof value === 'string') return `"${value}"`;
   return String(value);
 }
 
@@ -184,7 +189,9 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
   const entries = isArr
     ? (value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
     : Object.entries(value as Record<string, unknown>);
-  const preview = isArr ? `[${entries.length}]` : `{${entries.length > 3 ? '…' : entries.slice(0, 3).map(([k]) => k).join(', ')}}`;
+  const preview = isArr
+    ? `[${entries.length}]`
+    : `{${entries.slice(0, 3).map(([k]) => k).join(', ')}${entries.length > 3 ? ', …' : ''}}`;
 
   return (
     <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
@@ -211,6 +218,41 @@ function PropValueView({ value, depth = 0 }: { value: unknown; depth?: number })
         </div>
       )}
     </span>
+  );
+}
+
+/** Props 한 행 — 타입 정보(ts-morph) + 런타임 값(fiber) */
+function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
+  const isFunc = typeof value === 'function';
+  const isObj  = !isPrimitive(value);
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 0,
+      padding: '4px 7px', borderRadius: 4, background: '#f8fafc',
+      border: '1px solid #f1f5f9', fontFamily: 'monospace', fontSize: 11,
+    }}>
+      {/* 첫 번째 줄: 이름 + optional + 타입 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, overflow: 'hidden' }}>
+        <span style={{ color: '#7c3aed', flexShrink: 0 }}>{name}</span>
+        {typeEntry?.optional && <span style={{ color: '#f59e0b', flexShrink: 0 }}>?</span>}
+        {typeEntry && (
+          <>
+            <span style={{ color: '#94a3b8', flexShrink: 0 }}>:</span>
+            <span style={{
+              color: isFunc ? '#64748b' : '#0369a1',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, minWidth: 0,
+            }}>
+              {typeEntry.type}
+            </span>
+          </>
+        )}
+      </div>
+      {/* 두 번째 줄: 런타임 값 (오브젝트/함수는 들여쓰기로 분리) */}
+      <div style={{ paddingLeft: isObj ? 0 : 8 }}>
+        <PropValueView value={value} />
+      </div>
+    </div>
   );
 }
 
@@ -663,19 +705,14 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
           ? Object.entries(props).filter(([k]) => k !== 'children')
           : [];
         if (entries.length === 0) return null;
+        const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, PropTypeEntry>> })
+          .__goriPropTypes?.[entry.symbolId];
         return (
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
             <DetailSection label="Props">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {entries.map(([k, v]) => (
-                  <div key={k} style={{
-                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
-                    padding: '3px 7px', borderRadius: 4, background: '#f8fafc',
-                    border: '1px solid #f1f5f9',
-                  }}>
-                    <span style={{ color: '#7c3aed', flexShrink: 0, fontFamily: 'monospace', fontSize: 11 }}>{k}</span>
-                    <PropValueView value={v} />
-                  </div>
+                  <PropRow key={k} name={k} value={v} typeEntry={propTypes?.[k]} />
                 ))}
               </div>
             </DetailSection>
