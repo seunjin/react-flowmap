@@ -866,18 +866,10 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
   );
 }
 
-function GraphConnector({ label }: { label?: string }) {
+function GraphConnector() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, flexShrink: 0 }}>
-      <div style={{ width: 1, height: 8, background: '#cbd5e1' }} />
-      {label && (
-        <span style={{
-          fontSize: 9, color: '#94a3b8', fontFamily: 'monospace',
-          padding: '1px 4px', background: 'rgba(241,245,249,0.8)',
-          borderRadius: 3, border: '1px solid rgba(226,232,240,0.6)',
-        }}>{label}</span>
-      )}
-      <div style={{ width: 1, height: 8, background: '#cbd5e1' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, margin: '6px 0' }}>
+      <div style={{ width: 1, height: 16, background: '#cbd5e1' }} />
       <div style={{
         width: 0, height: 0,
         borderLeft: '3.5px solid transparent',
@@ -888,30 +880,22 @@ function GraphConnector({ label }: { label?: string }) {
   );
 }
 
-function NodeRow({ items, label, onNavigate, onHover, onHoverEnd }: {
+function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
   items: { name: string; symbolId: string }[];
-  label?: string;
   onNavigate?: ((n: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      {label && (
-        <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-          {label}
-        </span>
-      )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
-        {items.map(({ name, symbolId }) => (
-          <GraphNode
-            key={symbolId} name={name}
-            onClick={() => onNavigate?.(name)}
-            onHover={() => onHover?.(symbolId)}
-            onHoverEnd={onHoverEnd}
-          />
-        ))}
-      </div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
+      {items.map(({ name, symbolId }) => (
+        <GraphNode
+          key={symbolId} name={name}
+          onClick={() => onNavigate?.(name)}
+          onHover={() => onHover?.(symbolId)}
+          onHoverEnd={onHoverEnd}
+        />
+      ))}
     </div>
   );
 }
@@ -941,7 +925,7 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, padding: '4px 0' }}>
       {parent && (
         <>
-          <NodeRow items={[parent]} label="부모" onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
+          <NodeRow items={[parent]} onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
           <GraphConnector />
         </>
       )}
@@ -949,7 +933,7 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
       {children.length > 0 && (
         <>
           <GraphConnector />
-          <NodeRow items={children} label="자식" onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
+          <NodeRow items={children} onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
         </>
       )}
     </div>
