@@ -1356,6 +1356,9 @@ export function ComponentOverlay({
   const [floatPos,     setFloatPos]     = useState(loadFloatPos);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
   const selectedElRef = useRef<HTMLElement | null>(null);
+  // MutationObserver 콜백에서 최신 selectedId 참조용
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
   const onDeactivateRef = useRef(onDeactivate);
   useEffect(() => { onDeactivateRef.current = onDeactivate; }, [onDeactivate]);
@@ -1400,13 +1403,23 @@ export function ComponentOverlay({
     }
   }, [active]);
 
-  // 선택된 DOM 요소가 페이지 전환으로 unmount되면 ref 초기화
+  // 선택된 DOM 요소가 unmount(페이지 전환·필터)되면 대체 인스턴스 탐색 or 선택 해제
   useEffect(() => {
     if (!active) return;
     const observer = new MutationObserver(() => {
-      if (selectedElRef.current && !selectedElRef.current.isConnected) {
+      if (!selectedElRef.current || selectedElRef.current.isConnected) return;
+      const id = selectedIdRef.current;
+      const fallback = id
+        ? (document.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null)
+        : null;
+      if (fallback) {
+        // 같은 컴포넌트의 다른 인스턴스가 남아 있으면 교체
+        selectedElRef.current = fallback;
+        setSelectedId(prev => prev); // re-render
+      } else {
+        // 인스턴스가 전혀 없으면 선택 해제 → 트리 뷰로
         selectedElRef.current = null;
-        setSelectedId(prev => prev); // re-render 유도
+        setSelectedId('');
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
