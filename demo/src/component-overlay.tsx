@@ -129,6 +129,44 @@ function normalizePath(filePath: string): string {
   return filePath.replace(/^demo\//, '');
 }
 
+// ─── DOM 기반 직접 부모/자식 탐색 ─────────────────────────────────────────────
+type DomRelNode = { name: string; symbolId: string };
+
+function findDomParent(el: HTMLElement): DomRelNode | null {
+  const selfId = el.getAttribute('data-gori-id');
+  let cur: Element | null = el.parentElement;
+  while (cur) {
+    const id = cur.getAttribute('data-gori-id');
+    if (id && id !== selfId) {
+      return { name: id.split('#').at(-1) ?? id, symbolId: id };
+    }
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+function findDomChildren(el: HTMLElement): DomRelNode[] {
+  const rootId = el.getAttribute('data-gori-id');
+  const seen = new Set<string>();
+  const results: DomRelNode[] = [];
+  function walk(node: Element) {
+    for (const child of node.children) {
+      const id = child.getAttribute('data-gori-id');
+      if (id && id !== rootId) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          results.push({ name: id.split('#').at(-1) ?? id, symbolId: id });
+        }
+        // 이 컴포넌트의 서브트리는 더 깊이 탐색하지 않음
+      } else {
+        walk(child);
+      }
+    }
+  }
+  walk(el);
+  return results;
+}
+
 // ─── 폴더 트리 빌드 ──────────────────────────────────────────────────────────
 type FileTreeNode   = { kind: 'file';   name: string; fullPath: string; entries: DocEntry[] };
 type FolderTreeNode = { kind: 'folder'; name: string; fullPath: string; children: (FolderTreeNode | FileTreeNode)[] };
@@ -447,10 +485,13 @@ function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
   fetch(`/__gori-open?${params.toString()}`).catch(() => {});
 }
 
-export function EntryDetail({ entry, loc, onNavigate }: {
+export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHoverEnd }: {
   entry: DocEntry;
   loc?: string | null;
+  selectedEl?: HTMLElement | null;
   onNavigate?: ((name: string) => void) | undefined;
+  onHover?: ((symbolId: string) => void) | undefined;
+  onHoverEnd?: (() => void) | undefined;
 }) {
   const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
 
@@ -509,7 +550,13 @@ export function EntryDetail({ entry, loc, onNavigate }: {
         <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 12 }}>
           Relations
         </span>
-        <MiniRelationGraph entry={entry} onNavigate={onNavigate} />
+        <MiniRelationGraph
+          entry={entry}
+          selectedEl={selectedEl ?? null}
+          onNavigate={onNavigate}
+          onHover={onHover}
+          onHoverEnd={onHoverEnd}
+        />
       </div>
 
       {/* API Calls */}
@@ -561,11 +608,13 @@ function DetailSection({ label, children }: { label: string; children: React.Rea
 }
 
 // ─── 미니 관계 그래프 ──────────────────────────────────────────────────────────
-function GraphNode({ name, isCenter, hasApi, onClick }: {
+function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
   name: string;
   isCenter?: boolean;
   hasApi?: boolean;
-  onClick?: () => void;
+  onClick?: (() => void) | undefined;
+  onHover?: (() => void) | undefined;
+  onHoverEnd?: (() => void) | undefined;
 }) {
   return (
     <div style={{ position: 'relative', display: 'inline-flex', maxWidth: 120 }}>
@@ -584,8 +633,14 @@ function GraphNode({ name, isCenter, hasApi, onClick }: {
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           maxWidth: 120, transition: 'all 80ms',
         }}
-        onMouseEnter={e => { if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#eff6ff'; }}
-        onMouseLeave={e => { if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+        onMouseEnter={e => {
+          if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#eff6ff';
+          onHover?.();
+        }}
+        onMouseLeave={e => {
+          if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+          onHoverEnd?.();
+        }}
       >
         {name}
       </button>
@@ -614,40 +669,57 @@ function GraphConnector() {
   );
 }
 
-function NodeRow({ names, onNavigate }: { names: string[]; onNavigate?: ((n: string) => void) | undefined }) {
+function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
+  items: { name: string; symbolId: string }[];
+  onNavigate?: ((n: string) => void) | undefined;
+  onHover?: ((symbolId: string) => void) | undefined;
+  onHoverEnd?: (() => void) | undefined;
+}) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-      {names.map(name => (
-        <GraphNode key={name} name={name} onClick={() => onNavigate?.(name)} />
+      {items.map(({ name, symbolId }) => (
+        <GraphNode
+          key={symbolId} name={name}
+          onClick={() => onNavigate?.(name)}
+          onHover={() => onHover?.(symbolId)}
+          onHoverEnd={onHoverEnd}
+        />
       ))}
     </div>
   );
 }
 
-function MiniRelationGraph({ entry, onNavigate }: {
+function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd }: {
   entry: DocEntry;
+  selectedEl: HTMLElement | null;
   onNavigate?: ((name: string) => void) | undefined;
+  onHover?: ((symbolId: string) => void) | undefined;
+  onHoverEnd?: (() => void) | undefined;
 }) {
-  const parents  = entry.renderedBy.map(r => r.name);
-  const children = entry.renders.map(r => r.name);
+  const parent   = selectedEl ? findDomParent(selectedEl)   : null;
+  const children = selectedEl ? findDomChildren(selectedEl) : [];
   const hasApi   = entry.apiCalls.length > 0;
-  const noRelations = !parents.length && !children.length && !hasApi;
+  const noRelations = !parent && children.length === 0 && !hasApi;
 
   if (noRelations) {
     return (
       <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
-        아직 기록된 관계가 없습니다.<br />
-        <span style={{ fontSize: 10 }}>앱을 조작하면 관계가 쌓입니다.</span>
+        관계가 없습니다.
       </p>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-      {/* 부모 레이어 */}
-      {parents.length > 0 && (
+      {/* 부모 */}
+      {parent && (
         <>
-          <NodeRow names={parents} onNavigate={onNavigate} />
+          <NodeRow
+            items={[parent]}
+            onNavigate={onNavigate}
+            onHover={onHover}
+            onHoverEnd={onHoverEnd}
+          />
           <GraphConnector />
         </>
       )}
@@ -655,14 +727,18 @@ function MiniRelationGraph({ entry, onNavigate }: {
       {/* 현재 컴포넌트 */}
       <GraphNode name={entry.name} isCenter hasApi={hasApi} />
 
-      {/* 자식 레이어 */}
+      {/* 자식 */}
       {children.length > 0 && (
         <>
           <GraphConnector />
-          <NodeRow names={children} onNavigate={onNavigate} />
+          <NodeRow
+            items={children}
+            onNavigate={onNavigate}
+            onHover={onHover}
+            onHoverEnd={onHoverEnd}
+          />
         </>
       )}
-
     </div>
   );
 }
@@ -795,12 +871,14 @@ function BreadcrumbBar({
 
 // ─── 플로팅 사이드바 ──────────────────────────────────────────────────────────
 function FloatingSidebar({
-  stack, selectedId, selectedLoc, allEntries, onSelect, onClose,
+  stack, selectedId, selectedLoc, selectedEl, allEntries, onSelect, onClose,
   dockPosition, floatPos, onDockChange, onFloatMove,
+  onHighlight, onHighlightEnd,
 }: {
   stack: FoundComp[];
   selectedId: string;
   selectedLoc: string | null;
+  selectedEl: HTMLElement | null;
   allEntries: DocEntry[];
   onSelect: (symbolId: string, el?: HTMLElement) => void;
   onClose: () => void;
@@ -808,6 +886,8 @@ function FloatingSidebar({
   floatPos: { x: number; y: number };
   onDockChange: (pos: DockPosition) => void;
   onFloatMove: (pos: { x: number; y: number }) => void;
+  onHighlight: (symbolId: string) => void;
+  onHighlightEnd: () => void;
 }) {
   const [renderedOnly, setRenderedOnly] = useState(false);
   const [view, setView] = useState<'tree' | 'detail'>('tree');
@@ -967,10 +1047,13 @@ function FloatingSidebar({
               ? <EntryDetail
                   entry={selectedEntry}
                   loc={selectedLoc}
+                  selectedEl={selectedEl}
                   onNavigate={(name) => {
                     const target = allEntries.find(e => e.name === name);
                     if (target) onSelect(target.symbolId);
                   }}
+                  onHover={(symbolId) => onHighlight(symbolId)}
+                  onHoverEnd={onHighlightEnd}
                 />
               : <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#94a3b8' }}>데이터 없음</p>
             }
@@ -1068,6 +1151,7 @@ export function ComponentOverlay({
 }) {
   const [stack,      setStack]      = useState<FoundComp[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const [highlightId, setHighlightId] = useState<string>('');
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(loadFloatPos);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
@@ -1192,6 +1276,16 @@ export function ComponentOverlay({
 
   return (
     <>
+      {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
+      {highlightId && (() => {
+        const els = [...document.querySelectorAll(`[data-gori-id="${highlightId}"]`)] as HTMLElement[];
+        const label = highlightId.split('#').at(-1) ?? '';
+        return els.map((el, i) => {
+          const rect = el.getBoundingClientRect();
+          return isVisible(rect) ? <HoverPreviewBox key={i} rect={rect} label={label} /> : null;
+        });
+      })()}
+
       {/* 호버 프리뷰: 점선 amber */}
       {showHoverBox && (
         <HoverPreviewBox rect={hoveredComp.rect} label={hoveredLabel} />
@@ -1212,6 +1306,7 @@ export function ComponentOverlay({
         selectedId={selectedId}
         selectedLoc={selectedLoc}
         allEntries={allEntries}
+        selectedEl={selectedElRef.current}
         dockPosition={dockPosition}
         floatPos={floatPos}
         onDockChange={(pos) => { setDockPosition(pos); saveDock(pos); }}
@@ -1246,6 +1341,8 @@ export function ComponentOverlay({
           }
         }}
         onClose={onDeactivate}
+        onHighlight={setHighlightId}
+        onHighlightEnd={() => setHighlightId('')}
       />
     </>
   );
