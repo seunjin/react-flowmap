@@ -6,6 +6,7 @@ import { loadDock, saveDock, saveFloatPos, findComponentsAt, isVisible } from '.
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
 import { InspectButton, type GoriConfig } from './InspectButton';
+import inspectorCss from './inspector.css?inline';
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
@@ -38,6 +39,16 @@ export function ComponentOverlay({
 
   const onDeactivateRef = useRef(onDeactivate);
   useEffect(() => { onDeactivateRef.current = onDeactivate; }, [onDeactivate]);
+
+  // CSS 주입 — 한 번만 실행
+  useEffect(() => {
+    if (document.querySelector('style[data-gori-inspector]')) return;
+    const el = document.createElement('style');
+    el.setAttribute('data-gori-inspector', '');
+    el.textContent = inspectorCss;
+    document.head.appendChild(el);
+    return () => { el.remove(); };
+  }, []);
 
   const index      = useMemo(() => buildDocIndex(graph), [graph]);
   const graphEntries = useMemo(() => [...index.pages, ...index.components], [index]);
@@ -77,6 +88,18 @@ export function ComponentOverlay({
       setSelectedId('');
       selectedElRef.current = null;
     }
+  }, [active]);
+
+  // 리사이즈/스크롤 시 선택 박스 위치 갱신
+  useEffect(() => {
+    if (!active) return;
+    function refresh() { forceRender(n => n + 1); }
+    window.addEventListener('resize', refresh);
+    window.addEventListener('scroll', refresh, true);
+    return () => {
+      window.removeEventListener('resize', refresh);
+      window.removeEventListener('scroll', refresh, true);
+    };
   }, [active]);
 
   // 선택된 DOM 요소가 unmount(페이지 전환·필터)되면 대체 인스턴스 탐색 or 선택 해제

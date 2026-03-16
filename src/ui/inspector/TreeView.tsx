@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type React from 'react';
-import { Folder, FileCode, Component } from 'lucide-react';
+import { Folder, FileCode, Component, ChevronRight } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { AnyTreeNode, FolderTreeNode } from './tree-utils';
 import { folderHasHovered } from './tree-utils';
@@ -8,21 +8,21 @@ import { folderHasHovered } from './tree-utils';
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 export function FolderIcon({ hovered }: { hovered: boolean }) {
-  return <Folder size={12} style={{ flexShrink: 0, color: hovered ? '#374151' : '#9ca3af' }} />;
+  return <Folder size={12} className={`shrink-0 ${hovered ? 'text-gori-text-700' : 'text-gori-text-400'}`} />;
 }
 
 export function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return <FileCode size={12} style={{ flexShrink: 0, color: selected ? '#1e40af' : hovered ? '#374151' : '#9ca3af' }} />;
+  return <FileCode size={12} className={`shrink-0 ${selected ? 'text-gori-blue' : hovered ? 'text-gori-text-700' : 'text-gori-text-400'}`} />;
 }
 
 export function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  return <Component size={10} style={{ flexShrink: 0, color: isSelected ? '#1e40af' : isHovered ? '#374151' : '#d1d5db' }} />;
+  return <Component size={10} className={`shrink-0 ${isSelected ? 'text-gori-blue' : isHovered ? 'text-gori-text-700' : 'text-gori-text-300'}`} />;
 }
 
 // ─── TreeNodeView ─────────────────────────────────────────────────────────────
 
 export function TreeNodeView({
-  node, depth, hoveredIds, treeHoveredId, selectedId, focusedSymbolId, onSelect, selectedRef,
+  node, depth, hoveredIds, treeHoveredId, selectedId, focusedSymbolId, onSelect, onDetail, selectedRef,
   onHover, onHoverEnd, forceExpanded,
 }: {
   node: AnyTreeNode;
@@ -32,6 +32,7 @@ export function TreeNodeView({
   selectedId: string;
   focusedSymbolId: string;
   onSelect: (symbolId: string) => void;
+  onDetail: () => void;
   selectedRef: React.RefObject<HTMLButtonElement | null>;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
@@ -49,22 +50,14 @@ export function TreeNodeView({
             tabIndex={0}
             onClick={() => setCollapsed(c => !c)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCollapsed(c => !c); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: `4px 10px 4px ${10 + depth * 14}px`,
-              cursor: 'pointer', userSelect: 'none',
-            }}
+            className="flex items-center gap-[5px] cursor-pointer select-none"
+            style={{ padding: `4px 10px 4px ${8 + depth * 14}px` }}
           >
-            <span style={{
-              fontSize: 7, color: '#9ca3af', display: 'inline-block',
-              transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-              transition: 'transform 120ms', flexShrink: 0,
-            }}>▶</span>
+            <span
+              className={`text-[7px] text-gori-text-400 inline-block shrink-0 transition-transform duration-120 ${isCollapsed ? 'rotate-0' : 'rotate-90'}`}
+            >▶</span>
             <FolderIcon hovered={hasHovered} />
-            <span style={{
-              fontSize: 11, fontWeight: hasHovered ? 600 : 500,
-              color: hasHovered ? '#374151' : '#6b7280',
-            }}>
+            <span className={`text-[11px] ${hasHovered ? 'font-semibold text-gori-text-700' : 'font-medium text-gori-text-500'}`}>
               {node.name}
             </span>
           </div>
@@ -79,6 +72,7 @@ export function TreeNodeView({
             selectedId={selectedId}
             focusedSymbolId={focusedSymbolId}
             onSelect={onSelect}
+            onDetail={onDetail}
             selectedRef={selectedRef}
             onHover={onHover}
             onHoverEnd={onHoverEnd}
@@ -95,18 +89,12 @@ export function TreeNodeView({
 
   return (
     <div>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 5,
-        padding: `4px 10px 3px ${10 + depth * 14}px`,
-        background: fileSelected ? '#f3f4f6' : fileHovered ? '#f3f4f6' : 'transparent',
-      }}>
+      <div
+        className={`flex items-center gap-[5px] ${fileSelected || fileHovered ? 'bg-gori-bg-100' : 'bg-transparent'}`}
+        style={{ padding: `4px 10px 3px ${8 + depth * 14}px` }}
+      >
         <FileIcon hovered={fileHovered} selected={fileSelected} />
-        <span style={{
-          fontSize: 11,
-          fontWeight: fileSelected ? 600 : fileHovered ? 500 : 400,
-          color: fileSelected ? '#111827' : fileHovered ? '#374151' : '#9ca3af',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-        }}>
+        <span className={`text-[11px] truncate flex-1 ${fileSelected ? 'font-semibold text-gori-text-900' : fileHovered ? 'font-medium text-gori-text-700' : 'font-normal text-gori-text-400'}`}>
           {node.name}
         </span>
       </div>
@@ -117,41 +105,44 @@ export function TreeNodeView({
         const isFocused  = entry.symbolId === focusedSymbolId && !isSelected;
 
         return (
-          <button
+          <div
             key={entry.symbolId}
-            data-tree-entry
-            type="button"
-            ref={isSelected ? (el) => { selectedRef.current = el; } : undefined}
-            onClick={() => onSelect(entry.symbolId)}
-            onMouseEnter={() => onHover(entry.symbolId)}
-            onMouseLeave={onHoverEnd}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              width: '100%', padding: `4px 10px 4px ${10 + (depth + 1) * 14}px`,
-              border: 'none',
-              borderLeft: isSelected
-                ? '2px solid #1e40af'
+            className={`flex items-center transition-[background] duration-60 ${
+              isSelected
+                ? 'border-l-2 border-gori-blue bg-gori-blue-light'
                 : isFocused
-                  ? '2px solid #bfdbfe'
+                  ? 'border-l-2 border-gori-blue-border bg-gori-bg-100'
                   : isHovered
-                    ? '2px solid #9ca3af'
-                    : '2px solid transparent',
-              textAlign: 'left', cursor: 'pointer',
-              background: isSelected ? '#dbeafe' : isFocused ? '#f3f4f6' : isHovered ? '#f3f4f6' : 'transparent',
-              outline: 'none',
-              transition: 'background 60ms',
-            }}
+                    ? 'border-l-2 border-gori-text-400 bg-gori-bg-100'
+                    : 'border-l-2 border-transparent bg-transparent'
+            }`}
           >
-            <ComponentIcon isSelected={isSelected} isHovered={isHovered} />
-            <span style={{
-              fontSize: 12,
-              fontWeight: isSelected ? 700 : isHovered ? 500 : 400,
-              color: isSelected ? '#111827' : isHovered ? '#374151' : '#9ca3af',
-              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {entry.name}
-            </span>
-          </button>
+            <button
+              data-tree-entry
+              type="button"
+              ref={isSelected ? (el) => { selectedRef.current = el; } : undefined}
+              onClick={() => onSelect(entry.symbolId)}
+              onMouseEnter={() => onHover(entry.symbolId)}
+              onMouseLeave={onHoverEnd}
+              className="flex items-center gap-[6px] flex-1 border-none bg-transparent text-left cursor-pointer outline-none"
+              style={{ padding: `4px 6px 4px ${8 + (depth + 1) * 14}px` }}
+            >
+              <ComponentIcon isSelected={isSelected} isHovered={isHovered} />
+              <span className={`text-[12px] font-normal truncate flex-1 ${isSelected ? 'text-gori-text-900' : isHovered ? 'text-gori-text-700' : 'text-gori-text-400'}`}>
+                {entry.name}
+              </span>
+            </button>
+            {isSelected && (
+              <button
+                type="button"
+                onClick={onDetail}
+                title="View details"
+                className="shrink-0 w-6 h-6 mr-1.5 flex items-center justify-center border border-gori-border-light rounded-[4px] bg-transparent cursor-pointer text-gori-blue transition-[background] duration-80 hover:bg-gori-blue-xlight"
+              >
+                <ChevronRight size={13} />
+              </button>
+            )}
+          </div>
         );
       })}
     </div>

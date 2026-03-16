@@ -26,18 +26,12 @@ export function InspectButton({
       data-gori-overlay
       type="button"
       onClick={onClick}
-      title="컴포넌트 Inspector"
+      title="Component Inspector"
+      className="fixed w-11 h-11 rounded-full border-none bg-[#3b82f6] text-white cursor-pointer flex items-center justify-center shadow-[0_2px_10px_rgba(59,130,246,0.4)] transition-all duration-[180ms] z-[10001]"
       style={{
-        position: 'fixed',
         bottom,
         ...(right !== undefined ? { right } : {}),
         ...(left  !== undefined ? { left  } : {}),
-        width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: '#1d4ed8',
-        color: '#ffffff', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 10px rgba(29,78,216,0.4)',
-        transition: 'all 180ms', zIndex: 10001,
       } as React.CSSProperties}
     >
       <svg width="20" height="20" viewBox="0 0 22 22" fill="none">

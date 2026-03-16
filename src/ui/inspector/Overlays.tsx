@@ -7,24 +7,21 @@ export function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string 
   if (c.width <= 0 || c.height <= 0) return null;
   const labelAbove = rect.top > 22;
   return (
-    <div style={{
-      position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '1.5px dashed #9ca3af',
-      background: 'rgba(59,130,246,0.04)',
-      boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9998,
-    }}>
-      <div style={{
-        position: 'absolute',
-        ...(labelAbove
-          ? { top: -1, left: -1, transform: 'translateY(-100%)' }
-          : { top: 3, left: 3 }),
-        background: '#3b82f6',
-        borderRadius: labelAbove ? '4px 4px 0 0' : 4,
-        padding: '1px 7px', fontSize: 10, fontWeight: 600,
-        color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
-        fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
-        pointerEvents: 'none',
-      }}>
+    <div
+      data-gori-overlay
+      className="fixed border-[1.5px] border-dashed border-gori-text-400 bg-[rgba(59,130,246,0.04)] box-border pointer-events-none z-9998"
+      style={{ left: c.left, top: c.top, width: c.width, height: c.height }}
+    >
+      <div
+        className="absolute bg-gray-300 pointer-events-none text-[10px] font-semibold text-white whitespace-nowrap leading-[1.6] px-[7px] py-px"
+        style={{
+          fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
+          borderRadius: labelAbove ? '4px 4px 0 0' : 4,
+          ...(labelAbove
+            ? { top: -1, left: -1, transform: 'translateY(-100%)' }
+            : { top: 3, left: 3 }),
+        }}
+      >
         {label}
       </div>
     </div>
@@ -38,24 +35,21 @@ export function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string 
   if (c.width <= 0 || c.height <= 0) return null;
   const labelAbove = rect.top > 22;
   return (
-    <div style={{
-      position: 'fixed', left: c.left, top: c.top, width: c.width, height: c.height,
-      border: '2px solid #1e40af',
-      background: 'rgba(30,64,175,0.05)',
-      boxSizing: 'border-box', pointerEvents: 'none', zIndex: 9999,
-    }}>
-      <div style={{
-        position: 'absolute',
-        ...(labelAbove
-          ? { top: -1, left: -1, transform: 'translateY(-100%)' }
-          : { top: 3, left: 3 }),
-        background: '#1e40af',
-        borderRadius: labelAbove ? '4px 4px 0 0' : 4,
-        padding: '1px 7px', fontSize: 11, fontWeight: 600,
-        color: '#fff', whiteSpace: 'nowrap', lineHeight: 1.6,
-        fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
-        pointerEvents: 'none',
-      }}>
+    <div
+      data-gori-overlay
+      className="fixed border-[1.5px] border-gori-blue bg-[rgba(59,130,246,0.05)] box-border pointer-events-none z-9999"
+      style={{ left: c.left, top: c.top, width: c.width, height: c.height }}
+    >
+      <div
+        className="absolute bg-gori-blue pointer-events-none text-[11px] font-semibold text-white whitespace-nowrap leading-[1.6] px-[7px] py-px"
+        style={{
+          fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
+          borderRadius: labelAbove ? '4px 4px 0 0' : 4,
+          ...(labelAbove
+            ? { top: -1, left: -1, transform: 'translateY(-100%)' }
+            : { top: 3, left: 3 }),
+        }}
+      >
         {label}
       </div>
     </div>

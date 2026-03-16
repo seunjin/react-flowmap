@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { SquareMousePointer, X, Search, ChevronLeft } from 'lucide-react';
+import type React from 'react';
+import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
-import { sidebarStyle } from './utils';
+import { sidebarStyle, openInEditor } from './utils';
 import { buildFolderTree, flattenTreeEntries } from './tree-utils';
 import { DockDropdown } from './DockDropdown';
 import { TreeNodeView } from './TreeView';
@@ -58,17 +59,13 @@ export function FloatingSidebar({
     document.addEventListener('mouseup', onMouseUp);
   }
 
-  // 선택 시 자동으로 detail 뷰로 전환
-  useEffect(() => {
-    if (selectedId) setView('detail');
-  }, [selectedId]);
-
   const hoveredIds = useMemo(() => new Set(stack.map(c => c.symbolId)), [stack]);
   const [treeHoveredId, setTreeHoveredId] = useState('');
 
   const displayEntries = useMemo(() => {
     const domIds = new Set(
       [...document.querySelectorAll('[data-gori-id]')]
+        .filter(el => !el.closest('[data-gori-overlay]'))
         .map(el => el.getAttribute('data-gori-id')!)
     );
     return allEntries.filter(e => domIds.has(e.symbolId));
@@ -124,7 +121,13 @@ export function FloatingSidebar({
         e.preventDefault();
         e.stopPropagation();
         const entry = treeOrderedEntries[focusedIdx];
-        if (entry) onSelect(entry.symbolId);
+        if (entry) {
+          if (entry.symbolId === selectedId) {
+            setView('detail');
+          } else {
+            onSelect(entry.symbolId);
+          }
+        }
       }
     }
 
@@ -140,52 +143,38 @@ export function FloatingSidebar({
       {/* 헤더 */}
       <div
         onMouseDown={onHeaderMouseDown}
-        style={{
-          height: 44, minHeight: 44,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 8px 0 12px',
-          borderBottom: '1px solid rgba(229,231,235,0.5)',
-          background: dockPosition === 'float' ? 'rgba(249,250,251,0.5)' : 'rgba(249,250,251,0.6)',
-          flexShrink: 0,
-          cursor: dockPosition === 'float' ? 'grab' : 'default',
-          userSelect: 'none',
-        }}
+        className={`h-9 min-h-9 flex items-center justify-between px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0 select-none ${
+          dockPosition === 'float'
+            ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
+            : 'bg-[rgba(249,250,251,0.6)] cursor-default'
+        }`}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="flex items-center gap-1">
           {/* 요소 선택 픽 버튼 */}
           <button
             type="button"
             onClick={onPickToggle}
-            title={picking ? '선택 취소 (Escape)' : '요소 선택'}
-            onMouseEnter={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; } }}
-            onMouseLeave={e => { if (!picking) { (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
-            style={{
-              width: 26, height: 26, borderRadius: 5,
-              border: '1px solid',
-              borderColor: picking ? '#1e40af' : 'rgba(229,231,235,0.8)',
-              background: picking ? '#eff6ff' : 'transparent',
-              color: picking ? '#1e40af' : '#9ca3af',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 120ms',
-            }}
+            title={picking ? 'Cancel (Escape)' : 'Pick element'}
+            className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${
+              picking
+                ? 'bg-gori-bg-100 text-gori-text-700'
+                : 'bg-transparent text-gori-text-400 hover:bg-gori-bg-100 hover:text-gori-text-700'
+            }`}
           >
             <SquareMousePointer size={14} />
           </button>
-          <div style={{ width: 1, height: 14, background: 'rgba(229,231,235,0.8)' }} />
+          <div className="w-px h-3.5 bg-gori-border-light" />
           {/* 포지션 버튼 */}
           <DockDropdown current={dockPosition} onChange={onDockChange} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <button type="button" onClick={onClose}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; }}
-            style={{
-              width: 24, height: 24, borderRadius: 5, border: '1px solid rgba(229,231,235,0.8)',
-              background: 'transparent', color: '#9ca3af', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 100ms',
-            }}><X size={13} /></button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-6 h-6 rounded-[4px] border-none bg-transparent text-gori-text-400 cursor-pointer flex items-center justify-center transition-all duration-100 hover:bg-gori-bg-100 hover:text-gori-text-700"
+          >
+            <X size={13} />
+          </button>
         </div>
       </div>
 
@@ -194,45 +183,31 @@ export function FloatingSidebar({
         <>
 
           {/* 검색 */}
-          <div style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+          <div className="px-2 py-1.5 border-b border-gori-border shrink-0">
+            <div className="relative">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-gori-text-400" />
               <input
                 type="text"
-                placeholder="컴포넌트 검색..."
+                placeholder="Search components..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '5px 26px 5px 26px',
-                  borderRadius: 5, border: '1px solid rgba(229,231,235,0.8)',
-                  background: 'rgba(249,250,251,0.6)', fontSize: 11, color: '#111827',
-                  outline: 'none', fontFamily: 'inherit',
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(229,231,235,0.8)'; e.currentTarget.style.background = 'rgba(249,250,251,0.6)'; }}
+                className="w-full box-border py-[5px] pl-[26px] pr-[26px] rounded-[5px] border border-gori-border-light bg-[rgba(249,250,251,0.6)] text-[11px] text-gori-text-900 outline-none font-[inherit] focus:border-gori-text-400 focus:bg-[rgba(255,255,255,0.9)]"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-                    width: 16, height: 16, borderRadius: '50%', border: 'none',
-                    background: '#d1d5db', color: '#fff', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 0,
-                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-none bg-gori-text-300 text-white cursor-pointer flex items-center justify-center p-0"
                 ><X size={10} /></button>
               )}
             </div>
           </div>
 
           {/* 폴더 트리 */}
-          <div ref={treeScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+          <div ref={treeScrollRef} className="flex-1 overflow-y-auto py-1">
             {filteredEntries.length === 0 ? (
-              <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>
-                {searchQuery ? `"${searchQuery}" 검색 결과 없음` : '현재 화면에 렌더된 컴포넌트가 없습니다'}
+              <p className="m-0 px-2 py-4 text-[11px] text-gori-text-400 leading-relaxed">
+                {searchQuery ? `No results for "${searchQuery}"` : 'No components rendered on screen'}
               </p>
             ) : (
               <TreeNodeView
@@ -243,6 +218,7 @@ export function FloatingSidebar({
                 selectedId={selectedId}
                 focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
                 onSelect={onSelect}
+                onDetail={() => setView('detail')}
                 selectedRef={selectedRef}
                 onHover={(id) => { setTreeHoveredId(id); onHighlight(id); }}
                 onHoverEnd={() => { setTreeHoveredId(''); onHighlightEnd(); }}
@@ -254,45 +230,36 @@ export function FloatingSidebar({
       ) : (
         <>
           {/* 뒤로가기 바 */}
-          <div style={{
-            height: 36, minHeight: 36,
-            display: 'grid', gridTemplateColumns: '32px 1fr 32px',
-            alignItems: 'center',
-            padding: '0 6px',
-            borderBottom: '1px solid rgba(229,231,235,0.6)',
-            background: 'rgba(249,250,251,0.5)',
-            flexShrink: 0,
-          }}>
+          <div className="h-9 min-h-9 grid grid-cols-[32px_1fr_32px] items-center px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0">
             <button
               type="button"
               onClick={() => setView('tree')}
-              style={{
-                width: 28, height: 28, borderRadius: 5,
-                border: '1px solid rgba(229,231,235,0.8)', background: 'transparent',
-                cursor: 'pointer', color: '#9ca3af',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              className="w-6 h-6 rounded-[4px] border-none bg-transparent cursor-pointer text-gori-text-400 flex items-center justify-center transition-all duration-100 hover:bg-gori-bg-100 hover:text-gori-text-700"
             >
               <ChevronLeft size={14} />
             </button>
-            <span style={{
-              fontSize: 12, fontWeight: 600, color: '#111827',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              textAlign: 'center',
-            }}>
+            <span className="text-[12px] font-semibold text-gori-text-900 truncate text-center">
               {selectedEntry?.name ?? selectedId.split('#').at(-1)}
             </span>
-            <div />
+            <div className="flex justify-end">
+              {selectedEntry?.filePath && (
+                <button
+                  type="button"
+                  onClick={() => openInEditor(selectedEntry.filePath!, selectedEntry.symbolId, selectedLoc)}
+                  title="Open in editor"
+                  className="w-6 h-6 rounded-[4px] border-none bg-transparent cursor-pointer text-gori-text-400 flex items-center justify-center transition-all duration-100 hover:bg-gori-bg-100 hover:text-gori-text-700"
+                >
+                  <ExternalLink size={12} />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* 상세 — 전체 높이 사용 */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="flex-1 overflow-y-auto">
             {selectedEntry
               ? <EntryDetail
                   entry={selectedEntry}
-                  loc={selectedLoc}
                   selectedEl={selectedEl}
                   onNavigate={(name) => {
                     const target = allEntries.find(e => e.name === name);
@@ -301,7 +268,7 @@ export function FloatingSidebar({
                   onHover={(symbolId) => onHighlight(symbolId)}
                   onHoverEnd={onHighlightEnd}
                 />
-              : <p style={{ margin: 0, padding: '16px 12px', fontSize: 11, color: '#9ca3af' }}>데이터 없음</p>
+              : <p className="m-0 px-2 py-4 text-[11px] text-gori-text-400">No data</p>
             }
           </div>
         </>

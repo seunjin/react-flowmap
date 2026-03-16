@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { goriInspect } from './src/vite-plugin/index.js';
@@ -7,7 +8,7 @@ import { goriInspect } from './src/vite-plugin/index.js';
 const libraryEntry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 
 export default defineConfig(({ mode }) => ({
-  plugins: [goriInspect(), react()],
+  plugins: [tailwindcss(), goriInspect(), react()],
   ...(mode === 'demo'
     ? {}
     : {

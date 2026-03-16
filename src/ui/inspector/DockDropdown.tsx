@@ -4,7 +4,7 @@ import type { DockPosition } from './types';
 // ─── DOCK_LABELS ──────────────────────────────────────────────────────────────
 
 export const DOCK_LABELS: Record<DockPosition, string> = {
-  left: '왼쪽', bottom: '하단', right: '오른쪽', float: '플로팅',
+  left: 'Left', bottom: 'Bottom', right: 'Right', float: 'Float',
 };
 
 // ─── DockSvg ──────────────────────────────────────────────────────────────────
@@ -53,34 +53,24 @@ export function DockDropdown({ current, onChange }: { current: DockPosition; onC
   }, [open]);
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="relative">
       <button
         data-gori-overlay
         type="button"
         onClick={() => setOpen(o => !o)}
-        title="패널 위치 변경"
-        style={{
-          width: 26, height: 26, borderRadius: 5,
-          border: '1px solid rgba(229,231,235,0.8)',
-          background: open ? 'rgba(243,244,246,0.9)' : 'transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 3, transition: 'background 100ms',
-        }}
+        title="Change panel position"
+        className={`w-6 h-6 rounded-[4px] border-none cursor-pointer flex items-center justify-center transition-all duration-100 ${
+          open
+            ? 'bg-gori-bg-100 text-gori-text-700'
+            : 'bg-transparent text-gori-text-400 hover:bg-gori-bg-100 hover:text-gori-text-700'
+        }`}
       >
-        <DockSvg pos={current} color="#6b7280" />
+        <DockSvg pos={current} color={open ? '#374151' : '#9ca3af'} />
       </button>
       {open && (
         <div
           data-gori-overlay
-          style={{
-            position: 'absolute', top: 30, left: 0,
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(229,231,235,0.8)',
-            borderRadius: 8, boxShadow: '0 4px 16px rgba(23,37,84,0.1)',
-            padding: 4, zIndex: 10001, minWidth: 110,
-          }}
+          className="absolute top-[30px] left-0 bg-[rgba(255,255,255,0.95)] backdrop-blur-[12px] border border-gori-border-light rounded-lg shadow-[0_4px_16px_rgba(23,37,84,0.1)] p-1 z-[10001] min-w-[110px]"
         >
           {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
             <button
@@ -88,17 +78,11 @@ export function DockDropdown({ current, onChange }: { current: DockPosition; onC
               key={pos}
               type="button"
               onClick={() => { onChange(pos); setOpen(false); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                width: '100%', padding: '6px 8px', borderRadius: 5,
-                border: 'none', cursor: 'pointer', textAlign: 'left',
-                background: current === pos ? 'rgba(243,244,246,0.9)' : 'transparent',
-                color: current === pos ? '#111827' : '#6b7280',
-                fontSize: 11, fontWeight: current === pos ? 600 : 400,
-                transition: 'background 80ms',
-              }}
-              onMouseEnter={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'rgba(243,244,246,0.8)'; }}
-              onMouseLeave={e => { if (current !== pos) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-[5px] border-none cursor-pointer text-left text-[11px] transition-[background] duration-[80ms] ${
+                current === pos
+                  ? 'bg-[rgba(243,244,246,0.9)] text-gori-text-900 font-semibold'
+                  : 'bg-transparent text-gori-text-500 font-normal hover:bg-[rgba(243,244,246,0.8)]'
+              }`}
             >
               <DockSvg pos={pos} color={current === pos ? '#111827' : '#9ca3af'} />
               {DOCK_LABELS[pos]}
