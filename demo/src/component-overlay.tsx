@@ -819,28 +819,37 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
   onHoverEnd?: (() => void) | undefined;
 }) {
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', maxWidth: 120 }}>
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         type="button"
         onClick={onClick}
         disabled={isCenter}
         title={name}
         style={{
-          padding: '4px 10px', borderRadius: 6,
-          border: isCenter ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-          background: isCenter ? '#eff6ff' : '#f8fafc',
-          color: isCenter ? '#1d4ed8' : '#475569',
+          padding: '5px 12px', borderRadius: 7,
+          border: isCenter ? '1.5px solid #3b82f6' : '1px solid rgba(226,232,240,0.9)',
+          background: isCenter ? 'rgba(239,246,255,0.9)' : 'rgba(248,250,252,0.7)',
+          color: isCenter ? '#1d4ed8' : '#64748b',
           fontSize: 11, fontWeight: isCenter ? 700 : 500,
           cursor: isCenter ? 'default' : 'pointer',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          maxWidth: 120, transition: 'all 80ms',
+          maxWidth: 130, transition: 'all 80ms',
+          boxShadow: isCenter ? '0 0 0 3px rgba(59,130,246,0.1)' : 'none',
         }}
         onMouseEnter={e => {
-          if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#eff6ff';
+          if (!isCenter) {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(239,246,255,0.9)';
+            (e.currentTarget as HTMLElement).style.borderColor = '#93c5fd';
+            (e.currentTarget as HTMLElement).style.color = '#1d4ed8';
+          }
           onHover?.();
         }}
         onMouseLeave={e => {
-          if (!isCenter) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+          if (!isCenter) {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(248,250,252,0.7)';
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,232,240,0.9)';
+            (e.currentTarget as HTMLElement).style.color = '#64748b';
+          }
           onHoverEnd?.();
         }}
       >
@@ -849,44 +858,60 @@ function GraphNode({ name, isCenter, hasApi, onClick, onHover, onHoverEnd }: {
       {hasApi && (
         <span style={{
           position: 'absolute', top: -3, right: -3,
-          width: 8, height: 8, borderRadius: '50%',
-          background: '#f59e0b', border: '2px solid #fff',
+          width: 7, height: 7, borderRadius: '50%',
+          background: '#f59e0b', border: '1.5px solid white',
         }} title="API 호출 있음" />
       )}
     </div>
   );
 }
 
-function GraphConnector() {
+function GraphConnector({ label }: { label?: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-      <div style={{ width: 1.5, height: 10, background: '#cbd5e1' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+      <div style={{ width: 1, height: 8, background: '#cbd5e1' }} />
+      {label && (
+        <span style={{
+          fontSize: 9, color: '#94a3b8', fontFamily: 'monospace',
+          padding: '1px 4px', background: 'rgba(241,245,249,0.8)',
+          borderRadius: 3, border: '1px solid rgba(226,232,240,0.6)',
+        }}>{label}</span>
+      )}
+      <div style={{ width: 1, height: 8, background: '#cbd5e1' }} />
       <div style={{
         width: 0, height: 0,
-        borderLeft: '4px solid transparent',
-        borderRight: '4px solid transparent',
-        borderTop: '5px solid #cbd5e1',
+        borderLeft: '3.5px solid transparent',
+        borderRight: '3.5px solid transparent',
+        borderTop: '4.5px solid #cbd5e1',
       }} />
     </div>
   );
 }
 
-function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
+function NodeRow({ items, label, onNavigate, onHover, onHoverEnd }: {
   items: { name: string; symbolId: string }[];
+  label?: string;
   onNavigate?: ((n: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-      {items.map(({ name, symbolId }) => (
-        <GraphNode
-          key={symbolId} name={name}
-          onClick={() => onNavigate?.(name)}
-          onHover={() => onHover?.(symbolId)}
-          onHoverEnd={onHoverEnd}
-        />
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      {label && (
+        <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          {label}
+        </span>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
+        {items.map(({ name, symbolId }) => (
+          <GraphNode
+            key={symbolId} name={name}
+            onClick={() => onNavigate?.(name)}
+            onHover={() => onHover?.(symbolId)}
+            onHoverEnd={onHoverEnd}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -913,67 +938,20 @@ function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-      {/* 부모 */}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, padding: '4px 0' }}>
       {parent && (
         <>
-          <NodeRow
-            items={[parent]}
-            onNavigate={onNavigate}
-            onHover={onHover}
-            onHoverEnd={onHoverEnd}
-          />
+          <NodeRow items={[parent]} label="부모" onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
           <GraphConnector />
         </>
       )}
-
-      {/* 현재 컴포넌트 */}
       <GraphNode name={entry.name} isCenter hasApi={hasApi} />
-
-      {/* 자식 */}
       {children.length > 0 && (
         <>
           <GraphConnector />
-          <NodeRow
-            items={children}
-            onNavigate={onNavigate}
-            onHover={onHover}
-            onHoverEnd={onHoverEnd}
-          />
+          <NodeRow items={children} label="자식" onNavigate={onNavigate} onHover={onHover} onHoverEnd={onHoverEnd} />
         </>
       )}
-    </div>
-  );
-}
-
-function _ChipList({ items, color = 'default', onNavigate }: {
-  items: string[];
-  color?: 'default' | 'purple';
-  onNavigate?: ((name: string) => void) | undefined;
-}) {
-  const s = color === 'purple'
-    ? { bg: '#faf5ff', border: '#e9d5ff', text: '#6d28d9', hover: '#f3e8ff' }
-    : { bg: '#f8fafc', border: '#e2e8f0', text: '#334155', hover: '#eff6ff' };
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {items.map(item => (
-        <button
-          key={item}
-          type="button"
-          onClick={() => onNavigate?.(item)}
-          style={{
-            padding: '3px 8px', borderRadius: 4,
-            border: `1px solid ${s.border}`, background: s.bg,
-            fontSize: 11, color: s.text,
-            cursor: onNavigate ? 'pointer' : 'default',
-            transition: 'all 80ms',
-          }}
-          onMouseEnter={e => { if (onNavigate) (e.currentTarget as HTMLElement).style.background = s.hover; }}
-          onMouseLeave={e => { if (onNavigate) (e.currentTarget as HTMLElement).style.background = s.bg; }}
-        >
-          {item}
-        </button>
-      ))}
     </div>
   );
 }
