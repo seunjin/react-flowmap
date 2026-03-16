@@ -886,6 +886,7 @@ function FloatingSidebar({
   stack, selectedId, selectedLoc, selectedEl, allEntries, onSelect, onClose,
   dockPosition, floatPos, onDockChange, onFloatMove,
   onHighlight, onHighlightEnd,
+  picking, onPickToggle,
 }: {
   stack: FoundComp[];
   selectedId: string;
@@ -900,6 +901,8 @@ function FloatingSidebar({
   onFloatMove: (pos: { x: number; y: number }) => void;
   onHighlight: (symbolId: string) => void;
   onHighlightEnd: () => void;
+  picking: boolean;
+  onPickToggle: () => void;
 }) {
   const [renderedOnly, setRenderedOnly] = useState(false);
   const [view, setView] = useState<'tree' | 'detail'>('tree');
@@ -1022,6 +1025,31 @@ function FloatingSidebar({
             fontSize: 10, fontWeight: 800, color: '#fff', flexShrink: 0,
           }}>G</div>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Inspector</span>
+          <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
+          {/* 요소 선택 픽 버튼 (DevTools 스타일) */}
+          <button
+            type="button"
+            onClick={onPickToggle}
+            title={picking ? '선택 취소 (Escape)' : '요소 선택'}
+            style={{
+              width: 26, height: 26, borderRadius: 5, border: '1px solid',
+              borderColor: picking ? '#3b82f6' : '#e2e8f0',
+              background: picking ? '#eff6ff' : 'transparent',
+              color: picking ? '#3b82f6' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 120ms',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="3" fill="currentColor" />
+              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+              <line x1="10" y1="1" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="10" y1="16" x2="10" y2="19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="1" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="16" y1="10" x2="19" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
@@ -1151,10 +1179,9 @@ function ToggleTab({
 
 // ─── 플로팅 Inspect 버튼 ──────────────────────────────────────────────────────
 export function InspectButton({
-  open, picking, onClick, dockPosition = 'right',
+  open, onClick, dockPosition = 'right',
 }: {
   open: boolean;
-  picking: boolean;
   onClick: () => void;
   dockPosition?: DockPosition;
 }) {
@@ -1176,52 +1203,28 @@ export function InspectButton({
     btnBottom = 20;
   }
 
-  const bg =
-    picking ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' :
-    open    ? '#1e40af' :
-              '#0f172a';
-
-  const shadow =
-    picking ? '0 0 0 3px rgba(99,102,241,0.35), 0 4px 14px rgba(59,130,246,0.45)' :
-    open    ? '0 0 0 2px rgba(59,130,246,0.3), 0 2px 10px rgba(15,23,42,0.2)' :
-              '0 2px 10px rgba(15,23,42,0.3)';
-
-  const title =
-    picking ? '클릭 취소 (선택 대기 중)' :
-    open    ? '다시 선택하기' :
-              '컴포넌트 Inspect';
-
   return (
     <button
       data-gori-overlay
       type="button"
       onClick={onClick}
-      title={title}
+      title={open ? '인스펙터 닫기' : '컴포넌트 Inspector'}
       style={{
         position: 'fixed',
         bottom: btnBottom,
         ...(btnRight !== undefined ? { right: btnRight } : {}),
         ...(btnLeft  !== undefined ? { left:  btnLeft  } : {}),
         width: 44, height: 44, borderRadius: '50%', border: 'none',
-        background: bg, color: '#ffffff', cursor: 'pointer',
+        background: open ? '#1e40af' : '#0f172a',
+        color: '#ffffff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: shadow,
+        boxShadow: open
+          ? '0 0 0 2px rgba(59,130,246,0.3), 0 2px 10px rgba(15,23,42,0.2)'
+          : '0 2px 10px rgba(15,23,42,0.3)',
         transition: 'all 180ms', zIndex: 10001,
       }}
     >
-      {picking ? (
-        // 피킹 중: 커서 아이콘
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="3" fill="#fff" />
-          <circle cx="10" cy="10" r="7" stroke="#fff" strokeWidth="1.5" fill="none" />
-          <line x1="10" y1="1" x2="10" y2="4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="10" y1="16" x2="10" y2="19" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="1" y1="10" x2="4" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="16" y1="10" x2="19" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      ) : (
-        <span style={{ fontSize: 18 }}>⬡</span>
-      )}
+      <span style={{ fontSize: 18 }}>⬡</span>
     </button>
   );
 }
@@ -1276,9 +1279,7 @@ export function ComponentOverlay({
 
   // 패널 열림/닫힘
   useEffect(() => {
-    if (active) {
-      setPicking(true); // 패널 열릴 때 자동으로 피킹 시작
-    } else {
+    if (!active) {
       setPicking(false);
       setStack([]);
       setSelectedId('');
@@ -1379,19 +1380,12 @@ export function ComponentOverlay({
   const selectedLabel  = selectedId.split('#').at(-1) ?? '';
 
   function handleButtonClick() {
-    if (!active) {
-      onToggle?.(); // 패널 열기
-    } else if (picking) {
-      setPicking(false); // 피킹 취소, 패널 유지
-      setStack([]);
-    } else {
-      setPicking(true); // 다시 피킹 시작
-    }
+    onToggle?.();
   }
 
   if (!active) {
     return (
-      <InspectButton open={false} picking={false} onClick={handleButtonClick} dockPosition={dockPosition} />
+      <InspectButton open={false} onClick={handleButtonClick} dockPosition={dockPosition} />
     );
   }
 
@@ -1417,7 +1411,7 @@ export function ComponentOverlay({
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
 
-      <InspectButton open={true} picking={picking} onClick={handleButtonClick} dockPosition={dockPosition} />
+      <InspectButton open={true} onClick={handleButtonClick} dockPosition={dockPosition} />
 
       {/* 플로팅 사이드바 */}
       <FloatingSidebar
@@ -1428,6 +1422,11 @@ export function ComponentOverlay({
         selectedEl={selectedElRef.current}
         dockPosition={dockPosition}
         floatPos={floatPos}
+        picking={picking}
+        onPickToggle={() => {
+          if (picking) { setPicking(false); setStack([]); }
+          else { setPicking(true); }
+        }}
         onDockChange={(pos) => { setDockPosition(pos); saveDock(pos); }}
         onFloatMove={(pos) => { setFloatPos(pos); saveFloatPos(pos); }}
         onSelect={(id, el) => {
