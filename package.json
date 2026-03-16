@@ -1,9 +1,13 @@
 {
   "name": "gori",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "description": "Runtime graph explorer for React applications.",
+  "description": "Runtime component inspector for React applications.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite-plugin": "./src/vite-plugin/index.ts"
+  },
   "engines": {
     "node": ">=22.22.0"
   },
@@ -19,7 +23,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@xyflow/react": "^12.10.1",
     "lucide-react": "^0.577.0",
     "react": "19.1.1",
     "react-dom": "19.1.1"

@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { buildGraph } from '../../src/core/graph/graph-builder';
-import type { GoriGraph } from '../../src/core/types/graph';
-import type { RuntimeEvent } from '../../src/core/types/runtime-events';
-import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
-import { ComponentOverlay } from '../../src/ui/inspector';
+import { buildGraph, type GoriGraph, attachFetchInterceptor, ComponentOverlay } from 'gori';
+import type { RuntimeEvent } from 'gori';
 import { NotificationToast } from './features/notification-toast';
 import { HomePage } from './pages/home-page';
 import { ProductPage } from './pages/product-page';
@@ -166,7 +163,7 @@ export function App() {
       getContext: () => demoRuntimeSession.getContext(),
     });
 
-    const unsub = demoCollector.subscribe((nextEvents) => {
+    const unsub = demoCollector.subscribe((nextEvents: RuntimeEvent[]) => {
       setEvents(nextEvents);
       setGraph(buildGraph(nextEvents));
     });
