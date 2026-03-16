@@ -4,7 +4,7 @@ import { buildGraph } from '../../src/core/graph/graph-builder';
 import type { GoriGraph } from '../../src/core/types/graph';
 import type { RuntimeEvent } from '../../src/core/types/runtime-events';
 import { attachFetchInterceptor } from '../../src/runtime/collector/fetch-interceptor';
-import { ComponentOverlay } from './component-overlay';
+import { ComponentOverlay } from '../../src/ui/inspector';
 import { NotificationToast } from './features/notification-toast';
 import { HomePage } from './pages/home-page';
 import { ProductPage } from './pages/product-page';
