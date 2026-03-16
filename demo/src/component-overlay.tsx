@@ -4,12 +4,6 @@ import type { GoriGraph } from '../../src/core/types/graph';
 import { buildDocIndex, type DocEntry } from '../../src/ui/doc/build-doc-index';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
-const CAT_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  page:      { bg: '#eff6ff', color: '#1e40af', label: 'Page'      },
-  component: { bg: '#eff6ff', color: '#1e40af', label: 'Component' },
-  hook:      { bg: '#f3f4f6', color: '#4b5563', label: 'Hook'      },
-  function:  { bg: '#f3f4f6', color: '#4b5563', label: 'Fn'        },
-};
 
 const SIDEBAR_W = 320;
 const BOTTOM_H  = 320;
@@ -715,21 +709,13 @@ export function EntryDetail({ entry, loc, selectedEl, onNavigate, onHover, onHov
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
-  const cat = CAT_STYLE[entry.category] ?? CAT_STYLE['function']!;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 섹션 */}
       <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        <div style={{ marginBottom: 6 }}>
           <span style={{ fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
             {entry.name}
-          </span>
-          <span style={{
-            padding: '2px 7px', borderRadius: 4, background: cat.bg, color: cat.color,
-            fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2,
-          }}>
-            {cat.label}
           </span>
         </div>
 
