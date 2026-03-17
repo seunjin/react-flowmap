@@ -18,7 +18,8 @@ const generate  = generateModule.default ?? generateModule;
 export const DEFAULT_CONTEXT_IMPORT = 'virtual:rfm/context';
 
 const DEFAULT_EXCLUDE = [
-  /\/ui\/inspector\//,  // inspector UI 소스 — 라이브러리 내부
+  /\/ui\/inspector\//,   // inspector UI 소스 — 라이브러리 내부
+  /\/ui\/graph-window\//, // 그래프 창 UI 소스
   /vite-plugin/,
   /rfm-context/,
   /rfm-runtime/,

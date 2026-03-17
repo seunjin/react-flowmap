@@ -232,6 +232,13 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
   </head>
   <body>
     <div id="rfm-root"></div>
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
     <script type="module" src="${RFM_GRAPH_ENTRY_ID}"></script>
   </body>
 </html>`);

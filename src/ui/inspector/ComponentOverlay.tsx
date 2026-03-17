@@ -81,6 +81,7 @@ export function ComponentOverlay({
       } else if (msg.type === 'window-close') {
         setGraphWindowOpen(false);
         graphWinRef.current = null;
+        onDeactivateRef.current(); // 그래프 창 닫히면 inspector 전체 비활성화
       }
     };
 
@@ -404,7 +405,13 @@ export function ComponentOverlay({
             }
           }
         }}
-        onClose={onDeactivate}
+        onClose={() => {
+          if (graphWindowOpen && graphWinRef.current && !graphWinRef.current.closed) {
+            graphWinRef.current.close();
+            setGraphWindowOpen(false);
+          }
+          onDeactivate();
+        }}
         onHighlight={setHighlightId}
         onHighlightEnd={() => setHighlightId('')}
       />
