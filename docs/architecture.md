@@ -182,24 +182,68 @@ Projection 결과를 실제 UI로 렌더링합니다.
 
 앱 화면 위에서 직접 컴포넌트를 탐색하는 개발 도구입니다.
 
-구성:
+#### 패키지 구조
 
-- **Vite 플러그인** (`src/vite-plugin/`) — 빌드 타임에 다음을 자동 주입:
-  - `data-rfm-id`, `data-rfm-loc` DOM 속성 (hover 탐색용)
-  - `useContext(__RfmCtx)` + `__useRfmRecord()` 훅 (렌더 추적용)
-  - `<__RfmCtx.Provider>` 래핑 (부모-자식 관계 자동 전달)
-  - 개발 서버 미들웨어 `/__rfm-open` (에디터 오픈)
-- **Runtime Context** (`src/runtime/rfm-context.ts`) — `__RfmCtx`, `__useRfmRecord`, `__rfmCollector`, `__rfmSession` 싱글턴
-- **Component Overlay UI** (`demo/src/component-overlay.tsx`) — hover/select 박스, 폴더 트리 사이드바
+```
+react-flowmap/
+├── src/
+│   ├── vite-plugin/          react-flowmap/vite  — Vite 플러그인
+│   ├── runtime/rfm-context.ts                    — React Context 싱글턴
+│   └── ui/inspector/                             — Inspector UI 컴포넌트
+└── packages/
+    ├── babel-plugin/         @react-flowmap/babel-plugin
+    │   └── src/index.ts      — transformFlowmap() 핵심 변환 함수
+    └── next-plugin/          @react-flowmap/next-plugin  (react-flowmap/next)
+        ├── src/index.ts      — withFlowmap() Next.js config 래퍼
+        ├── src/webpack-loader.ts  — webpack 로더
+        └── src/api-handler.ts    — 에디터 열기 API 핸들러
+```
 
-동작 원리:
+#### 서브패스 exports
 
-1. Vite 플러그인이 각 컴포넌트 함수에 `data-rfm-id` 주입 + Context Provider로 감쌈
+| import 경로 | 역할 |
+|---|---|
+| `react-flowmap/vite` | Vite 플러그인 (`flowmapInspect()`) |
+| `react-flowmap/next` | Next.js 플러그인 (`withFlowmap()`) |
+| `react-flowmap/next/api-handler` | App Router / Pages Router API 핸들러 |
+| `react-flowmap/context` | Runtime Context (내부 사용) |
+
+#### 빌드 타임 변환 (`@react-flowmap/babel-plugin`)
+
+`transformFlowmap(code, fileId, opts)` 함수가 각 JSX 파일에 다음을 주입합니다:
+
+- `data-rfm-id`, `data-rfm-loc` DOM 속성 (hover 탐색용)
+- `useContext(__RfmCtx)` + `__useRfmRecord()` 훅 (렌더 추적용)
+- `<__RfmCtx.Provider>` 래핑 (부모-자식 관계 자동 전달)
+
+이 변환 함수는 `contextImport` 옵션으로 import 경로를 커스텀할 수 있어 Vite와 Next.js 양쪽에서 재사용됩니다:
+- Vite: `virtual:rfm/context` (가상 모듈)
+- Next.js: `react-flowmap/context` (webpack alias로 실제 파일 경로로 해석)
+
+#### 번들러별 통합
+
+**Vite** (`react-flowmap/vite`):
+- `enforce: 'pre'` 플러그인으로 JSX 변환 파이프라인 앞단에 실행
+- ts-morph로 prop 타입 추출 (`globalThis.__rfmPropTypes`)
+- `configureServer`로 `/__rfm-open` dev 미들웨어 제공
+
+**Next.js App Router** (`react-flowmap/next`):
+- `withFlowmap(nextConfig)` — `next.config.ts`에서 사용
+- webpack 로더가 dev 빌드 시 클라이언트 사이드 JSX 파일에 변환 주입
+- `app/api/__rfm-open/route.ts`에서 `export { GET } from 'react-flowmap/next/api-handler'`로 에디터 열기 지원
+
+#### Runtime Context (`src/runtime/rfm-context.ts`)
+
+`__RfmCtx`, `__useRfmRecord`, `__rfmCollector`, `__rfmSession` 싱글턴.
+
+#### 동작 원리
+
+1. 번들러 플러그인이 각 컴포넌트 함수에 `data-rfm-id` 주입 + Context Provider로 감쌈
 2. 앱 실행 중 컴포넌트가 렌더될 때 `__useRfmRecord`가 parent-child 관계를 `__rfmCollector`에 기록
 3. Inspector 활성화 시 `document.elementsFromPoint`로 커서 아래 컴포넌트 스택 탐색
 4. 컴포넌트 선택 시 `/__rfm-open` 엔드포인트를 통해 에디터에서 해당 파일 오픈
 
-프로덕션 빌드에서는 Vite 플러그인의 `transform`이 `isDev = false`일 때 즉시 반환되어 어떠한 코드도 번들에 포함되지 않습니다.
+프로덕션 빌드에서는 변환이 실행되지 않아(`isDev = false`) 어떠한 코드도 번들에 포함되지 않습니다.
 
 ---
 

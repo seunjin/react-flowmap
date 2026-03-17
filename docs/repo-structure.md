@@ -15,26 +15,47 @@
 
 ## Repository Shape
 
-React Flowmap v1은 **단일 패키지 저장소(single package repo)** 로 시작합니다.
+React Flowmap은 **하이브리드 구조**를 사용합니다.
+메인 라이브러리는 `src/`에 유지하고, 번들러별 플러그인은 `packages/`로 분리합니다.
 
-초기 최상위 구조:
+최상위 구조:
 
 ```text
 docs/
 src/
+packages/
 demo/
 tests/
 ```
 
-이유:
+분리 이유:
 
-- 아직 배포 단위가 `core`, `runtime`, `ui`로 분리된 상태가 아니다.
-- 초기에는 구조적 경계가 중요하지, 패키지 분리는 중요하지 않다.
-- 나중에 필요하면 `packages/` 기반 구조로 확장할 수 있다.
+- `src/` — 코어 엔진, 런타임, UI, Vite 플러그인 (메인 패키지 `react-flowmap`)
+- `packages/babel-plugin/` — Babel AST 변환 로직 (`@react-flowmap/babel-plugin`)
+- `packages/next-plugin/` — Next.js 통합 (`@react-flowmap/next-plugin`)
+- 사용자는 `react-flowmap` 하나만 설치하고 서브패스(`/vite`, `/next`)로 접근
 
 ---
 
 ## Top-level Directories
+
+### `packages/`
+
+번들러별 플러그인 패키지를 둡니다.
+
+```text
+packages/
+  babel-plugin/         @react-flowmap/babel-plugin
+    src/
+      index.ts          — transformFlowmap() 핵심 변환 함수
+  next-plugin/          @react-flowmap/next-plugin  (react-flowmap/next)
+    src/
+      index.ts          — withFlowmap() Next.js config 래퍼
+      webpack-loader.ts — webpack 로더
+      api-handler.ts    — 에디터 열기 API 핸들러
+```
+
+---
 
 ### `docs/`
 
