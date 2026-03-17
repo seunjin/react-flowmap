@@ -1,0 +1,16 @@
+{
+  "name": "@react-flowmap/babel-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Babel AST transform core for react-flowmap.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@babel/generator": ">=7",
+    "@babel/parser": ">=7",
+    "@babel/traverse": ">=7",
+    "@babel/types": ">=7"
+  }
+}

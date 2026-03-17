@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./vite-plugin": "./src/vite-plugin/index.ts"
+    "./vite-plugin": "./src/vite-plugin/index.ts",
+    "./context": "./src/runtime/rfm-context.ts"
   },
   "engines": {
     "node": ">=22.22.0"

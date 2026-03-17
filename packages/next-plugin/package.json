@@ -1,0 +1,22 @@
+{
+  "name": "@react-flowmap/next-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Next.js plugin for react-flowmap.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./webpack-loader": "./src/webpack-loader.ts",
+    "./api-handler": "./src/api-handler.ts"
+  },
+  "dependencies": {
+    "@react-flowmap/babel-plugin": "workspace:*"
+  },
+  "peerDependencies": {
+    "next": ">=13",
+    "ts-morph": ">=20"
+  },
+  "peerDependenciesMeta": {
+    "ts-morph": { "optional": true }
+  }
+}

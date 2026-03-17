@@ -4,131 +4,15 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project, TypeFormatFlags, ts } from 'ts-morph';
 import type { Plugin } from 'vite';
+import { transformFlowmap } from '../../packages/babel-plugin/src/index.js';
 
 const _require = createRequire(import.meta.url);
-
-// @babel packages are transitive deps of @vitejs/plugin-react
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const parser = _require('@babel/parser') as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const traverseModule = _require('@babel/traverse') as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const generateModule = _require('@babel/generator') as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const t = _require('@babel/types') as any;
-
-const traverse = traverseModule.default ?? traverseModule;
-const generate = generateModule.default ?? generateModule;
 
 // Virtual module ID
 const RFM_CONTEXT_ID = 'virtual:rfm/context';
 const RESOLVED_RFM_CONTEXT_ID = '\0' + RFM_CONTEXT_ID;
 
-// Plugin 파일 위치 기반으로 runtime context 파일 경로 계산
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
-
-// ─── JSX에 data-rfm-id / data-rfm-loc 속성 추가 ────────────────────────────
-function addAttr(node: unknown, symbolId: string, line: number): void {
-  if (t.isJSXElement(node)) {
-    const el = node as { openingElement: { attributes: unknown[] } };
-    const alreadyHas = el.openingElement.attributes.some(
-      (a: unknown) =>
-        t.isJSXAttribute(a) &&
-        t.isJSXIdentifier((a as { name: unknown }).name) &&
-        (a as { name: { name: string } }).name.name === 'data-rfm-id'
-    );
-    if (alreadyHas) return;
-
-    el.openingElement.attributes.unshift(
-      t.jsxAttribute(t.jsxIdentifier('data-rfm-id'),  t.stringLiteral(symbolId)),
-      t.jsxAttribute(t.jsxIdentifier('data-rfm-loc'), t.stringLiteral(String(line))),
-    );
-  } else if (t.isConditionalExpression(node)) {
-    const n = node as { consequent: unknown; alternate: unknown };
-    addAttr(n.consequent, symbolId, line);
-    addAttr(n.alternate, symbolId, line);
-  } else if (t.isLogicalExpression(node) && (node as { operator: string }).operator === '&&') {
-    addAttr((node as { right: unknown }).right, symbolId, line);
-  }
-}
-
-// ─── JSX를 __RfmCtx.Provider로 감싸기 ───────────────────────────────────────
-function createProviderElement(child: unknown, symbolId: string): unknown {
-  const memberExpr = t.jsxMemberExpression(
-    t.jsxIdentifier('__RfmCtx'),
-    t.jsxIdentifier('Provider'),
-  );
-  const openingEl = t.jsxOpeningElement(
-    memberExpr,
-    [t.jsxAttribute(t.jsxIdentifier('value'), t.stringLiteral(symbolId))],
-    false,
-  );
-  const closingEl = t.jsxClosingElement(memberExpr);
-  return t.jsxElement(openingEl, closingEl, [child], false);
-}
-
-function wrapWithProvider(node: unknown, symbolId: string): unknown {
-  if (t.isJSXElement(node) || t.isJSXFragment(node)) {
-    return createProviderElement(node, symbolId);
-  } else if (t.isConditionalExpression(node)) {
-    const n = node as { consequent: unknown; alternate: unknown };
-    n.consequent = wrapWithProvider(n.consequent, symbolId);
-    n.alternate  = wrapWithProvider(n.alternate,  symbolId);
-    return node;
-  } else if (t.isLogicalExpression(node) && (node as { operator: string }).operator === '&&') {
-    (node as { right: unknown }).right = wrapWithProvider(
-      (node as { right: unknown }).right, symbolId,
-    );
-    return node;
-  }
-  return node;
-}
-
-// ─── 함수에 Context 훅 주입 + Provider 래핑 ──────────────────────────────────
-function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: string): void {
-  const fn = fnPath as {
-    node: { type: string; body: unknown };
-    traverse: (v: unknown) => void;
-  };
-
-  // 화살표 함수 표현식 바디를 블록으로 변환: () => <div> → () => { return <div>; }
-  if (fn.node.type === 'ArrowFunctionExpression' && !t.isBlockStatement(fn.node.body)) {
-    fn.node.body = t.blockStatement([t.returnStatement(fn.node.body)]);
-  }
-
-  // 블록 바디 최상단에 Context 훅 주입
-  if (t.isBlockStatement(fn.node.body)) {
-    const body = fn.node.body as { body: unknown[] };
-    const constDecl = t.variableDeclaration('const', [
-      t.variableDeclarator(
-        t.identifier('__rfmParent'),
-        t.callExpression(t.identifier('__rfmUseContext'), [t.identifier('__RfmCtx')]),
-      ),
-    ]);
-    const recordCall = t.expressionStatement(
-      t.callExpression(t.identifier('__useRfmRecord'), [
-        t.identifier('__rfmParent'),
-        t.stringLiteral(symbolId),
-        t.stringLiteral(fileRef),
-      ]),
-    );
-    body.body.unshift(constDecl, recordCall);
-  }
-
-  // ReturnStatement의 JSX에 data-rfm-id 추가 + Provider 래핑
-  fn.traverse({
-    ReturnStatement(retPath: { node: { argument: unknown } }) {
-      if (retPath.node.argument) {
-        addAttr(retPath.node.argument, symbolId, line);
-        retPath.node.argument = wrapWithProvider(retPath.node.argument, symbolId);
-      }
-    },
-    // 중첩 함수는 건너뜀 (해당 함수가 컴포넌트라면 자체적으로 처리됨)
-    FunctionDeclaration:     { enter(p: { skip: () => void }) { p.skip(); } },
-    FunctionExpression:      { enter(p: { skip: () => void }) { p.skip(); } },
-    ArrowFunctionExpression: { enter(p: { skip: () => void }) { p.skip(); } },
-  });
-}
 
 // ─── ts-morph Props 타입 추출 ─────────────────────────────────────────────────
 export type TypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, TypeFieldEntry> };
@@ -136,7 +20,6 @@ export type PropTypeEntry  = TypeFieldEntry;
 export type PropTypesMap   = Record<string, PropTypeEntry>;
 
 function isFromProject(type: import('ts-morph').Type): boolean {
-  // union 같은 합성 타입은 getSymbol()이 null → getAliasSymbol()로 fallback
   const sym = type.getSymbol() ?? type.getAliasSymbol();
   const decls = sym?.getDeclarations() ?? [];
   return decls.some(d => {
@@ -161,7 +44,6 @@ function resolveFields(
     const optional = sym.hasFlags(ts.SymbolFlags.Optional);
     const typeStr = propType.getText(locationNode, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
 
-    // 프로젝트 내 plain object 타입만 재귀 전개 (배열·함수·외부 타입 제외)
     let fields: Record<string, TypeFieldEntry> | undefined;
     const isExpandable =
       propType.isObject() &&
@@ -219,7 +101,6 @@ function extractPropsViaTsMorph(
       if (isObjectExpandable) {
         fields = resolveFields(propType, firstParam, 0);
       } else if (isFromProject(propType)) {
-        // union 타입 — 멤버를 직접 펼쳐서 저장
         if (propType.isUnion()) {
           resolvedType = propType.getUnionTypes()
             .map(t => t.getText(firstParam))
@@ -271,12 +152,7 @@ function openInEditor(absPath: string, line: number, editor: string): void {
 
 // ─── 플러그인 ─────────────────────────────────────────────────────────────────
 export type FlowmapInspectOptions = {
-  /** 변환에서 제외할 파일 경로 패턴 (정규식) */
   exclude?: RegExp[];
-  /**
-   * 에디터 명령어. VITE_EDITOR 환경변수가 있으면 그것을 우선합니다.
-   * @example 'cursor' | 'code' | 'windsurf' | 'zed' | 'antigravity'
-   */
   editor?: string;
 };
 
@@ -284,13 +160,11 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
   let root = process.cwd();
   let editorCmd = process.env['VITE_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
   let isDev = false;
-  // transform 시 수집: symbolId → 줄번호
   const symbolLocMap = new Map<string, number>();
-  // ts-morph Project (dev 서버 시작 시 초기화)
   let tsProject: Project | null = null;
 
-  const defaultExclude = [/component-overlay/, /vite-plugin/, /rfm-context/];
-  const excludePatterns = [...defaultExclude, ...(options.exclude ?? [])];
+  // suppress unused import warning — _require kept for potential future CJS compat shims
+  void _require;
 
   return {
     name: 'rfm-inspect',
@@ -307,7 +181,7 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         try {
           tsProject = new Project({
             tsConfigFilePath: tsconfigPath,
-            skipAddingFilesFromTsConfig: true, // 필요한 파일만 on-demand 로드
+            skipAddingFilesFromTsConfig: true,
           });
         } catch {
           tsProject = null;
@@ -315,7 +189,6 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
       }
     },
 
-    // ─── virtual:rfm/context 모듈 제공 ──────────────────────────────────────
     resolveId(id) {
       if (id === RFM_CONTEXT_ID) return RESOLVED_RFM_CONTEXT_ID;
     },
@@ -326,7 +199,6 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
       return `export * from ${JSON.stringify(contextPath)};`;
     },
 
-    // ─── dev server: /__rfm-open?file=<relPath>&line=<n> ─────────────────────
     configureServer(server) {
       server.middlewares.use('/__rfm-open', (req, res) => {
         const qs = req.url?.split('?')[1] ?? '';
@@ -348,14 +220,12 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
 
         const absPath = resolve(root, file);
         openInEditor(absPath, line, editorCmd);
-
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, file: absPath, line, editor: editorCmd }));
       });
     },
 
     handleHotUpdate({ file }) {
-      // 파일 변경 시 ts-morph 캐시 무효화
       if (tsProject && /\.[jt]sx?$/.test(file)) {
         const sf = tsProject.getSourceFile(file);
         if (sf) sf.refreshFromFileSystemSync();
@@ -364,117 +234,40 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
 
     transform(code: string, id: string) {
       if (!isDev) return null;
-      if (!/\.[jt]sx$/.test(id)) return null;
-      if (id.includes('node_modules')) return null;
-      if (excludePatterns.some((re) => re.test(id))) return null;
 
       const relPath = relative(root, id).replace(/\\/g, '/');
-
-      let ast: unknown;
-      try {
-        ast = parser.parse(code, {
-          sourceType: 'module',
-          plugins: ['typescript', 'jsx'],
-          errorRecovery: true,
-        });
-      } catch {
-        return null;
-      }
-
-      let modified = false;
-      const propTypesRegistry = new Map<string, PropTypesMap>();
-
-      traverse(ast, {
-        // 변환이 발생한 경우 파일 상단에 import 주입
-        Program: {
-          exit(path: unknown) {
-            if (!modified) return;
-            const p = path as { unshiftContainer: (key: string, nodes: unknown[]) => void };
-            p.unshiftContainer('body', [
-              t.importDeclaration(
-                [t.importSpecifier(t.identifier('__rfmUseContext'), t.identifier('useContext'))],
-                t.stringLiteral('react'),
-              ),
-              t.importDeclaration(
-                [
-                  t.importSpecifier(t.identifier('__RfmCtx'), t.identifier('__RfmCtx')),
-                  t.importSpecifier(t.identifier('__useRfmRecord'), t.identifier('__useRfmRecord')),
-                ],
-                t.stringLiteral(RFM_CONTEXT_ID),
-              ),
-            ]);
-          },
-        },
-
-        // function MyComponent() { ... }
-        FunctionDeclaration(path: { node: { id: { name: string } | null; loc?: { start: { line: number } } } }) {
-          const name = path.node.id?.name;
-          if (!name || !/^[A-Z]/.test(name)) return;
-          const line = path.node.loc?.start.line ?? 1;
-          const symbolId = `symbol:${relPath}#${name}`;
-          symbolLocMap.set(symbolId, line);
-          injectIntoFn(path, symbolId, line, `file:${relPath}`);
-          if (tsProject) {
-            const props = extractPropsViaTsMorph(tsProject, id, name);
-            if (props) propTypesRegistry.set(symbolId, props);
-          }
-          modified = true;
-        },
-
-        // const MyComponent = () => ... or function() { ... }
-        VariableDeclarator(
-          path: {
-            node: {
-              id: unknown;
-              init: { type: string } | null;
-              loc?: { start: { line: number } };
-            };
-          }
-        ) {
-          if (!t.isIdentifier(path.node.id)) return;
-          const name = (path.node.id as { name: string }).name;
-          if (!/^[A-Z]/.test(name)) return;
-
-          const init = path.node.init;
-          if (
-            !init ||
-            (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')
-          ) {
-            return;
-          }
-
-          const line = path.node.loc?.start.line ?? 1;
-          const symbolId = `symbol:${relPath}#${name}`;
-          symbolLocMap.set(symbolId, line);
-          const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
-          injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
-          if (tsProject) {
-            const props = extractPropsViaTsMorph(tsProject, id, name);
-            if (props) propTypesRegistry.set(symbolId, props);
-          }
-          modified = true;
-        },
+      const result = transformFlowmap(code, id, {
+        relPath,
+        contextImport: RFM_CONTEXT_ID,
+        exclude: options.exclude ?? [],
       });
+      if (!result) return null;
 
-      if (!modified) return null;
-
-      const { code: newCode, map } = generate(
-        ast,
-        { sourceMaps: true, sourceFileName: id },
-        code
-      ) as { code: string; map: string };
-
-      // prop types 레지스트리 주입
-      let finalCode = newCode;
-      if (propTypesRegistry.size > 0) {
-        const lines = ['\n// __rfm prop types', '(globalThis.__rfmPropTypes??={});'];
-        for (const [sid, props] of propTypesRegistry) {
-          lines.push(`globalThis.__rfmPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
-        }
-        finalCode += lines.join('\n');
+      // symbolLocMap 업데이트 (에디터 열기용)
+      for (const [symbolId, line] of result.symbolLocs) {
+        symbolLocMap.set(symbolId, line);
       }
 
-      return { code: finalCode, map };
+      // ts-morph prop types 주입
+      let finalCode = result.code;
+      if (tsProject) {
+        const propTypesRegistry = new Map<string, PropTypesMap>();
+        for (const symbolId of result.symbolLocs.keys()) {
+          const componentName = symbolId.split('#')[1] ?? '';
+          const props = extractPropsViaTsMorph(tsProject, id, componentName);
+          if (props) propTypesRegistry.set(symbolId, props);
+        }
+        if (propTypesRegistry.size > 0) {
+          const lines = ['\n// __rfm prop types', '(globalThis.__rfmPropTypes??={});'];
+          for (const [sid, props] of propTypesRegistry) {
+            lines.push(`globalThis.__rfmPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
+          }
+          finalCode += lines.join('\n');
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { code: finalCode, map: result.map as any };
     },
   };
 }
