@@ -13,8 +13,9 @@ import { FloatingSidebar } from './FloatingSidebar';
 import { SIDEBAR_W } from './tokens';
 import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.css?inline';
-import type { MainToGraph, GraphToMain } from './channel';
+import type { MainToGraph, GraphToMain, PropTypesMap } from './channel';
 import { RFM_CHANNEL } from './channel';
+import { getComponentPropsFromEl } from './utils';
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
@@ -71,7 +72,19 @@ export function ComponentOverlay({
       const msg = ev.data;
       if (msg.type === 'select') {
         setSelectedId(msg.symbolId);
-        selectedElRef.current = findElBySymbolId(msg.symbolId);
+        const el = findElBySymbolId(msg.symbolId);
+        selectedElRef.current = el;
+        // 선택된 컴포넌트의 현재 props를 그래프 창으로 역전송
+        if (el) {
+          const props = getComponentPropsFromEl(el);
+          if (props) {
+            ch.postMessage({
+              type: 'props-update',
+              symbolId: msg.symbolId,
+              props,
+            } satisfies MainToGraph);
+          }
+        }
       } else if (msg.type === 'hover') {
         setHighlightId(msg.symbolId);
       } else if (msg.type === 'hover-end') {
@@ -122,10 +135,12 @@ export function ComponentOverlay({
   // allEntries / selectedId 변경 시 그래프 창에 브로드캐스트
   useEffect(() => {
     if (!graphWindowOpen || !channelRef.current) return;
+    const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
     channelRef.current.postMessage({
       type: 'graph-update',
       allEntries,
       selectedId,
+      propTypesMap,
     } satisfies MainToGraph);
   }, [allEntries, selectedId, graphWindowOpen]);
 
@@ -147,10 +162,12 @@ export function ComponentOverlay({
     graphWinRef.current = win;
     setGraphWindowOpen(true);
     setTimeout(() => {
+      const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
       channelRef.current?.postMessage({
         type: 'graph-update',
         allEntries,
         selectedId,
+        propTypesMap,
       } satisfies MainToGraph);
     }, 600);
   }
