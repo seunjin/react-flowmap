@@ -1,11 +1,14 @@
+import { useParams } from '@tanstack/react-router';
+import { useAppContext } from '../app';
 import { ProductDetail } from '../widgets/product-detail';
 
-type Props = { productId: string; onBack: () => void; onCartUpdated: () => void };
+export function ProductPage() {
+  const { productId } = useParams({ from: '/product/$productId' });
+  const { onCartUpdated } = useAppContext();
 
-export function ProductPage({ productId, onBack, onCartUpdated }: Props) {
   return (
     <div>
-      <ProductDetail productId={productId} onBack={onBack} onCartUpdated={onCartUpdated} />
+      <ProductDetail productId={productId} onCartUpdated={onCartUpdated} />
     </div>
   );
 }

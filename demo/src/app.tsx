@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+
+// ─── App Context (root → children) ───────────────────────────────────────────
+type AppContextValue = { onCartUpdated: () => void };
+const AppCtx = createContext<AppContextValue>({ onCartUpdated: () => {} });
+export const useAppContext = () => useContext(AppCtx);
 
 import { buildGraph, type FlowmapGraph, attachFetchInterceptor, ComponentOverlay } from 'react-flowmap';
 import type { RuntimeEvent } from 'react-flowmap';
 import { NotificationToast } from './features/notification-toast';
-import { HomePage } from './pages/home-page';
-import { ProductPage } from './pages/product-page';
-import { CartPage } from './pages/cart-page';
 import { UserMenu } from './entities/user/user-menu';
 import { demoCollector, demoRuntimeSession } from './rfm-runtime';
 import type { Product, CartItem, User } from './shared/types';
@@ -31,21 +34,20 @@ const MOCK_PRODUCTS: Product[] = [
   { id: '6', name: 'A5 무선 노트북', price: 12000, category: 'Stationery', emoji: '📓', description: '120g 고급 무지 용지, 실 제본 방식으로 완전히 펼쳐지는 노트북입니다.', rating: { score: 3.9, count: 412 } },
 ];
 
-type Page = 'home' | 'product' | 'cart';
-
-// ─── App ─────────────────────────────────────────────────────────────────────
+// ─── App (Root Layout) ────────────────────────────────────────────────────────
 export function App() {
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   void events;
   const [graph, setGraph] = useState<FlowmapGraph>(emptyGraph);
   const [runtimeReady, setRuntimeReady] = useState(false);
-  const [activePage, setActivePage] = useState<Page>('home');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [cartRefreshKey, setCartRefreshKey] = useState(0);
   const [cartCount, setCartCount] = useState(0);
   const [inspectMode, setInspectMode] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [toast, setToast] = useState<string>('');
+
+  const navigate = useNavigate();
+  const routerState = useRouterState();
+  const activePath = routerState.location.pathname;
 
   const styleRef = useRef<HTMLStyleElement | null>(null);
   useEffect(() => {
@@ -59,8 +61,6 @@ export function App() {
   // ── 런타임 + Mock API 초기화 ──────────────────────────────────────────────
   useEffect(() => {
     const originalFetch = globalThis.fetch;
-
-    // 인메모리 장바구니 상태
     const cartItems: CartItem[] = [];
     let cartIdCounter = 1;
 
@@ -71,24 +71,18 @@ export function App() {
           : input instanceof URL
             ? input
             : new URL((input as Request).url);
-
       const method = (init?.method ?? 'GET').toUpperCase();
 
-      // GET /api/user
       if (url.pathname === '/api/user' && method === 'GET') {
         return new Response(JSON.stringify({ id: '1', name: 'Flowmap User', email: 'user@react-flowmap.dev' }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
-
-      // GET /api/products
       if (url.pathname === '/api/products' && method === 'GET') {
         return new Response(JSON.stringify(MOCK_PRODUCTS), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
-
-      // GET /api/products/:id
       const productMatch = url.pathname.match(/^\/api\/products\/(.+)$/);
       if (productMatch && method === 'GET') {
         const product = MOCK_PRODUCTS.find(p => p.id === productMatch[1]);
@@ -97,15 +91,11 @@ export function App() {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
-
-      // GET /api/cart
       if (url.pathname === '/api/cart' && method === 'GET') {
         return new Response(JSON.stringify(cartItems), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
-
-      // POST /api/cart
       if (url.pathname === '/api/cart' && method === 'POST') {
         const body = JSON.parse(init?.body as string ?? '{}') as { productId: string; quantity: number };
         const product = MOCK_PRODUCTS.find(p => p.id === body.productId);
@@ -118,18 +108,13 @@ export function App() {
         }
         const newItem: CartItem = {
           id: String(cartIdCounter++),
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: body.quantity,
-          emoji: product.emoji,
+          productId: product.id, name: product.name,
+          price: product.price, quantity: body.quantity, emoji: product.emoji,
         };
         cartItems.push(newItem);
         setCartCount(cartItems.reduce((s, c) => s + c.quantity, 0));
         return new Response(JSON.stringify(newItem), { status: 201, headers: { 'Content-Type': 'application/json' } });
       }
-
-      // PUT /api/cart/:id
       const cartPutMatch = url.pathname.match(/^\/api\/cart\/(.+)$/);
       if (cartPutMatch && method === 'PUT') {
         const item = cartItems.find(c => c.id === cartPutMatch[1]);
@@ -139,8 +124,6 @@ export function App() {
         setCartCount(cartItems.reduce((s, c) => s + c.quantity, 0));
         return new Response(JSON.stringify(item), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-
-      // DELETE /api/cart/:id
       const cartDelMatch = url.pathname.match(/^\/api\/cart\/(.+)$/);
       if (cartDelMatch && method === 'DELETE') {
         const idx = cartItems.findIndex(c => c.id === cartDelMatch[1]);
@@ -148,26 +131,21 @@ export function App() {
         setCartCount(cartItems.reduce((s, c) => s + c.quantity, 0));
         return new Response(null, { status: 204 });
       }
-
       return originalFetch(input, init);
     };
 
     globalThis.fetch = demoFetch;
     demoCollector.reset();
-
-    // 유저 정보 로드
     fetch('/api/user').then(r => r.json()).then(setUser as (v: unknown) => void);
 
     const detach = attachFetchInterceptor({
       collector: demoCollector,
       getContext: () => demoRuntimeSession.getContext(),
     });
-
     const unsub = demoCollector.subscribe((nextEvents: RuntimeEvent[]) => {
       setEvents(nextEvents);
       setGraph(buildGraph(nextEvents));
     });
-
     setRuntimeReady(true);
 
     return () => {
@@ -179,17 +157,16 @@ export function App() {
     };
   }, []);
 
-  function handleSelectProduct(id: string) {
-    setSelectedProductId(id);
-    setActivePage('product');
-  }
-
   function handleCartUpdated() {
-    setCartRefreshKey(k => k + 1);
+    setCartCount(c => c + 1);
     setToast('장바구니에 추가됐습니다');
   }
 
-  // ── 렌더 ────────────────────────────────────────────────────────────────
+  const tabs = [
+    { path: '/',      label: '홈'    },
+    { path: '/cart',  label: `장바구니${cartCount > 0 ? ` (${cartCount})` : ''}` },
+  ] as const;
+
   return (
     <div style={{
       width: '100vw', height: '100vh', overflow: 'hidden',
@@ -197,80 +174,63 @@ export function App() {
       fontFamily: '"Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
       background: '#f8fafc',
     }}>
-      {/* ── 상단 바 ────────────────────────────────────────────────────── */}
+      {/* ── 상단 바 ──────────────────────────────────────────────────── */}
       <div style={{
         height: TOP_BAR_H, minHeight: TOP_BAR_H,
         display: 'flex', alignItems: 'center',
         padding: '0 16px', borderBottom: '1px solid #e2e8f0',
         background: '#ffffff', flexShrink: 0, gap: 12,
       }}>
-        {/* 로고 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 7,
             background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 14, fontWeight: 800, color: '#fff',
-          }}>G</div>
+          }}>R</div>
           <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Shop</span>
         </div>
 
         <div style={{ width: 1, height: 20, background: '#e2e8f0' }} />
 
-        {/* 페이지 탭 */}
         <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-          {([
-            { key: 'home',    label: '홈'    },
-            { key: 'product', label: '상품'  },
-            { key: 'cart',    label: `장바구니${cartCount > 0 ? ` (${cartCount})` : ''}` },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setActivePage(key)}
-              style={{
-                padding: '5px 12px', borderRadius: 6, border: '1px solid',
-                borderColor: activePage === key ? '#3b82f6' : 'transparent',
-                background: activePage === key ? '#eff6ff' : 'transparent',
-                color: activePage === key ? '#1d4ed8' : '#64748b',
-                cursor: 'pointer', fontSize: 13,
-                fontWeight: activePage === key ? 600 : 400,
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          {tabs.map(({ path, label }) => {
+            const isActive = activePath === path || (path !== '/' && activePath.startsWith(path));
+            return (
+              <button
+                key={path}
+                type="button"
+                onClick={() => navigate({ to: path })}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, border: '1px solid',
+                  borderColor: isActive ? '#3b82f6' : 'transparent',
+                  background: isActive ? '#eff6ff' : 'transparent',
+                  color: isActive ? '#1d4ed8' : '#64748b',
+                  cursor: 'pointer', fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* 유저 메뉴 */}
         <UserMenu user={user} />
       </div>
 
-      {/* ── 메인 ──────────────────────────────────────────────────────── */}
+      {/* ── 메인 ─────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <div style={{ maxWidth: 560, margin: '24px auto', padding: '0 16px 80px' }}>
-          {runtimeReady && activePage === 'home' && (
-            <HomePage onSelectProduct={handleSelectProduct} />
-          )}
-          {runtimeReady && activePage === 'product' && selectedProductId && (
-            <ProductPage
-              productId={selectedProductId}
-              onBack={() => setActivePage('home')}
-              onCartUpdated={handleCartUpdated}
-            />
-          )}
-          {runtimeReady && activePage === 'product' && !selectedProductId && (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8', fontSize: 13 }}>
-              홈에서 상품을 선택하세요
-            </div>
-          )}
-          {runtimeReady && activePage === 'cart' && (
-            <CartPage refreshKey={cartRefreshKey} />
+          {runtimeReady && (
+            <AppCtx.Provider value={{ onCartUpdated: handleCartUpdated }}>
+              <Outlet />
+            </AppCtx.Provider>
           )}
         </div>
       </div>
 
-      {/* ── 오버레이 ────────────────────────────────────────────────── */}
+      {/* ── 오버레이 ───────────────────────────────────────────────── */}
       {toast && <NotificationToast message={toast} onDismiss={() => setToast('')} />}
       <ComponentOverlay
         graph={graph}
@@ -278,7 +238,6 @@ export function App() {
         onDeactivate={() => setInspectMode(false)}
         onToggle={() => setInspectMode(p => !p)}
       />
-
     </div>
   );
 }

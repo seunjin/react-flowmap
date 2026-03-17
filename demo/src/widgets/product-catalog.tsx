@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import type { Product } from '../shared/types';
 import { fetchProducts } from '../shared/api/products-api';
 import { Spinner } from '../shared/ui/spinner';
@@ -6,12 +7,11 @@ import { EmptyState } from '../shared/ui/empty-state';
 import { ProductCard } from '../entities/product/product-card';
 import { CategoryFilter } from '../features/category-filter';
 
-type Props = { onSelectProduct: (id: string) => void };
-
-export function ProductCatalog({ onSelectProduct }: Props) {
+export function ProductCatalog() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>('All');
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -20,6 +20,10 @@ export function ProductCatalog({ onSelectProduct }: Props) {
 
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
   const filtered = category === 'All' ? products : products.filter(p => p.category === category);
+
+  function handleSelectProduct(id: string) {
+    navigate({ to: '/product/$productId', params: { productId: id } });
+  }
 
   if (loading) {
     return (
@@ -42,7 +46,7 @@ export function ProductCatalog({ onSelectProduct }: Props) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           {filtered.map(product => (
-            <ProductCard key={product.id} product={product} onClick={onSelectProduct} />
+            <ProductCard key={product.id} product={product} onClick={handleSelectProduct} />
           ))}
         </div>
       )}

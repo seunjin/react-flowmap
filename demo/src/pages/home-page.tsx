@@ -1,8 +1,6 @@
 import { ProductCatalog } from '../widgets/product-catalog';
 
-type Props = { onSelectProduct: (id: string) => void };
-
-export function HomePage({ onSelectProduct }: Props) {
+export function HomePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* 히어로 배너 */}
@@ -17,7 +15,7 @@ export function HomePage({ onSelectProduct }: Props) {
       </div>
 
       {/* 상품 목록 */}
-      <ProductCatalog onSelectProduct={onSelectProduct} />
+      <ProductCatalog />
     </div>
   );
 }

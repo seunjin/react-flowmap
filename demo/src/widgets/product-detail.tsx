@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import type { Product } from '../shared/types';
 import { fetchProduct } from '../shared/api/products-api';
 import { Spinner } from '../shared/ui/spinner';
@@ -8,10 +9,11 @@ import { ProductPrice } from '../entities/product/product-price';
 import { ProductRating } from '../entities/product/product-rating';
 import { AddToCart } from '../features/add-to-cart';
 
-type Props = { productId: string; onBack: () => void; onCartUpdated: () => void };
+type Props = { productId: string; onCartUpdated: () => void };
 
-export function ProductDetail({ productId, onBack, onCartUpdated }: Props) {
+export function ProductDetail({ productId, onCartUpdated }: Props) {
   const [product, setProduct] = useState<Product | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setProduct(null);
@@ -28,7 +30,7 @@ export function ProductDetail({ productId, onBack, onCartUpdated }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <Button variant="ghost" size="sm" onClick={onBack}>
+      <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/' })}>
         ← 목록으로
       </Button>
 

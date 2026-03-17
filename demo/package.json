@@ -8,10 +8,11 @@
     "build": "vite build --mode demo"
   },
   "dependencies": {
-    "react-flowmap": "workspace:*",
+    "@tanstack/react-router": "^1.167.4",
     "lucide-react": "^0.577.0",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "react-flowmap": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.1.12",

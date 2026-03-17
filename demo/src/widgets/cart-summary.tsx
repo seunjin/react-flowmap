@@ -6,9 +6,7 @@ import { EmptyState } from '../shared/ui/empty-state';
 import { Button } from '../shared/ui/button';
 import { CartItem } from '../entities/cart/cart-item';
 
-type Props = { refreshKey: number };
-
-export function CartSummary({ refreshKey }: Props) {
+export function CartSummary() {
   const [items, setItems] = useState<CartItemType[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +17,7 @@ export function CartSummary({ refreshKey }: Props) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => { load(); }, [load]);
 
   async function handleQtyChange(id: string, qty: number) {
     await updateCartItem(id, qty);
