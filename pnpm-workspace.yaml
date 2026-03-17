@@ -1,4 +1,4 @@
 packages:
   - '.'
-  - 'demo'
+  - 'demos/vite'
   - 'packages/*'
