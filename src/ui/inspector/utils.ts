@@ -190,26 +190,40 @@ export function findDomParent(el: HTMLElement): { name: string; symbolId: string
 }
 
 export function findDomChildren(el: HTMLElement): { name: string; symbolId: string }[] {
-  const compFiber = getCompFiber(getFiberFromEl(el));
-  if (!compFiber) return [];
+  // Find which component el belongs to
+  const selfComp = getCompFiber(getFiberFromEl(el));
+  if (!selfComp) return [];
+  const selfSymbolId = (selfComp.type as RfmFn).__rfm_symbolId!;
 
   const results: { name: string; symbolId: string }[] = [];
   const seen = new Set<string>();
-  // Iterative DFS through child fibers, stopping at component boundaries
-  const stack: FiberNode[] = compFiber.child ? [compFiber.child] : [];
-  while (stack.length > 0) {
-    const f = stack.pop()!;
-    const fn = f.type as RfmFn | null;
-    if (typeof fn === 'function' && fn.__rfm_symbolId) {
-      if (!seen.has(fn.__rfm_symbolId)) {
-        seen.add(fn.__rfm_symbolId);
-        results.push({ symbolId: fn.__rfm_symbolId, name: fn.__rfm_symbolId.split('#').at(-1) ?? '' });
+
+  // Walk DOM subtree — for each element, check if it's the root of a *direct* child component.
+  // "Direct child" means: the nearest RFM ancestor in the fiber chain is selfComp.
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = el;
+  while (node) {
+    const domEl = node as HTMLElement;
+    const compFiber = getCompFiber(getFiberFromEl(domEl));
+    if (compFiber) {
+      const symbolId = (compFiber.type as RfmFn).__rfm_symbolId;
+      if (symbolId && symbolId !== selfSymbolId && !seen.has(symbolId)) {
+        // Walk up from this component to find its nearest RFM parent
+        let f: FiberNode | null = compFiber.return;
+        while (f) {
+          const fn = f.type as RfmFn | null;
+          if (typeof fn === 'function' && fn.__rfm_symbolId) {
+            if (fn.__rfm_symbolId === selfSymbolId) {
+              seen.add(symbolId);
+              results.push({ symbolId, name: symbolId.split('#').at(-1) ?? '' });
+            }
+            break; // stop at first RFM ancestor regardless
+          }
+          f = f.return;
+        }
       }
-      // Don't recurse into this component's children (immediate children only)
-    } else {
-      if (f.child) stack.push(f.child);
     }
-    if (f.sibling) stack.push(f.sibling);
+    node = walker.nextNode();
   }
   return results;
 }

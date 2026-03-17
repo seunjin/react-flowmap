@@ -94,6 +94,28 @@ export function ComponentOverlay({
     }
   }, [active]);
 
+  // 라우터 전환 시 선택 상태 초기화 → 트리뷰로 복귀
+  // TanStack Router / React Router / Next.js 모두 history.pushState|replaceState 사용
+  useEffect(() => {
+    if (!active) return;
+    function reset() {
+      setSelectedId('');
+      selectedElRef.current = null;
+      setStack([]);
+      setPicking(false);
+    }
+    const origPush    = history.pushState.bind(history);
+    const origReplace = history.replaceState.bind(history);
+    history.pushState    = (...args: Parameters<typeof history.pushState>)    => { origPush(...args);    reset(); };
+    history.replaceState = (...args: Parameters<typeof history.replaceState>) => { origReplace(...args); reset(); };
+    window.addEventListener('popstate', reset);
+    return () => {
+      window.removeEventListener('popstate', reset);
+      history.pushState    = origPush;
+      history.replaceState = origReplace;
+    };
+  }, [active]);
+
   // 리사이즈/스크롤 시 선택 박스 위치 갱신
   useEffect(() => {
     if (!active) return;

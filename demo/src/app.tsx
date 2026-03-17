@@ -6,16 +6,13 @@ type AppContextValue = { onCartUpdated: () => void };
 const AppCtx = createContext<AppContextValue>({ onCartUpdated: () => {} });
 export const useAppContext = () => useContext(AppCtx);
 
-import { buildGraph, type FlowmapGraph, attachFetchInterceptor, ComponentOverlay } from 'react-flowmap';
-import type { RuntimeEvent } from 'react-flowmap';
+import { ReactFlowMap } from 'react-flowmap';
 import { NotificationToast } from './features/notification-toast';
 import { UserMenu } from './entities/user/user-menu';
-import { demoCollector, demoRuntimeSession } from './rfm-runtime';
 import type { Product, CartItem, User } from './shared/types';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 const TOP_BAR_H = 52;
-const emptyGraph: FlowmapGraph = { nodes: [], edges: [] };
 
 const globalStyle = `
   *, *::before, *::after { box-sizing: border-box; scrollbar-width: none; }
@@ -36,12 +33,8 @@ const MOCK_PRODUCTS: Product[] = [
 
 // ─── App (Root Layout) ────────────────────────────────────────────────────────
 export function App() {
-  const [events, setEvents] = useState<RuntimeEvent[]>([]);
-  void events;
-  const [graph, setGraph] = useState<FlowmapGraph>(emptyGraph);
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [cartCount, setCartCount] = useState(0);
-  const [inspectMode, setInspectMode] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [toast, setToast] = useState<string>('');
 
@@ -58,7 +51,7 @@ export function App() {
     return () => { el.remove(); };
   }, []);
 
-  // ── 런타임 + Mock API 초기화 ──────────────────────────────────────────────
+  // ── Mock API 초기화 ────────────────────────────────────────────────────────
   useEffect(() => {
     const originalFetch = globalThis.fetch;
     const cartItems: CartItem[] = [];
@@ -135,25 +128,12 @@ export function App() {
     };
 
     globalThis.fetch = demoFetch;
-    demoCollector.reset();
     fetch('/api/user').then(r => r.json()).then(setUser as (v: unknown) => void);
-
-    const detach = attachFetchInterceptor({
-      collector: demoCollector,
-      getContext: () => demoRuntimeSession.getContext(),
-    });
-    const unsub = demoCollector.subscribe((nextEvents: RuntimeEvent[]) => {
-      setEvents(nextEvents);
-      setGraph(buildGraph(nextEvents));
-    });
     setRuntimeReady(true);
 
     return () => {
       setRuntimeReady(false);
-      unsub();
-      detach();
       globalThis.fetch = originalFetch;
-      demoCollector.reset();
     };
   }, []);
 
@@ -232,12 +212,7 @@ export function App() {
 
       {/* ── 오버레이 ───────────────────────────────────────────────── */}
       {toast && <NotificationToast message={toast} onDismiss={() => setToast('')} />}
-      <ComponentOverlay
-        graph={graph}
-        active={inspectMode}
-        onDeactivate={() => setInspectMode(false)}
-        onToggle={() => setInspectMode(p => !p)}
-      />
+      <ReactFlowMap />
     </div>
   );
 }

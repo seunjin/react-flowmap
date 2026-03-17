@@ -79,6 +79,11 @@ export function FloatingSidebar({
   const selectedEntry = allEntries.find(e => e.symbolId === selectedId) ?? null;
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
+  // selectedId가 초기화되면(라우터 전환 등) 트리뷰로 복귀
+  useEffect(() => {
+    if (!selectedId) setView('tree');
+  }, [selectedId]);
+
   useEffect(() => {
     if (view === 'tree') selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selectedId, view]);
