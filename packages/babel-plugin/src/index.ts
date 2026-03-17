@@ -113,6 +113,8 @@ export type TransformResult = {
   map: unknown;
   /** symbolId → 소스 라인 번호 (에디터 열기용) */
   symbolLocs: Map<string, number>;
+  /** symbolId → 이 컴포넌트가 JSX에서 직접 렌더하는 컴포넌트 이름 목록 (상대 경로 import 기준) */
+  staticJsxMap: Map<string, string[]>;
 };
 
 // ─── 핵심 변환 함수 ───────────────────────────────────────────────────────────
@@ -137,6 +139,27 @@ export function transformFlowmap(
   const symbolLocs = new Map<string, number>();
   // Collect component defs to add __rfm_symbolId / __rfm_loc static props at module level
   const componentDefs: { name: string; symbolId: string; line: number }[] = [];
+  // localName → importSource (상대 경로 import 추적)
+  const importMap = new Map<string, string>();
+  // fromSymbolId → [child component names] (JSX 정적 관계)
+  const staticJsxMap = new Map<string, string[]>();
+
+  function scanJsxComponents(fnPath: unknown, fromSymbolId: string): void {
+    const childNames: string[] = [];
+    (fnPath as { traverse: (v: unknown) => void }).traverse({
+      JSXOpeningElement(jsxPath: { node: { name: unknown } }) {
+        const name = jsxPath.node.name;
+        if (t.isJSXIdentifier(name) && /^[A-Z]/.test((name as { name: string }).name)) {
+          const localName = (name as { name: string }).name;
+          const src = importMap.get(localName);
+          if (src && src.startsWith('.') && !childNames.includes(localName)) {
+            childNames.push(localName);
+          }
+        }
+      },
+    });
+    if (childNames.length > 0) staticJsxMap.set(fromSymbolId, childNames);
+  }
 
   let ast: unknown;
   try {
@@ -152,6 +175,14 @@ export function transformFlowmap(
   let modified = false;
 
   traverse(ast, {
+    ImportDeclaration(path: { node: { source: { value: string }; specifiers: unknown[] } }) {
+      const source = path.node.source.value;
+      for (const specifier of path.node.specifiers) {
+        const localName = ((specifier as { local: { name: string } }).local).name;
+        importMap.set(localName, source);
+      }
+    },
+
     Program: {
       exit(path: unknown) {
         if (!modified) return;
@@ -199,6 +230,7 @@ export function transformFlowmap(
       const symbolId = `symbol:${relPath}#${name}`;
       symbolLocs.set(symbolId, line);
       componentDefs.push({ name, symbolId, line });
+      scanJsxComponents(path, symbolId);
       injectIntoFn(path, symbolId, line, `file:${relPath}`);
       modified = true;
     },
@@ -224,6 +256,7 @@ export function transformFlowmap(
       symbolLocs.set(symbolId, line);
       componentDefs.push({ name, symbolId, line });
       const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
+      scanJsxComponents(initPath, symbolId);
       injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
       modified = true;
     },
@@ -237,5 +270,5 @@ export function transformFlowmap(
     code,
   ) as { code: string; map: unknown };
 
-  return { code: newCode, map, symbolLocs };
+  return { code: newCode, map, symbolLocs, staticJsxMap };
 }

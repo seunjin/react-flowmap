@@ -1,3 +1,8 @@
+
+type Rating = {
+  score: number;
+  count: number;
+}
 export type Product = {
   id: string;
   name: string;
@@ -7,7 +12,7 @@ export type Product = {
   badge?: 'sale' | 'new' | 'hot';
   description: string;
   emoji: string;
-  rating?: { score: number; count: number };
+  rating?: Rating;
 };
 
 export type CartItem = {

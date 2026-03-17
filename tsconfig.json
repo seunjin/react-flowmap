@@ -15,7 +15,11 @@
     "exactOptionalPropertyTypes": true,
     "jsx": "react-jsx",
     "types": ["vitest/globals", "node"],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "react-flowmap": ["./src/index.ts"],
+      "react-flowmap/vite": ["./src/vite-plugin/index.ts"]
+    }
   },
   "include": ["src", "demo", "tests", "vite.config.ts"]
 }

@@ -111,7 +111,8 @@ function GraphEntryDetail({ entry, props, propTypesMap, onSelect, onHover, onHov
   const propEntries = props
     ? Object.entries(props).filter(([k]) => k !== 'children')
     : [];
-  const propTypes = propTypesMap[entry.symbolId];
+  const compPropTypes = propTypesMap[entry.symbolId];
+  const propsDefLoc = compPropTypes?.propsDefLoc;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -139,12 +140,27 @@ function GraphEntryDetail({ entry, props, propTypesMap, onSelect, onHover, onHov
       {/* Props */}
       {propEntries.length > 0 && (
         <div className="px-4 py-4 flex flex-col gap-2">
-          <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase">
-            Props
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase">Props</span>
+            {propsDefLoc && (
+              <button
+                type="button"
+                onClick={() => {
+                  const url = new URL('/__rfm-open', window.location.origin);
+                  url.searchParams.set('file', propsDefLoc.file);
+                  url.searchParams.set('line', String(propsDefLoc.line));
+                  fetch(url.toString()).catch(() => {});
+                }}
+                title={`Go to Props type\n${propsDefLoc.file}:${propsDefLoc.line}`}
+                className="flex items-center text-rfm-text-300 hover:text-rfm-blue cursor-pointer border-none bg-transparent p-0 transition-all"
+              >
+                <ExternalLink size={11} />
+              </button>
+            )}
+          </div>
           <div className="flex flex-col gap-[5px]">
             {propEntries.map(([k, v]) => (
-              <PropRow key={k} name={k} value={v} typeEntry={propTypes?.[k]} />
+              <PropRow key={k} name={k} value={v} typeEntry={compPropTypes?.props?.[k]} />
             ))}
           </div>
         </div>
@@ -159,7 +175,7 @@ function GraphEntryDetail({ entry, props, propTypesMap, onSelect, onHover, onHov
       {props === null && (
         <div className="px-4 py-4">
           <p className="text-[11px] text-rfm-text-400 leading-relaxed">
-            Pick this element in the app window<br />to see live props.
+            Not currently rendered<br />in the app window.
           </p>
         </div>
       )}
@@ -173,9 +189,12 @@ export function GraphWindow() {
   const [allEntries, setAllEntries] = useState<DocEntry[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [propTypesMap, setPropTypesMap] = useState<PropTypesMap>({});
+  const [staticJsx, setStaticJsx] = useState<Record<string, string[]>>({});
   const [currentProps, setCurrentProps] = useState<Record<string, unknown> | null>(null);
   const [picking, setPicking] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const selectedIdRef = useRef('');
+  const closingByBackRef = useRef(false);
 
   // CSS 주입
   useEffect(() => {
@@ -190,29 +209,32 @@ export function GraphWindow() {
   useEffect(() => {
     const ch = new BroadcastChannel(RFM_CHANNEL);
     channelRef.current = ch;
+    // 준비 완료 신호 → main이 graph-update + props-update를 즉시 전송
+    ch.postMessage({ type: 'ready' } satisfies GraphToMain);
 
     ch.onmessage = (ev: MessageEvent<MainToGraph>) => {
       const msg = ev.data;
       if (msg.type === 'graph-update') {
         setAllEntries(msg.allEntries);
         setPropTypesMap(msg.propTypesMap ?? {});
+        if (msg.staticJsx) setStaticJsx(msg.staticJsx);
         if (msg.selectedId) setSelectedId(prev => msg.selectedId || prev);
       } else if (msg.type === 'pick-result') {
         setSelectedId(msg.symbolId);
-        setCurrentProps(null); // pick 완료 후 props는 select 메시지로 받음
+        selectedIdRef.current = msg.symbolId;
+        setCurrentProps(null);
         setPicking(false);
       } else if (msg.type === 'props-update') {
-        if (msg.symbolId === selectedId || !selectedId) {
-          setCurrentProps(msg.props);
-        }
+        setCurrentProps(msg.props);
       }
     };
 
     return () => ch.close();
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     function onUnload() {
+      if (closingByBackRef.current) return;
       channelRef.current?.postMessage({ type: 'window-close' } satisfies GraphToMain);
     }
     window.addEventListener('beforeunload', onUnload);
@@ -225,7 +247,8 @@ export function GraphWindow() {
 
   const handleSelect = useCallback((symbolId: string) => {
     setSelectedId(symbolId);
-    setCurrentProps(null); // 새 선택 시 props 초기화, 메인 창에서 보내줄 때까지 대기
+    selectedIdRef.current = symbolId;
+    setCurrentProps(null);
     sendToMain({ type: 'select', symbolId });
   }, [sendToMain]);
 
@@ -247,7 +270,8 @@ export function GraphWindow() {
   }, [picking, sendToMain]);
 
   const handleBackToOverlay = useCallback(() => {
-    sendToMain({ type: 'window-close' });
+    closingByBackRef.current = true;
+    sendToMain({ type: 'back-to-overlay' });
     window.close();
   }, [sendToMain]);
 
@@ -310,6 +334,7 @@ export function GraphWindow() {
         <FullGraph
           entries={allEntries}
           selectedId={selectedId}
+          staticJsx={staticJsx}
           onSelect={handleSelect}
           onHover={handleHover}
           onHoverEnd={handleHoverEnd}

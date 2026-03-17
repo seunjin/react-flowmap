@@ -138,6 +138,31 @@ export function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown
   return null;
 }
 
+/** Walk the entire DOM to find the fiber for a specific rfm symbolId and return its props.
+ *  Returns `{}` if mounted but has no props, `null` if not currently mounted. */
+export function getPropsForSymbolId(symbolId: string): Record<string, unknown> | null {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = document.body;
+  const seen = new Set<FiberNode>();
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        if (seen.has(f)) break;
+        seen.add(f);
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+          return f.memoizedProps ?? {};
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
+  }
+  return null;
+}
+
 // ─── Component finder (Fiber-based) ──────────────────────────────────────────
 
 export function findComponentsAt(x: number, y: number): FoundComp[] {

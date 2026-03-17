@@ -5,8 +5,11 @@ export type DockPosition = 'right' | 'left' | 'bottom' | 'float';
 export type PropTypeEntry = {
   type: string;
   optional: boolean;
-  resolvedType?: string;
-  fields?: Record<string, PropTypeEntry>;
+};
+
+export type ComponentPropTypes = {
+  propsDefLoc?: { file: string; line: number };
+  props: Record<string, PropTypeEntry>;
 };
 
 export type FoundComp = {

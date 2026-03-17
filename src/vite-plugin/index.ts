@@ -15,55 +15,35 @@ const RESOLVED_RFM_CONTEXT_ID = '\0' + RFM_CONTEXT_ID;
 const RFM_GRAPH_ENTRY_ID = '/@rfm/graph-entry';
 
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
+// 빌드된 패키지(dist/)와 소스(src/vite-plugin/) 모두에서 경로를 올바르게 해석
+const _inDist = _pluginDir.endsWith('/dist') || _pluginDir.includes('/dist/');
+const _resolvePkg = (distName: string, srcRelative: string) =>
+  _inDist ? resolve(_pluginDir, distName) : resolve(_pluginDir, srcRelative);
 
 // ─── ts-morph Props 타입 추출 ─────────────────────────────────────────────────
-export type TypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, TypeFieldEntry> };
-export type PropTypeEntry  = TypeFieldEntry;
-export type PropTypesMap   = Record<string, PropTypeEntry>;
+export type PropTypeEntry      = { type: string; optional: boolean };
+export type ComponentPropTypes = { propsDefLoc?: { file: string; line: number }; props: Record<string, PropTypeEntry> };
+export type PropTypesMap       = Record<string, ComponentPropTypes>;
 
-function isFromProject(type: import('ts-morph').Type): boolean {
+/** 타입의 선언 위치(파일, 라인)를 반환. node_modules / lib 타입은 null */
+function getTypeDefLoc(type: import('ts-morph').Type): { file: string; line: number } | null {
   const sym = type.getSymbol() ?? type.getAliasSymbol();
-  const decls = sym?.getDeclarations() ?? [];
-  return decls.some(d => {
+  if (!sym) return null;
+  // union 타입에서 null/undefined 제거 후 첫 번째 의미있는 선언
+  const decls = sym.getDeclarations() ?? [];
+  const decl = decls.find(d => {
     const fp = d.getSourceFile().getFilePath();
     return !fp.includes('node_modules') && !fp.includes('/typescript/lib/');
   });
-}
-
-function resolveFields(
-  type: import('ts-morph').Type,
-  locationNode: import('ts-morph').Node,
-  depth: number,
-): Record<string, TypeFieldEntry> | undefined {
-  if (depth >= 2) return undefined;
-  const props = type.getProperties();
-  if (props.length === 0) return undefined;
-
-  const result: Record<string, TypeFieldEntry> = {};
-  for (const sym of props) {
-    const name = sym.getName();
-    const propType = sym.getTypeAtLocation(locationNode);
-    const optional = sym.hasFlags(ts.SymbolFlags.Optional);
-    const typeStr = propType.getText(locationNode, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
-
-    let fields: Record<string, TypeFieldEntry> | undefined;
-    const isExpandable =
-      propType.isObject() &&
-      !propType.isArray() &&
-      propType.getCallSignatures().length === 0 &&
-      isFromProject(propType);
-    if (isExpandable) fields = resolveFields(propType, locationNode, depth + 1);
-
-    result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}) };
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
+  if (!decl) return null;
+  return { file: decl.getSourceFile().getFilePath(), line: decl.getStartLineNumber() };
 }
 
 function extractPropsViaTsMorph(
   tsProject: Project,
   absPath: string,
   componentName: string,
-): PropTypesMap | null {
+): ComponentPropTypes | null {
   try {
     let sf = tsProject.getSourceFile(absPath);
     if (!sf) sf = tsProject.addSourceFileAtPathIfExists(absPath);
@@ -84,38 +64,20 @@ function extractPropsViaTsMorph(
     const firstParam = params[0]!;
     const type = firstParam.getType();
 
-    const result: PropTypesMap = {};
+    // 컴포넌트 전체 props 타입의 선언 위치 (type Props = ... 또는 inline 타입)
+    const propsDefLoc = getTypeDefLoc(type) ?? null;
+
+    const props: Record<string, PropTypeEntry> = {};
     for (const prop of type.getProperties()) {
       const name = prop.getName();
       if (name === 'children') continue;
       const propType = prop.getTypeAtLocation(firstParam);
       const optional = prop.hasFlags(ts.SymbolFlags.Optional);
       const typeStr = propType.getText(firstParam, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
-
-      let fields: Record<string, TypeFieldEntry> | undefined;
-      let resolvedType: string | undefined;
-      const isObjectExpandable =
-        propType.isObject() &&
-        !propType.isArray() &&
-        propType.getCallSignatures().length === 0 &&
-        isFromProject(propType);
-
-      if (isObjectExpandable) {
-        fields = resolveFields(propType, firstParam, 0);
-      } else if (isFromProject(propType)) {
-        if (propType.isUnion()) {
-          resolvedType = propType.getUnionTypes()
-            .map(t => t.getText(firstParam))
-            .join(' | ');
-        } else {
-          const resolved = propType.getText(firstParam);
-          if (resolved !== typeStr) resolvedType = resolved;
-        }
-      }
-
-      result[name] = { type: typeStr, optional, ...(fields ? { fields } : {}), ...(resolvedType ? { resolvedType } : {}) };
+      props[name] = { type: typeStr, optional };
     }
-    return Object.keys(result).length > 0 ? result : null;
+    if (Object.keys(props).length === 0) return null;
+    return { props, ...(propsDefLoc ? { propsDefLoc } : {}) };
   } catch {
     return null;
   }
@@ -198,11 +160,11 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
 
     load(id) {
       if (id === RESOLVED_RFM_CONTEXT_ID) {
-        const contextPath = resolve(_pluginDir, '../runtime/rfm-context');
+        const contextPath = _resolvePkg('rfm-context', '../runtime/rfm-context');
         return `export * from ${JSON.stringify(contextPath)};`;
       }
       if (id === RFM_GRAPH_ENTRY_ID) {
-        const graphWindowPath = resolve(_pluginDir, '../ui/graph-window/GraphWindow');
+        const graphWindowPath = _resolvePkg('graph-window', '../ui/graph-window/GraphWindow');
         return [
           `import React from 'react';`,
           `import { createRoot } from 'react-dom/client';`,
@@ -292,14 +254,23 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         symbolLocMap.set(symbolId, line);
       }
 
-      // ts-morph prop types 주입
+      // 정적 JSX 관계 주입 (symbol:path#Name → [childComponentName, ...])
       let finalCode = result.code;
+      if (result.staticJsxMap.size > 0) {
+        const jsxLines = ['\n// __rfm static jsx', '(globalThis.__rfmStaticJsx??={});'];
+        for (const [fromId, names] of result.staticJsxMap) {
+          jsxLines.push(`(globalThis.__rfmStaticJsx[${JSON.stringify(fromId)}]??=[]).push(...${JSON.stringify(names)});`);
+        }
+        finalCode += jsxLines.join('\n');
+      }
+
+      // ts-morph prop types 주입
       if (tsProject) {
-        const propTypesRegistry = new Map<string, PropTypesMap>();
+        const propTypesRegistry = new Map<string, ComponentPropTypes>();
         for (const symbolId of result.symbolLocs.keys()) {
           const componentName = symbolId.split('#')[1] ?? '';
-          const props = extractPropsViaTsMorph(tsProject, id, componentName);
-          if (props) propTypesRegistry.set(symbolId, props);
+          const compTypes = extractPropsViaTsMorph(tsProject, id, componentName);
+          if (compTypes) propTypesRegistry.set(symbolId, compTypes);
         }
         if (propTypesRegistry.size > 0) {
           const lines = ['\n// __rfm prop types', '(globalThis.__rfmPropTypes??={});'];

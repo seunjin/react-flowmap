@@ -6,7 +6,7 @@ import {
   loadDock, saveDock, saveFloatPos,
   findComponentsAt, findElBySymbolId, findAllElsBySymbolId,
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
-  findAllMountedRfmComponents, isVisible,
+  findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -15,7 +15,112 @@ import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.css?inline';
 import type { MainToGraph, GraphToMain, PropTypesMap } from './channel';
 import { RFM_CHANNEL } from './channel';
-import { getComponentPropsFromEl } from './utils';
+
+// ─── Serialization helper ─────────────────────────────────────────────────────
+
+/** BroadcastChannel은 structured clone만 지원하므로 함수 등은 문자열로 변환 */
+function serializeForChannel(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'function') {
+    const raw = value.name || '';
+    const name = raw === 'bound dispatchSetState' ? 'setState'
+      : raw === 'bound dispatchReducerState' ? 'dispatch'
+      : raw.startsWith('bound ') ? raw.slice(6)
+      : raw;
+    return { __rfmFn: name };
+  }
+  if (typeof value === 'symbol') return value.toString();
+  if (typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(serializeForChannel);
+  try {
+    // plain object인지 확인 (Date, RegExp 등은 structured clone 가능하므로 통과)
+    const proto = Object.getPrototypeOf(value);
+    if (proto === Object.prototype || proto === null) {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, serializeForChannel(v)]),
+      );
+    }
+    return String(value);
+  } catch {
+    return '[Object]';
+  }
+}
+
+function serializeProps(rawProps: Record<string, unknown> | null): Record<string, unknown> {
+  if (!rawProps) return {};
+  return Object.fromEntries(
+    Object.entries(rawProps)
+      .filter(([k]) => k !== 'children')
+      .map(([k, v]) => [k, serializeForChannel(v)]),
+  );
+}
+
+function applyStaticEdges(
+  entries: import('../doc/build-doc-index').DocEntry[],
+  staticJsx: Record<string, string[]>,
+): import('../doc/build-doc-index').DocEntry[] {
+  const byId = new Map(entries.map(e => [e.symbolId, e]));
+  const byName = new Map(entries.map(e => [e.name, e]));
+
+  // child name → [parentSymbolId] 역방향
+  const staticParents = new Map<string, string[]>();
+  for (const [fromId, childNames] of Object.entries(staticJsx)) {
+    for (const name of childNames) {
+      if (!staticParents.has(name)) staticParents.set(name, []);
+      staticParents.get(name)!.push(fromId);
+    }
+  }
+
+  return entries.map(entry => {
+    let { renderedBy, renders } = entry;
+
+    // renderedBy 보완: 런타임 부모가 없으면 static 부모 추가
+    if (renderedBy.length === 0) {
+      const extra = (staticParents.get(entry.name) ?? [])
+        .map(id => byId.get(id))
+        .filter(Boolean)
+        .map(pe => ({ symbolId: pe!.symbolId, name: pe!.name, filePath: pe!.filePath }));
+      if (extra.length > 0) renderedBy = extra;
+    }
+
+    // renders 보완: staticJsx에 있지만 런타임 renders에 없는 자식 추가
+    const staticChildren = staticJsx[entry.symbolId] ?? [];
+    const runtimeChildIds = new Set(renders.map(r => r.symbolId));
+    const extraRenders = staticChildren
+      .map(name => byName.get(name))
+      .filter(Boolean)
+      .filter(ce => !runtimeChildIds.has(ce!.symbolId))
+      .map(ce => ({ symbolId: ce!.symbolId, name: ce!.name, filePath: ce!.filePath }));
+    if (extraRenders.length > 0) renders = [...renders, ...extraRenders];
+
+    if (renderedBy === entry.renderedBy && renders === entry.renders) return entry;
+    return { ...entry, renderedBy, renders };
+  });
+}
+
+function broadcastToGraph(
+  ch: BroadcastChannel,
+  allEntries: import('../doc/build-doc-index').DocEntry[],
+  selectedId: string,
+) {
+  // 항상 fresh하게 계산 (unmount 반영)
+  const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
+  let mountedEntries = allEntries.filter(e => mountedIds.has(e.symbolId));
+  const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
+  const staticJsx = (globalThis as unknown as { __rfmStaticJsx?: Record<string, string[]> }).__rfmStaticJsx;
+  if (staticJsx) mountedEntries = applyStaticEdges(mountedEntries, staticJsx);
+  ch.postMessage({
+    type: 'graph-update',
+    allEntries: mountedEntries,
+    selectedId,
+    propTypesMap,
+    ...(staticJsx ? { staticJsx } : {}),
+  } satisfies MainToGraph);
+  if (selectedId) {
+    const props = serializeProps(getPropsForSymbolId(selectedId));
+    ch.postMessage({ type: 'props-update', symbolId: selectedId, props } satisfies MainToGraph);
+  }
+}
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
@@ -52,6 +157,12 @@ export function ComponentOverlay({
   const onDeactivateRef = useRef(onDeactivate);
   useEffect(() => { onDeactivateRef.current = onDeactivate; }, [onDeactivate]);
 
+  // 채널 핸들러에서 최신 값 참조용 (stale closure 방지)
+  const currentDataRef = useRef<{
+    mountedEntries: import('../doc/build-doc-index').DocEntry[]; // allEntries 저장 (broadcastToGraph 내부에서 fresh mount 계산)
+    selectedId: string;
+  }>({ mountedEntries: [], selectedId: '' });
+
   // CSS 주입 — 한 번만 실행
   useEffect(() => {
     if (document.querySelector('style[data-rfm-inspector]')) return;
@@ -70,27 +181,30 @@ export function ComponentOverlay({
 
     ch.onmessage = (ev: MessageEvent<GraphToMain>) => {
       const msg = ev.data;
-      if (msg.type === 'select') {
+      if (msg.type === 'ready') {
+        // 그래프 창 준비 완료 → 현재 상태 즉시 전송
+        const { mountedEntries, selectedId: sid } = currentDataRef.current;
+        broadcastToGraph(ch, mountedEntries, sid);
+      } else if (msg.type === 'select') {
         setSelectedId(msg.symbolId);
         const el = findElBySymbolId(msg.symbolId);
         selectedElRef.current = el;
-        // 선택된 컴포넌트의 현재 props를 그래프 창으로 역전송
-        if (el) {
-          const props = getComponentPropsFromEl(el);
-          if (props) {
-            ch.postMessage({
-              type: 'props-update',
-              symbolId: msg.symbolId,
-              props,
-            } satisfies MainToGraph);
-          }
-        }
+        const props = serializeProps(getPropsForSymbolId(msg.symbolId));
+        ch.postMessage({
+          type: 'props-update',
+          symbolId: msg.symbolId,
+          props,
+        } satisfies MainToGraph);
       } else if (msg.type === 'hover') {
         setHighlightId(msg.symbolId);
       } else if (msg.type === 'hover-end') {
         setHighlightId('');
       } else if (msg.type === 'pick-start') {
         setPicking(true);
+      } else if (msg.type === 'back-to-overlay') {
+        setGraphWindowOpen(false);
+        graphWinRef.current = null;
+        // 인스펙터는 활성 상태 유지
       } else if (msg.type === 'window-close') {
         setGraphWindowOpen(false);
         graphWinRef.current = null;
@@ -132,17 +246,30 @@ export function ComponentOverlay({
     return [...graphEntries, ...extra];
   }, [graphEntries]);
 
+  // 채널 핸들러에서 최신 값 참조용 ref 동기화
+  useEffect(() => {
+    currentDataRef.current = { mountedEntries: allEntries, selectedId };
+  }, [allEntries, selectedId]);
+
   // allEntries / selectedId 변경 시 그래프 창에 브로드캐스트
   useEffect(() => {
     if (!graphWindowOpen || !channelRef.current) return;
-    const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
-    channelRef.current.postMessage({
-      type: 'graph-update',
-      allEntries,
-      selectedId,
-      propTypesMap,
-    } satisfies MainToGraph);
+    broadcastToGraph(channelRef.current, allEntries, selectedId);
   }, [allEntries, selectedId, graphWindowOpen]);
+
+  // DOM 변화(mount/unmount) 감지 → 그래프창 재동기화
+  useEffect(() => {
+    if (!graphWindowOpen) return;
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    const obs = new MutationObserver(() => {
+      if (debounceId) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        if (channelRef.current) broadcastToGraph(channelRef.current, allEntries, selectedIdRef.current);
+      }, 100);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => { obs.disconnect(); if (debounceId) clearTimeout(debounceId); };
+  }, [graphWindowOpen, allEntries]);
 
   // pick 완료 시 그래프 창으로 결과 전달
   const prevPickingRef = useRef(false);

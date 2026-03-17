@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { DocEntry } from '../doc/build-doc-index';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
 const NODE_W = 160;
 const NODE_H = 34;
-const COL_GAP = 96;   // gap between columns
-const ROW_GAP = 14;   // gap between rows in same column
-const COL_W = NODE_W + COL_GAP;
-const ROW_H = NODE_H + ROW_GAP;
-const PAD = 40;       // canvas padding
+const LEVEL_GAP = 72;  // vertical gap between depth levels
+const NODE_GAP  = 20;  // horizontal gap between nodes in same level
+const LEVEL_STEP = NODE_H + LEVEL_GAP;
+const NODE_STEP  = NODE_W + NODE_GAP;
+const PAD = 40;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ interface Layout {
 
 // ─── Layout builder ───────────────────────────────────────────────────────────
 
-function buildLayout(entries: DocEntry[]): Layout {
+function buildLayout(entries: DocEntry[], staticJsx: Record<string, string[]>): Layout {
   if (entries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
 
   const byId = new Map(entries.map(e => [e.symbolId, e]));
@@ -65,6 +65,33 @@ function buildLayout(entries: DocEntry[]): Layout {
     }
   }
 
+  // 정적 JSX 관계로 depth 보완 (런타임 부모가 없는 컴포넌트용)
+  if (Object.keys(staticJsx).length > 0) {
+    // child name → [parentSymbolId] 역방향 맵
+    const staticParentIds = new Map<string, string[]>();
+    for (const [fromId, childNames] of Object.entries(staticJsx)) {
+      for (const name of childNames) {
+        if (!staticParentIds.has(name)) staticParentIds.set(name, []);
+        staticParentIds.get(name)!.push(fromId);
+      }
+    }
+    // 반복: 부모 depth가 확정된 후 자식 depth 할당
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const entry of entries) {
+        if (depthMap.has(entry.symbolId)) continue;
+        for (const parentId of staticParentIds.get(entry.name) ?? []) {
+          if (depthMap.has(parentId)) {
+            depthMap.set(entry.symbolId, depthMap.get(parentId)! + 1);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // Assign disconnected nodes to last column
   let maxDepth = depthMap.size > 0 ? Math.max(...depthMap.values()) : 0;
   for (const entry of entries) {
@@ -87,23 +114,23 @@ function buildLayout(entries: DocEntry[]): Layout {
   };
   for (const group of colGroups.values()) group.sort(sortGroup);
 
-  const numCols = maxDepth + 1;
-  const colHeights = Array.from({ length: numCols }, (_, i) => {
+  const numLevels = maxDepth + 1;
+  const levelWidths = Array.from({ length: numLevels }, (_, i) => {
     const cnt = colGroups.get(i)?.length ?? 0;
-    return Math.max(0, cnt * ROW_H - ROW_GAP);
+    return Math.max(0, cnt * NODE_STEP - NODE_GAP);
   });
-  const maxColH = Math.max(...colHeights, NODE_H);
+  const maxLevelW = Math.max(...levelWidths, NODE_W);
 
-  // Position nodes
+  // Position nodes: depth → y (top-to-bottom), index → x (centered)
   const posMap = new Map<string, { x: number; y: number }>();
-  for (let d = 0; d < numCols; d++) {
+  for (let d = 0; d < numLevels; d++) {
     const group = colGroups.get(d) ?? [];
-    const colH = colHeights[d] ?? 0;
-    const startY = PAD + (maxColH - colH) / 2;
+    const levelW = levelWidths[d] ?? 0;
+    const startX = PAD + (maxLevelW - levelW) / 2;
     group.forEach((entry, i) => {
       posMap.set(entry.symbolId, {
-        x: PAD + d * COL_W,
-        y: startY + i * ROW_H,
+        x: startX + i * NODE_STEP,
+        y: PAD + d * LEVEL_STEP,
       });
     });
   }
@@ -135,8 +162,8 @@ function buildLayout(entries: DocEntry[]): Layout {
     })
     .filter(Boolean) as LayoutNode[];
 
-  const canvasW = PAD + numCols * COL_W - COL_GAP + PAD;
-  const canvasH = PAD + maxColH + PAD;
+  const canvasW = PAD + maxLevelW + PAD;
+  const canvasH = PAD + numLevels * LEVEL_STEP - LEVEL_GAP + PAD;
 
   return { nodes, edges, canvasW, canvasH };
 }
@@ -147,14 +174,14 @@ function edgePath(
   fx: number, fy: number,
   tx: number, ty: number,
 ): string {
-  // Source: right-center of node, Target: left-center of node
-  const sx = fx + NODE_W;
-  const sy = fy + NODE_H / 2;
-  const ex = tx;
-  const ey = ty + NODE_H / 2;
-  const dx = Math.abs(ex - sx);
-  const cp = Math.max(dx * 0.45, 40);
-  return `M ${sx} ${sy} C ${sx + cp} ${sy}, ${ex - cp} ${ey}, ${ex} ${ey}`;
+  // Source: bottom-center of node, Target: top-center of node
+  const sx = fx + NODE_W / 2;
+  const sy = fy + NODE_H;
+  const ex = tx + NODE_W / 2;
+  const ey = ty;
+  const dy = Math.abs(ey - sy);
+  const cp = Math.max(dy * 0.45, 30);
+  return `M ${sx} ${sy} C ${sx} ${sy + cp}, ${ex} ${ey - cp}, ${ex} ${ey}`;
 }
 
 // ─── FullGraph ────────────────────────────────────────────────────────────────
@@ -162,23 +189,36 @@ function edgePath(
 export function FullGraph({
   entries,
   selectedId,
+  staticJsx,
   onSelect,
   onHover,
   onHoverEnd,
 }: {
   entries: DocEntry[];
   selectedId: string;
+  staticJsx: Record<string, string[]>;
   onSelect: (symbolId: string) => void;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
 }) {
-  const layout = useMemo(() => buildLayout(entries), [entries]);
+  const layout = useMemo(() => buildLayout(entries, staticJsx), [entries, staticJsx]);
 
   // Pan & zoom
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // 초기 pan: 캔버스를 컨테이너 중앙으로
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPan({
+      x: Math.max(0, (width  - layout.canvasW) / 2),
+      y: Math.max(0, (height - layout.canvasH) / 2),
+    });
+  }, [layout]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -220,7 +260,12 @@ export function FullGraph({
       {/* zoom reset */}
       <button
         type="button"
-        onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }}
+        onClick={() => {
+          const el = containerRef.current;
+          const { width, height } = el?.getBoundingClientRect() ?? { width: 0, height: 0 };
+          setPan({ x: Math.max(0, (width - layout.canvasW) / 2), y: Math.max(0, (height - layout.canvasH) / 2) });
+          setZoom(1);
+        }}
         className="absolute bottom-3 right-3 z-10 text-[10px] text-rfm-text-400 border border-rfm-border-light bg-white rounded-md px-2 py-1 hover:text-rfm-text-700 hover:border-rfm-text-300 transition-colors"
       >
         Reset view
