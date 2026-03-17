@@ -4,22 +4,22 @@
 
 
 @theme {
-  --color-gori-blue: #3b82f6;
-  --color-gori-blue-dark: #2563eb;
-  --color-gori-blue-light: #dbeafe;
-  --color-gori-blue-xlight: #eff6ff;
-  --color-gori-blue-label: #93c5fd;
-  --color-gori-blue-border: #bfdbfe;
+  --color-rfm-blue: #3b82f6;
+  --color-rfm-blue-dark: #2563eb;
+  --color-rfm-blue-light: #dbeafe;
+  --color-rfm-blue-xlight: #eff6ff;
+  --color-rfm-blue-label: #93c5fd;
+  --color-rfm-blue-border: #bfdbfe;
 
-  --color-gori-text-900: #111827;
-  --color-gori-text-700: #374151;
-  --color-gori-text-500: #6b7280;
-  --color-gori-text-400: #9ca3af;
-  --color-gori-text-300: #d1d5db;
+  --color-rfm-text-900: #111827;
+  --color-rfm-text-700: #374151;
+  --color-rfm-text-500: #6b7280;
+  --color-rfm-text-400: #9ca3af;
+  --color-rfm-text-300: #d1d5db;
 
-  --color-gori-border: #e5e7eb;
-  --color-gori-border-light: rgba(229,231,235,0.8);
+  --color-rfm-border: #e5e7eb;
+  --color-rfm-border-light: rgba(229,231,235,0.8);
 
-  --color-gori-bg-50: #f9fafb;
-  --color-gori-bg-100: #f3f4f6;
+  --color-rfm-bg-50: #f9fafb;
+  --color-rfm-bg-100: #f3f4f6;
 }

@@ -6,6 +6,6 @@ export * from './core/projection/index.js';
 export * from './runtime/collector/index.js';
 export * from './runtime/events/index.js';
 export * from './runtime/tracing/index.js';
-export * from './runtime/gori-context.js';
+export * from './runtime/rfm-context.js';
 export * from './ui/doc/build-doc-index.js';
 export * from './ui/inspector/index.js';

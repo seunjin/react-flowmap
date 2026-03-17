@@ -1,5 +1,5 @@
 {
-  "name": "gori",
+  "name": "react-flowmap",
   "version": "0.1.0",
   "type": "module",
   "description": "Runtime component inspector for React applications.",

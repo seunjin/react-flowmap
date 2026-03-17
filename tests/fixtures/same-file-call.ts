@@ -1,6 +1,6 @@
-import type { GoriGraph } from '../../src/core/types/graph';
+import type { FlowmapGraph } from '../../src/core/types/graph';
 
-export const sameFileCallFlow: GoriGraph = {
+export const sameFileCallFlow: FlowmapGraph = {
   nodes: [
     {
       id: 'file:src/api/user.ts',

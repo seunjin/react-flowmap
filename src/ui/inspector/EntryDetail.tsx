@@ -10,7 +10,7 @@ import { MiniRelationGraph } from './MiniRelationGraph';
 export function DetailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[9px] font-bold text-gori-text-400 tracking-[0.07em] uppercase">{label}</span>
+      <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase">{label}</span>
       {children}
     </div>
   );
@@ -30,7 +30,7 @@ export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd
 
       {/* 미니 관계 그래프 */}
       <div className="px-3 py-4">
-        <span className="text-[9px] font-bold text-gori-text-400 tracking-[0.07em] uppercase block mb-3">
+        <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase block mb-3">
           Relations
         </span>
         <MiniRelationGraph
@@ -49,10 +49,10 @@ export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd
           ? Object.entries(props).filter(([k]) => k !== 'children')
           : [];
         if (entries.length === 0) return null;
-        const propTypes = (globalThis as unknown as { __goriPropTypes?: Record<string, Record<string, PropTypeEntry>> })
-          .__goriPropTypes?.[entry.symbolId];
+        const propTypes = (globalThis as unknown as { __rfmPropTypes?: Record<string, Record<string, PropTypeEntry>> })
+          .__rfmPropTypes?.[entry.symbolId];
         return (
-          <div className="px-3 py-3  border-gori-border">
+          <div className="px-3 py-3  border-rfm-border">
             <DetailSection label="Props">
               <div className="flex flex-col gap-[3px]">
                 {entries.map(([k, v]) => (

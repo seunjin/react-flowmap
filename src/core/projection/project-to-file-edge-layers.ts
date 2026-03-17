@@ -1,6 +1,6 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
 import { selectRuntimeEdgesForSymbol } from '../selection/select-runtime-edges.js';
-import type { GoriGraph, RuntimeEdge } from '../types/graph.js';
+import type { FlowmapGraph, RuntimeEdge } from '../types/graph.js';
 import type { FileEdge, FileEdgeLayer } from '../types/projection.js';
 import type { SelectionState } from '../types/selection.js';
 
@@ -109,7 +109,7 @@ function getLayerEdgesForSymbol(
 }
 
 export function projectToFileEdgeLayers(
-  graph: GoriGraph,
+  graph: FlowmapGraph,
   selection: SelectionState
 ): FileEdgeLayer[] {
   if (selection.selectedSymbolIds.length === 0) {

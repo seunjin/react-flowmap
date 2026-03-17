@@ -8,15 +8,15 @@ import { folderHasHovered } from './tree-utils';
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 export function FolderIcon({ hovered }: { hovered: boolean }) {
-  return <Folder size={12} className={`shrink-0 ${hovered ? 'text-gori-text-700' : 'text-gori-text-400'}`} />;
+  return <Folder size={12} className={`shrink-0 ${hovered ? 'text-rfm-text-700' : 'text-rfm-text-400'}`} />;
 }
 
 export function FileIcon({ hovered, selected }: { hovered: boolean; selected: boolean }) {
-  return <FileCode size={12} className={`shrink-0 ${selected ? 'text-gori-blue' : hovered ? 'text-gori-text-700' : 'text-gori-text-400'}`} />;
+  return <FileCode size={12} className={`shrink-0 ${selected ? 'text-rfm-blue' : hovered ? 'text-rfm-text-700' : 'text-rfm-text-400'}`} />;
 }
 
 export function ComponentIcon({ isSelected, isHovered }: { isSelected: boolean; isHovered: boolean }) {
-  return <Component size={10} className={`shrink-0 ${isSelected ? 'text-gori-blue' : isHovered ? 'text-gori-text-700' : 'text-gori-text-300'}`} />;
+  return <Component size={10} className={`shrink-0 ${isSelected ? 'text-rfm-blue' : isHovered ? 'text-rfm-text-700' : 'text-rfm-text-300'}`} />;
 }
 
 // ─── TreeNodeView ─────────────────────────────────────────────────────────────
@@ -54,10 +54,10 @@ export function TreeNodeView({
             style={{ padding: `4px 10px 4px ${8 + depth * 14}px` }}
           >
             <span
-              className={`text-[7px] text-gori-text-400 inline-block shrink-0 transition-transform duration-120 ${isCollapsed ? 'rotate-0' : 'rotate-90'}`}
+              className={`text-[7px] text-rfm-text-400 inline-block shrink-0 transition-transform duration-120 ${isCollapsed ? 'rotate-0' : 'rotate-90'}`}
             >▶</span>
             <FolderIcon hovered={hasHovered} />
-            <span className={`text-[11px] ${hasHovered ? 'font-semibold text-gori-text-700' : 'font-medium text-gori-text-500'}`}>
+            <span className={`text-[11px] ${hasHovered ? 'font-semibold text-rfm-text-700' : 'font-medium text-rfm-text-500'}`}>
               {node.name}
             </span>
           </div>
@@ -90,11 +90,11 @@ export function TreeNodeView({
   return (
     <div>
       <div
-        className={`flex items-center gap-[5px] ${fileSelected || fileHovered ? 'bg-gori-bg-100' : 'bg-transparent'}`}
+        className={`flex items-center gap-[5px] ${fileSelected || fileHovered ? 'bg-rfm-bg-100' : 'bg-transparent'}`}
         style={{ padding: `4px 10px 3px ${8 + depth * 14}px` }}
       >
         <FileIcon hovered={fileHovered} selected={fileSelected} />
-        <span className={`text-[11px] truncate flex-1 ${fileSelected ? 'font-semibold text-gori-text-900' : fileHovered ? 'font-medium text-gori-text-700' : 'font-normal text-gori-text-400'}`}>
+        <span className={`text-[11px] truncate flex-1 ${fileSelected ? 'font-semibold text-rfm-text-900' : fileHovered ? 'font-medium text-rfm-text-700' : 'font-normal text-rfm-text-400'}`}>
           {node.name}
         </span>
       </div>
@@ -109,11 +109,11 @@ export function TreeNodeView({
             key={entry.symbolId}
             className={`flex items-center transition-[background] duration-60 ${
               isSelected
-                ? 'border-l-2 border-gori-blue bg-gori-blue-light'
+                ? 'border-l-2 border-rfm-blue bg-rfm-blue-light'
                 : isFocused
-                  ? 'border-l-2 border-gori-blue-border bg-gori-bg-100'
+                  ? 'border-l-2 border-rfm-blue-border bg-rfm-bg-100'
                   : isHovered
-                    ? 'border-l-2 border-gori-text-400 bg-gori-bg-100'
+                    ? 'border-l-2 border-rfm-text-400 bg-rfm-bg-100'
                     : 'border-l-2 border-transparent bg-transparent'
             }`}
           >
@@ -128,7 +128,7 @@ export function TreeNodeView({
               style={{ padding: `4px 6px 4px ${8 + (depth + 1) * 14}px` }}
             >
               <ComponentIcon isSelected={isSelected} isHovered={isHovered} />
-              <span className={`text-[12px] font-normal truncate flex-1 ${isSelected ? 'text-gori-text-900' : isHovered ? 'text-gori-text-700' : 'text-gori-text-400'}`}>
+              <span className={`text-[12px] font-normal truncate flex-1 ${isSelected ? 'text-rfm-text-900' : isHovered ? 'text-rfm-text-700' : 'text-rfm-text-400'}`}>
                 {entry.name}
               </span>
             </button>
@@ -137,7 +137,7 @@ export function TreeNodeView({
                 type="button"
                 onClick={onDetail}
                 title="View details"
-                className="shrink-0 w-6 h-6 mr-1.5 flex items-center justify-center border border-gori-border-light rounded-[4px] bg-transparent cursor-pointer text-gori-blue transition-[background] duration-80 hover:bg-gori-blue-xlight"
+                className="shrink-0 w-6 h-6 mr-1.5 flex items-center justify-center border border-rfm-border-light rounded-[4px] bg-transparent cursor-pointer text-rfm-blue transition-[background] duration-80 hover:bg-rfm-blue-xlight"
               >
                 <ChevronRight size={13} />
               </button>

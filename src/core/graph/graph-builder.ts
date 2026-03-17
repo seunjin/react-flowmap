@@ -6,9 +6,9 @@ import { createRuntimeEdgeIdFromEvent } from './create-runtime-edge-id-from-even
 import type {
   ApiNode,
   FileNode,
-  GoriEdge,
-  GoriGraph,
-  GoriNode,
+  FlowmapEdge,
+  FlowmapGraph,
+  FlowmapNode,
   RuntimeEdge,
   SymbolNode,
 } from '../types/graph.js';
@@ -33,17 +33,17 @@ function inferSymbolType(symbolName: string): SymbolNode['symbolType'] {
 }
 
 type BuilderState = {
-  nodes: Map<string, GoriNode>;
-  edges: Map<string, GoriEdge>;
+  nodes: Map<string, FlowmapNode>;
+  edges: Map<string, FlowmapEdge>;
 };
 
-function addNode(state: BuilderState, node: GoriNode): void {
+function addNode(state: BuilderState, node: FlowmapNode): void {
   if (!state.nodes.has(node.id)) {
     state.nodes.set(node.id, node);
   }
 }
 
-function addEdge(state: BuilderState, edge: GoriEdge): void {
+function addEdge(state: BuilderState, edge: FlowmapEdge): void {
   if (!state.edges.has(edge.id)) {
     state.edges.set(edge.id, edge);
   }
@@ -155,10 +155,10 @@ function addRuntimeEdge(state: BuilderState, edge: RuntimeEdge): void {
   addEdge(state, edge);
 }
 
-export function buildGraph(events: RuntimeEvent[]): GoriGraph {
+export function buildGraph(events: RuntimeEvent[]): FlowmapGraph {
   const state: BuilderState = {
-    nodes: new Map<string, GoriNode>(),
-    edges: new Map<string, GoriEdge>(),
+    nodes: new Map<string, FlowmapNode>(),
+    edges: new Map<string, FlowmapEdge>(),
   };
 
   for (const event of events) {

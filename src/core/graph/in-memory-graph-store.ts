@@ -1,9 +1,9 @@
 import type {
   ApiNode,
   FileNode,
-  GoriEdge,
-  GoriGraph,
-  GoriNode,
+  FlowmapEdge,
+  FlowmapGraph,
+  FlowmapNode,
   RuntimeEdge,
   SymbolNode,
 } from '../types/graph.js';
@@ -11,22 +11,22 @@ import type {
 import type { GraphStore } from './graph-store.js';
 
 export class InMemoryGraphStore implements GraphStore {
-  private readonly nodes = new Map<string, GoriNode>();
-  private readonly edges = new Map<string, GoriEdge>();
-  private readonly outgoing = new Map<string, GoriEdge[]>();
-  private readonly incoming = new Map<string, GoriEdge[]>();
+  private readonly nodes = new Map<string, FlowmapNode>();
+  private readonly edges = new Map<string, FlowmapEdge>();
+  private readonly outgoing = new Map<string, FlowmapEdge[]>();
+  private readonly incoming = new Map<string, FlowmapEdge[]>();
 
-  addNode(node: GoriNode): void {
+  addNode(node: FlowmapNode): void {
     this.nodes.set(node.id, node);
   }
 
-  addEdge(edge: GoriEdge): void {
+  addEdge(edge: FlowmapEdge): void {
     this.edges.set(edge.id, edge);
     this.outgoing.set(edge.source, [...(this.outgoing.get(edge.source) ?? []), edge]);
     this.incoming.set(edge.target, [...(this.incoming.get(edge.target) ?? []), edge]);
   }
 
-  addGraph(graph: GoriGraph): void {
+  addGraph(graph: FlowmapGraph): void {
     for (const node of graph.nodes) {
       this.addNode(node);
     }
@@ -36,11 +36,11 @@ export class InMemoryGraphStore implements GraphStore {
     }
   }
 
-  getNode(id: string): GoriNode | undefined {
+  getNode(id: string): FlowmapNode | undefined {
     return this.nodes.get(id);
   }
 
-  getGraph(): GoriGraph {
+  getGraph(): FlowmapGraph {
     return {
       nodes: [...this.nodes.values()],
       edges: [...this.edges.values()],
@@ -72,7 +72,7 @@ export class InMemoryGraphStore implements GraphStore {
     return parent?.kind === 'file' ? parent : undefined;
   }
 
-  getEdgesByKind(kind: GoriEdge['kind']): GoriEdge[] {
+  getEdgesByKind(kind: FlowmapEdge['kind']): FlowmapEdge[] {
     return [...this.edges.values()].filter((edge) => edge.kind === kind);
   }
 
@@ -82,11 +82,11 @@ export class InMemoryGraphStore implements GraphStore {
     );
   }
 
-  getOutgoingEdges(nodeId: string): GoriEdge[] {
+  getOutgoingEdges(nodeId: string): FlowmapEdge[] {
     return this.outgoing.get(nodeId) ?? [];
   }
 
-  getIncomingEdges(nodeId: string): GoriEdge[] {
+  getIncomingEdges(nodeId: string): FlowmapEdge[] {
     return this.incoming.get(nodeId) ?? [];
   }
 }

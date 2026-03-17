@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import type { GoriGraph } from '../../core/types/graph.js';
+import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
 import { loadDock, saveDock, saveFloatPos, findComponentsAt, isVisible } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
-import { InspectButton, type GoriConfig } from './InspectButton';
+import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.css?inline';
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
@@ -13,8 +13,8 @@ import inspectorCss from './inspector.css?inline';
 export function ComponentOverlay({
   graph, active, onDeactivate, onToggle, config = {},
 }: {
-  graph: GoriGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
-  config?: GoriConfig;
+  graph: FlowmapGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
+  config?: FlowmapConfig;
 }) {
   const [stack,      setStack]      = useState<FoundComp[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -23,7 +23,7 @@ export function ComponentOverlay({
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(() => {
     try {
-      const s = localStorage.getItem('gori-float-pos');
+      const s = localStorage.getItem('rfm-float-pos');
       if (s) return JSON.parse(s) as { x: number; y: number };
     } catch { /* noop */ }
     return config.defaultFloatPos
@@ -42,9 +42,9 @@ export function ComponentOverlay({
 
   // CSS 주입 — 한 번만 실행
   useEffect(() => {
-    if (document.querySelector('style[data-gori-inspector]')) return;
+    if (document.querySelector('style[data-rfm-inspector]')) return;
     const el = document.createElement('style');
-    el.setAttribute('data-gori-inspector', '');
+    el.setAttribute('data-rfm-inspector', '');
     el.textContent = inspectorCss;
     document.head.appendChild(el);
     return () => { el.remove(); };
@@ -60,9 +60,9 @@ export function ComponentOverlay({
   const allEntries = useMemo(() => {
     const graphIds = new Set(graphEntries.map(e => e.symbolId));
     const extra: DocEntry[] = [];
-    document.querySelectorAll('[data-gori-id]').forEach((el) => {
-      const symbolId = el.getAttribute('data-gori-id');
-      const loc = el.getAttribute('data-gori-loc');
+    document.querySelectorAll('[data-rfm-id]').forEach((el) => {
+      const symbolId = el.getAttribute('data-rfm-id');
+      const loc = el.getAttribute('data-rfm-loc');
       if (symbolId && loc) locCacheRef.current.set(symbolId, loc);
       if (!symbolId || graphIds.has(symbolId)) return;
       const match = symbolId.match(/^symbol:(.+)#(.+)$/);
@@ -109,7 +109,7 @@ export function ComponentOverlay({
       if (!selectedElRef.current || selectedElRef.current.isConnected) return;
       const id = selectedIdRef.current;
       const fallback = id
-        ? (document.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null)
+        ? (document.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null)
         : null;
       if (fallback) {
         // 같은 컴포넌트의 다른 인스턴스가 남아 있으면 교체 후 re-render 강제
@@ -136,7 +136,7 @@ export function ComponentOverlay({
 
     let rafId = 0;
     function onMove(e: MouseEvent) {
-      if ((e.target as HTMLElement).closest('[data-gori-overlay]')) return;
+      if ((e.target as HTMLElement).closest('[data-rfm-overlay]')) return;
       const x = e.clientX, y = e.clientY;
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
@@ -147,7 +147,7 @@ export function ComponentOverlay({
     }
 
     function onClickApp(e: MouseEvent) {
-      if ((e.target as HTMLElement).closest('[data-gori-overlay]')) return;
+      if ((e.target as HTMLElement).closest('[data-rfm-overlay]')) return;
       const found = findComponentsAt(e.clientX, e.clientY);
       if (found[0]) {
         e.preventDefault();
@@ -193,7 +193,7 @@ export function ComponentOverlay({
   ) ?? null;
   let selectedRect: DOMRect | null = selectedComp?.rect ?? null;
   if (!selectedRect && selectedId) {
-    const el = selectedElRef.current ?? document.querySelector(`[data-gori-id="${selectedId}"]`);
+    const el = selectedElRef.current ?? document.querySelector(`[data-rfm-id="${selectedId}"]`);
     if (el) selectedRect = (el as HTMLElement).getBoundingClientRect();
   }
 
@@ -202,8 +202,8 @@ export function ComponentOverlay({
     if (!selectedId) return null;
     const fromStack = stack.find(c => c.symbolId === selectedId)?.loc;
     if (fromStack) { locCacheRef.current.set(selectedId, fromStack); return fromStack; }
-    const el = document.querySelector(`[data-gori-id="${selectedId}"]`);
-    const fromDom = el?.getAttribute('data-gori-loc');
+    const el = document.querySelector(`[data-rfm-id="${selectedId}"]`);
+    const fromDom = el?.getAttribute('data-rfm-loc');
     if (fromDom) { locCacheRef.current.set(selectedId, fromDom); return fromDom; }
     return locCacheRef.current.get(selectedId) ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,7 +231,7 @@ export function ComponentOverlay({
     <>
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightId && (() => {
-        const els = [...document.querySelectorAll(`[data-gori-id="${highlightId}"]`)] as HTMLElement[];
+        const els = [...document.querySelectorAll(`[data-rfm-id="${highlightId}"]`)] as HTMLElement[];
         const label = highlightId.split('#').at(-1) ?? '';
         return els.map((el, i) => {
           const rect = el.getBoundingClientRect();
@@ -275,13 +275,13 @@ export function ComponentOverlay({
             // 2) 없으면 조상에서 탐색 (부모 방향) → n번째 인스턴스 유지
             const currentEl = selectedElRef.current;
             if (currentEl) {
-              const inSubtree = currentEl.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null;
+              const inSubtree = currentEl.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null;
               if (inSubtree) {
                 selectedElRef.current = inSubtree;
               } else {
                 let ancestor: Element | null = currentEl.parentElement;
                 while (ancestor) {
-                  if (ancestor.getAttribute('data-gori-id') === id) {
+                  if (ancestor.getAttribute('data-rfm-id') === id) {
                     selectedElRef.current = ancestor as HTMLElement;
                     break;
                   }
@@ -292,7 +292,7 @@ export function ComponentOverlay({
             } else {
               // currentEl이 없을 때 (트리에서 직접 선택): DOM 쿼리로 첫 번째 인스턴스 사용
               selectedElRef.current =
-                (document.querySelector(`[data-gori-id="${id}"]`) as HTMLElement | null) ?? null;
+                (document.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null) ?? null;
             }
           }
         }}

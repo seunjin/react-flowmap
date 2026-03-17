@@ -13,7 +13,7 @@ export function NotificationToast({
 
   return (
     <div
-      data-gori-overlay
+      data-rfm-overlay
       style={{
         position: 'fixed', bottom: 80, left: '50%',
         transform: 'translateX(-50%)',
@@ -23,7 +23,7 @@ export function NotificationToast({
         boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
         zIndex: 9999, whiteSpace: 'nowrap',
         display: 'flex', alignItems: 'center', gap: 8,
-        animation: 'gori-fadein 150ms ease',
+        animation: 'rfm-fadein 150ms ease',
       }}
     >
       <span style={{ color: '#86efac' }}>✓</span>

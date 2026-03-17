@@ -3,20 +3,20 @@ import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { goriInspect } from './src/vite-plugin/index.js';
+import { flowmapInspect } from './src/vite-plugin/index.js';
 
 const libraryEntry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 
 export default defineConfig(({ mode }) => ({
-  plugins: [tailwindcss(), goriInspect(), react()],
+  plugins: [tailwindcss(), flowmapInspect(), react()],
   ...(mode === 'demo'
     ? {}
     : {
         build: {
           lib: {
             entry: libraryEntry,
-            name: 'Gori',
-            fileName: (format) => `gori.${format}.js`,
+            name: 'ReactFlowmap',
+            fileName: (format) => `react-flowmap.${format}.js`,
           },
           rollupOptions: {
             external: ['react', 'react-dom'],

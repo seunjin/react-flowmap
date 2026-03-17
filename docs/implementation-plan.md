@@ -1,8 +1,8 @@
-# Gori Implementation Plan
+# React Flowmap Implementation Plan
 
 ## Purpose
 
-이 문서는 Gori v1을 실제로 구현하기 위한 단계별 실행 계획을 정의합니다.  
+이 문서는 React Flowmap v1을 실제로 구현하기 위한 단계별 실행 계획을 정의합니다.  
 목표는 아이디어를 나열하는 것이 아니라, **어떤 순서로 무엇을 만들고, 각 단계에서 무엇을 검증해야 하는지**를 명확히 하는 것입니다.
 
 이 계획은 다음 원칙을 따릅니다.
@@ -16,11 +16,11 @@
 
 ## Success Criteria
 
-Gori v1은 아래를 만족하면 성공으로 간주합니다.
+React Flowmap v1은 아래를 만족하면 성공으로 간주합니다.
 
 - React 애플리케이션에서 최소한의 런타임 관계를 수집할 수 있다.
-- 수집된 이벤트를 `GoriGraph`로 정규화할 수 있다.
-- `GoriGraph`를 `FileLevelView`로 투영할 수 있다.
+- 수집된 이벤트를 `FlowmapGraph`로 정규화할 수 있다.
+- `FlowmapGraph`를 `FileLevelView`로 투영할 수 있다.
 - 파일 노드 내부에서 export를 선택해 연결을 탐색할 수 있다.
 - `render`, `use`, `call`, `request` 관계를 최소 예제로 시각화할 수 있다.
 
@@ -62,7 +62,7 @@ Gori v1은 아래를 만족하면 성공으로 간주합니다.
 ### Tasks
 
 - `RuntimeEvent` 타입 정의
-- `GoriGraph` 타입 정의
+- `FlowmapGraph` 타입 정의
 - `FileLevelView` 타입 정의
 - `SelectionState` 타입 정의
 - node / edge ID 규칙 유틸 정의
@@ -149,7 +149,7 @@ v1 PoC에서는 아래를 우선 대상으로 삼습니다.
 
 ### Tasks
 
-- `RuntimeEvent -> GoriNode/GoriEdge` 변환 규칙 구현
+- `RuntimeEvent -> FlowmapNode/FlowmapEdge` 변환 규칙 구현
 - symbol/file/API node 생성 규칙 구현
 - 중복 node/edge 정규화
 - `contains` edge 생성
@@ -158,11 +158,11 @@ v1 PoC에서는 아래를 우선 대상으로 삼습니다.
 ### Expected Output
 
 - `GraphBuilder`
-- 이벤트 배열을 받아 `GoriGraph`를 생성하는 함수
+- 이벤트 배열을 받아 `FlowmapGraph`를 생성하는 함수
 
 ### Exit Criteria
 
-- 예제 `RuntimeEvent[]`를 넣으면 `GoriGraph`가 생성됨
+- 예제 `RuntimeEvent[]`를 넣으면 `FlowmapGraph`가 생성됨
 - 예제 코드 흐름이 문서와 동일한 graph로 재현됨
 
 ---
@@ -402,13 +402,13 @@ Control:
 2. `core/types`와 `GraphStore` 구현
 3. `fetch request` 기반 Runtime Collector PoC
 
-이 순서가 맞는 이유는, 가장 낮은 비용으로 Gori의 핵심 가설을 빠르게 검증할 수 있기 때문입니다.
+이 순서가 맞는 이유는, 가장 낮은 비용으로 React Flowmap의 핵심 가설을 빠르게 검증할 수 있기 때문입니다.
 
 ---
 
 ## Summary
 
-Gori v1의 실행 계획은 다음 흐름으로 진행합니다.
+React Flowmap v1의 실행 계획은 다음 흐름으로 진행합니다.
 
 1. 타입과 그래프 계약을 고정한다.
 2. 메모리 기반 graph store를 만든다.
@@ -418,4 +418,4 @@ Gori v1의 실행 계획은 다음 흐름으로 진행합니다.
 6. selection과 inspector를 붙인다.
 7. 마지막에 시각화 프로토타입으로 연결한다.
 
-이 계획은 Gori를 “다이어그램 도구”가 아니라, **런타임 관계 엔진을 가진 탐색 가능한 시스템**으로 구현하기 위한 기준선이다.
+이 계획은 React Flowmap를 “다이어그램 도구”가 아니라, **런타임 관계 엔진을 가진 탐색 가능한 시스템**으로 구현하기 위한 기준선이다.

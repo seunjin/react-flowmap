@@ -1,5 +1,5 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
-import type { GoriGraph, RuntimeEdge } from '../types/graph.js';
+import type { FlowmapGraph, RuntimeEdge } from '../types/graph.js';
 import type { SelectionState } from '../types/selection.js';
 import type { FileEdge, FileLevelView } from '../types/projection.js';
 
@@ -53,7 +53,7 @@ function mergeFileEdges(current: FileEdge, next: RuntimeEdge): FileEdge {
 }
 
 export function projectToFileLevelView(
-  graph: GoriGraph,
+  graph: FlowmapGraph,
   selection?: SelectionState
 ): FileLevelView {
   const store = new InMemoryGraphStore();

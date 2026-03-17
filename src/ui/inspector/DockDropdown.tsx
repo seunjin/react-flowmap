@@ -55,33 +55,33 @@ export function DockDropdown({ current, onChange }: { current: DockPosition; onC
   return (
     <div ref={ref} className="relative">
       <button
-        data-gori-overlay
+        data-rfm-overlay
         type="button"
         onClick={() => setOpen(o => !o)}
         title="Change panel position"
         className={`w-6 h-6 rounded-[4px] border-none cursor-pointer flex items-center justify-center transition-all duration-100 ${
           open
-            ? 'bg-gori-bg-100 text-gori-text-700'
-            : 'bg-transparent text-gori-text-400 hover:bg-gori-bg-100 hover:text-gori-text-700'
+            ? 'bg-rfm-bg-100 text-rfm-text-700'
+            : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
         }`}
       >
         <DockSvg pos={current} color={open ? '#374151' : '#9ca3af'} />
       </button>
       {open && (
         <div
-          data-gori-overlay
-          className="absolute top-[30px] left-0 bg-[rgba(255,255,255,0.95)] backdrop-blur-[12px] border border-gori-border-light rounded-lg shadow-[0_4px_16px_rgba(23,37,84,0.1)] p-1 z-[10001] min-w-[110px]"
+          data-rfm-overlay
+          className="absolute top-[30px] left-0 bg-[rgba(255,255,255,0.95)] backdrop-blur-[12px] border border-rfm-border-light rounded-lg shadow-[0_4px_16px_rgba(23,37,84,0.1)] p-1 z-[10001] min-w-[110px]"
         >
           {(['left', 'bottom', 'right', 'float'] as DockPosition[]).map(pos => (
             <button
-              data-gori-overlay
+              data-rfm-overlay
               key={pos}
               type="button"
               onClick={() => { onChange(pos); setOpen(false); }}
               className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-[5px] border-none cursor-pointer text-left text-[11px] transition-[background] duration-[80ms] ${
                 current === pos
-                  ? 'bg-[rgba(243,244,246,0.9)] text-gori-text-900 font-semibold'
-                  : 'bg-transparent text-gori-text-500 font-normal hover:bg-[rgba(243,244,246,0.8)]'
+                  ? 'bg-[rgba(243,244,246,0.9)] text-rfm-text-900 font-semibold'
+                  : 'bg-transparent text-rfm-text-500 font-normal hover:bg-[rgba(243,244,246,0.8)]'
               }`}
             >
               <DockSvg pos={pos} color={current === pos ? '#111827' : '#9ca3af'} />

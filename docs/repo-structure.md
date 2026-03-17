@@ -1,13 +1,13 @@
-# Gori Repository Structure
+# React Flowmap Repository Structure
 
 ## Purpose
 
-이 문서는 Gori v1의 Phase 0에서 사용할 저장소 구조와 초기 파일 배치를 정의합니다.  
+이 문서는 React Flowmap v1의 Phase 0에서 사용할 저장소 구조와 초기 파일 배치를 정의합니다.  
 목표는 구현을 시작하기 전에 코드 책임 경계를 분명히 하고, 이후 Phase 1~8이 구조적으로 흔들리지 않도록 기준선을 만드는 것입니다.
 
 이 문서는 다음 질문에 답합니다.
 
-- Gori는 어떤 디렉터리 구조로 시작해야 하는가
+- React Flowmap은 어떤 디렉터리 구조로 시작해야 하는가
 - 어떤 책임이 어떤 폴더에 들어가야 하는가
 - 초기에는 어떤 파일들만 있으면 충분한가
 
@@ -15,7 +15,7 @@
 
 ## Repository Shape
 
-Gori v1은 **단일 패키지 저장소(single package repo)** 로 시작합니다.
+React Flowmap v1은 **단일 패키지 저장소(single package repo)** 로 시작합니다.
 
 초기 최상위 구조:
 
@@ -70,7 +70,7 @@ tests/
 
 ### `demo/`
 
-Gori를 실제로 연결해볼 수 있는 최소 데모 앱을 둡니다.
+React Flowmap을 실제로 연결해볼 수 있는 최소 데모 앱을 둡니다.
 
 목적:
 
@@ -122,7 +122,7 @@ src/
 
 ## `src/core/`
 
-Gori의 핵심 데이터 모델과 순수 로직이 위치합니다.
+React Flowmap의 핵심 데이터 모델과 순수 로직이 위치합니다.
 
 여기에는 다음만 있어야 합니다.
 
@@ -157,7 +157,7 @@ src/core/types/
 
 역할:
 
-- `graph.ts`: `FileNode`, `SymbolNode`, `ApiNode`, `GoriEdge`, `GoriGraph`
+- `graph.ts`: `FileNode`, `SymbolNode`, `ApiNode`, `FlowmapEdge`, `FlowmapGraph`
 - `runtime-events.ts`: `RuntimeEvent` 관련 타입
 - `projection.ts`: `FileEdge`, `FileLevelView`
 - `selection.ts`: `SelectionState`, `SelectionMode`
@@ -200,7 +200,7 @@ src/core/graph/
 
 - `graph-store.ts`: 저장소 인터페이스
 - `in-memory-graph-store.ts`: 메모리 기반 구현
-- `graph-builder.ts`: `RuntimeEvent[] -> GoriGraph`
+- `graph-builder.ts`: `RuntimeEvent[] -> FlowmapGraph`
 
 ### `src/core/projection/`
 
@@ -321,7 +321,7 @@ v1에서는 구현이 비어 있어도 괜찮지만, 폴더 경계는 미리 잡
 
 ```text
 src/ui/canvas/
-  gori-canvas.tsx
+  rfm-canvas.tsx
   file-level-view.tsx
 ```
 
@@ -386,7 +386,7 @@ demo/
     app.tsx
     main.tsx
     component-overlay.tsx   — Inspector UI (hover/select/editor open)
-    gori-runtime.ts         — __goriCollector, __goriSession re-export
+    rfm-runtime.ts         — __rfmCollector, __rfmSession re-export
 ```
 
 데모 목표:
@@ -458,7 +458,7 @@ src/
       collector.ts
   ui/
     canvas/
-      gori-canvas.tsx
+      rfm-canvas.tsx
 demo/
   src/
     main.tsx
@@ -526,7 +526,7 @@ tests/
 
 ## Summary
 
-Gori v1의 Phase 0 저장소 구조는 다음 원칙 위에 세워집니다.
+React Flowmap v1의 Phase 0 저장소 구조는 다음 원칙 위에 세워집니다.
 
 - 단일 패키지 저장소로 시작한다.
 - `core`, `runtime`, `static`, `ui`를 분리한다.

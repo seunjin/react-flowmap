@@ -1,4 +1,4 @@
-import type { GoriGraph, SymbolNode } from '../../core/types/graph.js';
+import type { FlowmapGraph, SymbolNode } from '../../core/types/graph.js';
 
 export type DocRef = {
   symbolId: string;
@@ -39,7 +39,7 @@ export type DocIndex = {
   apis: ApiDocEntry[];
 };
 
-export function buildDocIndex(graph: GoriGraph): DocIndex {
+export function buildDocIndex(graph: FlowmapGraph): DocIndex {
   const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
   const runtimeEdges = graph.edges.filter((e) => e.kind !== 'contains');
 

@@ -8,8 +8,8 @@ export function HoverPreviewBox({ rect, label }: { rect: DOMRect; label: string 
   const labelAbove = rect.top > 22;
   return (
     <div
-      data-gori-overlay
-      className="fixed border-[1.5px] border-dashed border-gori-text-400 bg-[rgba(59,130,246,0.04)] box-border pointer-events-none z-9998"
+      data-rfm-overlay
+      className="fixed border-[1.5px] border-dashed border-rfm-text-400 bg-[rgba(59,130,246,0.04)] box-border pointer-events-none z-9998"
       style={{ left: c.left, top: c.top, width: c.width, height: c.height }}
     >
       <div
@@ -36,12 +36,12 @@ export function ActiveSelectBox({ rect, label }: { rect: DOMRect; label: string 
   const labelAbove = rect.top > 22;
   return (
     <div
-      data-gori-overlay
-      className="fixed border-[1.5px] border-gori-blue bg-[rgba(59,130,246,0.05)] box-border pointer-events-none z-9999"
+      data-rfm-overlay
+      className="fixed border-[1.5px] border-rfm-blue bg-[rgba(59,130,246,0.05)] box-border pointer-events-none z-9999"
       style={{ left: c.left, top: c.top, width: c.width, height: c.height }}
     >
       <div
-        className="absolute bg-gori-blue pointer-events-none text-[11px] font-semibold text-white whitespace-nowrap leading-[1.6] px-[7px] py-px"
+        className="absolute bg-rfm-blue pointer-events-none text-[11px] font-semibold text-white whitespace-nowrap leading-[1.6] px-[7px] py-px"
         style={{
           fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
           borderRadius: labelAbove ? '4px 4px 0 0' : 4,

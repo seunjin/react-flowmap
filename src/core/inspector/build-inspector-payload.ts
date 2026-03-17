@@ -1,5 +1,5 @@
 import { InMemoryGraphStore } from '../graph/in-memory-graph-store.js';
-import type { GoriGraph, RuntimeEdge, SymbolNode } from '../types/graph.js';
+import type { FlowmapGraph, RuntimeEdge, SymbolNode } from '../types/graph.js';
 import type { InspectorPayload, SymbolRelationSummary } from '../types/inspector.js';
 import type { SelectionState } from '../types/selection.js';
 
@@ -86,7 +86,7 @@ function buildRelationSummary(
 }
 
 export function buildInspectorPayload(
-  graph: GoriGraph,
+  graph: FlowmapGraph,
   selection: SelectionState
 ): InspectorPayload {
   const store = new InMemoryGraphStore();

@@ -1,25 +1,25 @@
 import type {
   ApiNode,
   FileNode,
-  GoriEdge,
-  GoriGraph,
-  GoriNode,
+  FlowmapEdge,
+  FlowmapGraph,
+  FlowmapNode,
   RuntimeEdge,
   SymbolNode,
 } from '../types/graph.js';
 
 export interface GraphStore {
-  addNode(node: GoriNode): void;
-  addEdge(edge: GoriEdge): void;
-  addGraph(graph: GoriGraph): void;
-  getNode(id: string): GoriNode | undefined;
-  getGraph(): GoriGraph;
+  addNode(node: FlowmapNode): void;
+  addEdge(edge: FlowmapEdge): void;
+  addGraph(graph: FlowmapGraph): void;
+  getNode(id: string): FlowmapNode | undefined;
+  getGraph(): FlowmapGraph;
   getFileNodes(): FileNode[];
   getApiNodes(): ApiNode[];
   getSymbolsForFile(fileId: string): SymbolNode[];
   getFileForSymbol(symbolId: string): FileNode | undefined;
-  getEdgesByKind(kind: GoriEdge['kind']): GoriEdge[];
+  getEdgesByKind(kind: FlowmapEdge['kind']): FlowmapEdge[];
   getRuntimeEdges(): RuntimeEdge[];
-  getOutgoingEdges(nodeId: string): GoriEdge[];
-  getIncomingEdges(nodeId: string): GoriEdge[];
+  getOutgoingEdges(nodeId: string): FlowmapEdge[];
+  getIncomingEdges(nodeId: string): FlowmapEdge[];
 }

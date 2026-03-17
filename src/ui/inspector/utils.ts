@@ -4,15 +4,15 @@ import { SIDEBAR_W, BOTTOM_H } from './tokens';
 // ─── Dock persistence ─────────────────────────────────────────────────────────
 
 export function loadDock(): DockPosition {
-  try { return (localStorage.getItem('gori-dock') as DockPosition) ?? 'float'; } catch { return 'float'; }
+  try { return (localStorage.getItem('rfm-dock') as DockPosition) ?? 'float'; } catch { return 'float'; }
 }
 
 export function saveDock(pos: DockPosition) {
-  try { localStorage.setItem('gori-dock', pos); } catch { /* noop */ }
+  try { localStorage.setItem('rfm-dock', pos); } catch { /* noop */ }
 }
 
 export function saveFloatPos(pos: { x: number; y: number }) {
-  try { localStorage.setItem('gori-float-pos', JSON.stringify(pos)); } catch { /* noop */ }
+  try { localStorage.setItem('rfm-float-pos', JSON.stringify(pos)); } catch { /* noop */ }
 }
 
 // ─── Sidebar style ────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ export function normalizePath(filePath: string): string {
 export function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
   const params = new URLSearchParams({ file: filePath, symbolId });
   if (loc) params.set('line', loc);
-  fetch(`/__gori-open?${params.toString()}`).catch(() => {});
+  fetch(`/__rfm-open?${params.toString()}`).catch(() => {});
 }
 
 // ─── React Fiber Props ────────────────────────────────────────────────────────
@@ -110,12 +110,12 @@ export function findComponentsAt(x: number, y: number): FoundComp[] {
   const found: FoundComp[] = [];
   const seen = new Set<string>();
   for (const el of document.elementsFromPoint(x, y)) {
-    const id = el.getAttribute('data-gori-id');
+    const id = el.getAttribute('data-rfm-id');
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const rect = (el as HTMLElement).getBoundingClientRect();
     if (!isVisible(rect)) continue;
-    const loc = (el as HTMLElement).getAttribute('data-gori-loc');
+    const loc = (el as HTMLElement).getAttribute('data-rfm-loc');
     found.push({ symbolId: id, el: el as HTMLElement, rect, depth: getDomDepth(el as HTMLElement), loc });
   }
   return found.sort((a, b) => {
@@ -128,10 +128,10 @@ export function findComponentsAt(x: number, y: number): FoundComp[] {
 // ─── DOM relation finders ─────────────────────────────────────────────────────
 
 export function findDomParent(el: HTMLElement): { name: string; symbolId: string } | null {
-  const selfId = el.getAttribute('data-gori-id');
+  const selfId = el.getAttribute('data-rfm-id');
   let cur: Element | null = el.parentElement;
   while (cur) {
-    const id = cur.getAttribute('data-gori-id');
+    const id = cur.getAttribute('data-rfm-id');
     if (id && id !== selfId) {
       return { name: id.split('#').at(-1) ?? id, symbolId: id };
     }
@@ -141,12 +141,12 @@ export function findDomParent(el: HTMLElement): { name: string; symbolId: string
 }
 
 export function findDomChildren(el: HTMLElement): { name: string; symbolId: string }[] {
-  const rootId = el.getAttribute('data-gori-id');
+  const rootId = el.getAttribute('data-rfm-id');
   const seen = new Set<string>();
   const results: { name: string; symbolId: string }[] = [];
   function walk(node: Element) {
     for (const child of node.children) {
-      const id = child.getAttribute('data-gori-id');
+      const id = child.getAttribute('data-rfm-id');
       if (id && id !== rootId) {
         if (!seen.has(id)) {
           seen.add(id);

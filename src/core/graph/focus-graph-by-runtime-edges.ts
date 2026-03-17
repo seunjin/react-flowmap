@@ -1,6 +1,6 @@
-import type { FileNode, GoriGraph, GoriNode, RuntimeEdge } from '../types/graph.js';
+import type { FileNode, FlowmapGraph, FlowmapNode, RuntimeEdge } from '../types/graph.js';
 
-function isIncludedRuntimeEdge(edge: GoriGraph['edges'][number], runtimeEdgeIds: Set<string>): edge is RuntimeEdge {
+function isIncludedRuntimeEdge(edge: FlowmapGraph['edges'][number], runtimeEdgeIds: Set<string>): edge is RuntimeEdge {
   return edge.kind !== 'contains' && runtimeEdgeIds.has(edge.id);
 }
 
@@ -12,9 +12,9 @@ function createFocusedFileNode(fileNode: FileNode, includedSymbolIds: Set<string
 }
 
 export function focusGraphByRuntimeEdges(
-  graph: GoriGraph,
+  graph: FlowmapGraph,
   supportingEdgeIds: string[]
-): GoriGraph {
+): FlowmapGraph {
   if (supportingEdgeIds.length === 0) {
     return graph;
   }
@@ -54,7 +54,7 @@ export function focusGraphByRuntimeEdges(
     }
   }
 
-  const nodes = graph.nodes.reduce<GoriNode[]>((current, node) => {
+  const nodes = graph.nodes.reduce<FlowmapNode[]>((current, node) => {
     if (!includedNodeIds.has(node.id)) {
       return current;
     }

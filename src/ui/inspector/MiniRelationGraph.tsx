@@ -18,8 +18,8 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
         disabled={isCenter}
         title={name}
         className={`px-3 py-[5px] rounded-[7px] text-[11px] truncate max-w-[130px] transition-all ${isCenter
-          ? 'border-[1.5px] border-gori-blue bg-[rgba(243,244,246,0.9)] text-gori-text-900 font-medium cursor-default'
-          : 'border border-[rgba(229,231,235,0.9)] bg-[rgba(249,250,251,0.7)] text-gori-text-500 font-medium cursor-pointer hover:bg-[rgba(243,244,246,0.9)] hover:border-gori-text-400 hover:text-gori-text-900'
+          ? 'border-[1.5px] border-rfm-blue bg-[rgba(243,244,246,0.9)] text-rfm-text-900 font-medium cursor-default'
+          : 'border border-[rgba(229,231,235,0.9)] bg-[rgba(249,250,251,0.7)] text-rfm-text-500 font-medium cursor-pointer hover:bg-[rgba(243,244,246,0.9)] hover:border-rfm-text-400 hover:text-rfm-text-900'
           }`}
         onMouseEnter={() => onHover?.()}
         onMouseLeave={() => onHoverEnd?.()}
@@ -35,8 +35,8 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
 function GraphConnector() {
   return (
     <div className="flex flex-col items-center shrink-0 my-1.5">
-      <div className="w-px h-4 bg-gori-text-300" />
-      <div className="w-0 h-0 border-l-[3.5px] border-r-[3.5px] border-t-[4.5px] border-l-transparent border-r-transparent border-t-gori-text-300" />
+      <div className="w-px h-4 bg-rfm-text-300" />
+      <div className="w-0 h-0 border-l-[3.5px] border-r-[3.5px] border-t-[4.5px] border-l-transparent border-r-transparent border-t-rfm-text-300" />
     </div>
   );
 }
@@ -79,7 +79,7 @@ export function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHo
 
   if (noRelations) {
     return (
-      <p className="m-0 text-[11px] text-gori-text-400 leading-relaxed">
+      <p className="m-0 text-[11px] text-rfm-text-400 leading-relaxed">
         No relations.
       </p>
     );

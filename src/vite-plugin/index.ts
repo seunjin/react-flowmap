@@ -21,13 +21,13 @@ const traverse = traverseModule.default ?? traverseModule;
 const generate = generateModule.default ?? generateModule;
 
 // Virtual module ID
-const GORI_CONTEXT_ID = 'virtual:gori/context';
-const RESOLVED_GORI_CONTEXT_ID = '\0' + GORI_CONTEXT_ID;
+const RFM_CONTEXT_ID = 'virtual:rfm/context';
+const RESOLVED_RFM_CONTEXT_ID = '\0' + RFM_CONTEXT_ID;
 
 // Plugin 파일 위치 기반으로 runtime context 파일 경로 계산
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
 
-// ─── JSX에 data-gori-id / data-gori-loc 속성 추가 ────────────────────────────
+// ─── JSX에 data-rfm-id / data-rfm-loc 속성 추가 ────────────────────────────
 function addAttr(node: unknown, symbolId: string, line: number): void {
   if (t.isJSXElement(node)) {
     const el = node as { openingElement: { attributes: unknown[] } };
@@ -35,13 +35,13 @@ function addAttr(node: unknown, symbolId: string, line: number): void {
       (a: unknown) =>
         t.isJSXAttribute(a) &&
         t.isJSXIdentifier((a as { name: unknown }).name) &&
-        (a as { name: { name: string } }).name.name === 'data-gori-id'
+        (a as { name: { name: string } }).name.name === 'data-rfm-id'
     );
     if (alreadyHas) return;
 
     el.openingElement.attributes.unshift(
-      t.jsxAttribute(t.jsxIdentifier('data-gori-id'),  t.stringLiteral(symbolId)),
-      t.jsxAttribute(t.jsxIdentifier('data-gori-loc'), t.stringLiteral(String(line))),
+      t.jsxAttribute(t.jsxIdentifier('data-rfm-id'),  t.stringLiteral(symbolId)),
+      t.jsxAttribute(t.jsxIdentifier('data-rfm-loc'), t.stringLiteral(String(line))),
     );
   } else if (t.isConditionalExpression(node)) {
     const n = node as { consequent: unknown; alternate: unknown };
@@ -52,10 +52,10 @@ function addAttr(node: unknown, symbolId: string, line: number): void {
   }
 }
 
-// ─── JSX를 __GoriCtx.Provider로 감싸기 ───────────────────────────────────────
+// ─── JSX를 __RfmCtx.Provider로 감싸기 ───────────────────────────────────────
 function createProviderElement(child: unknown, symbolId: string): unknown {
   const memberExpr = t.jsxMemberExpression(
-    t.jsxIdentifier('__GoriCtx'),
+    t.jsxIdentifier('__RfmCtx'),
     t.jsxIdentifier('Provider'),
   );
   const openingEl = t.jsxOpeningElement(
@@ -101,13 +101,13 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
     const body = fn.node.body as { body: unknown[] };
     const constDecl = t.variableDeclaration('const', [
       t.variableDeclarator(
-        t.identifier('__goriParent'),
-        t.callExpression(t.identifier('__goriUseContext'), [t.identifier('__GoriCtx')]),
+        t.identifier('__rfmParent'),
+        t.callExpression(t.identifier('__rfmUseContext'), [t.identifier('__RfmCtx')]),
       ),
     ]);
     const recordCall = t.expressionStatement(
-      t.callExpression(t.identifier('__useGoriRecord'), [
-        t.identifier('__goriParent'),
+      t.callExpression(t.identifier('__useRfmRecord'), [
+        t.identifier('__rfmParent'),
         t.stringLiteral(symbolId),
         t.stringLiteral(fileRef),
       ]),
@@ -115,7 +115,7 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
     body.body.unshift(constDecl, recordCall);
   }
 
-  // ReturnStatement의 JSX에 data-gori-id 추가 + Provider 래핑
+  // ReturnStatement의 JSX에 data-rfm-id 추가 + Provider 래핑
   fn.traverse({
     ReturnStatement(retPath: { node: { argument: unknown } }) {
       if (retPath.node.argument) {
@@ -270,7 +270,7 @@ function openInEditor(absPath: string, line: number, editor: string): void {
 }
 
 // ─── 플러그인 ─────────────────────────────────────────────────────────────────
-export type GoriInspectOptions = {
+export type FlowmapInspectOptions = {
   /** 변환에서 제외할 파일 경로 패턴 (정규식) */
   exclude?: RegExp[];
   /**
@@ -280,7 +280,7 @@ export type GoriInspectOptions = {
   editor?: string;
 };
 
-export function goriInspect(options: GoriInspectOptions = {}): Plugin {
+export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
   let root = process.cwd();
   let editorCmd = process.env['VITE_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
   let isDev = false;
@@ -289,11 +289,11 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
   // ts-morph Project (dev 서버 시작 시 초기화)
   let tsProject: Project | null = null;
 
-  const defaultExclude = [/component-overlay/, /vite-plugin/, /gori-context/];
+  const defaultExclude = [/component-overlay/, /vite-plugin/, /rfm-context/];
   const excludePatterns = [...defaultExclude, ...(options.exclude ?? [])];
 
   return {
-    name: 'gori-inspect',
+    name: 'rfm-inspect',
     enforce: 'pre',
 
     configResolved(config) {
@@ -315,20 +315,20 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       }
     },
 
-    // ─── virtual:gori/context 모듈 제공 ──────────────────────────────────────
+    // ─── virtual:rfm/context 모듈 제공 ──────────────────────────────────────
     resolveId(id) {
-      if (id === GORI_CONTEXT_ID) return RESOLVED_GORI_CONTEXT_ID;
+      if (id === RFM_CONTEXT_ID) return RESOLVED_RFM_CONTEXT_ID;
     },
 
     load(id) {
-      if (id !== RESOLVED_GORI_CONTEXT_ID) return null;
-      const contextPath = resolve(_pluginDir, '../runtime/gori-context');
+      if (id !== RESOLVED_RFM_CONTEXT_ID) return null;
+      const contextPath = resolve(_pluginDir, '../runtime/rfm-context');
       return `export * from ${JSON.stringify(contextPath)};`;
     },
 
-    // ─── dev server: /__gori-open?file=<relPath>&line=<n> ─────────────────────
+    // ─── dev server: /__rfm-open?file=<relPath>&line=<n> ─────────────────────
     configureServer(server) {
-      server.middlewares.use('/__gori-open', (req, res) => {
+      server.middlewares.use('/__rfm-open', (req, res) => {
         const qs = req.url?.split('?')[1] ?? '';
         const params = new URLSearchParams(qs);
         const file     = params.get('file');
@@ -392,15 +392,15 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
             const p = path as { unshiftContainer: (key: string, nodes: unknown[]) => void };
             p.unshiftContainer('body', [
               t.importDeclaration(
-                [t.importSpecifier(t.identifier('__goriUseContext'), t.identifier('useContext'))],
+                [t.importSpecifier(t.identifier('__rfmUseContext'), t.identifier('useContext'))],
                 t.stringLiteral('react'),
               ),
               t.importDeclaration(
                 [
-                  t.importSpecifier(t.identifier('__GoriCtx'), t.identifier('__GoriCtx')),
-                  t.importSpecifier(t.identifier('__useGoriRecord'), t.identifier('__useGoriRecord')),
+                  t.importSpecifier(t.identifier('__RfmCtx'), t.identifier('__RfmCtx')),
+                  t.importSpecifier(t.identifier('__useRfmRecord'), t.identifier('__useRfmRecord')),
                 ],
-                t.stringLiteral(GORI_CONTEXT_ID),
+                t.stringLiteral(RFM_CONTEXT_ID),
               ),
             ]);
           },
@@ -467,9 +467,9 @@ export function goriInspect(options: GoriInspectOptions = {}): Plugin {
       // prop types 레지스트리 주입
       let finalCode = newCode;
       if (propTypesRegistry.size > 0) {
-        const lines = ['\n// __gori prop types', '(globalThis.__goriPropTypes??={});'];
+        const lines = ['\n// __rfm prop types', '(globalThis.__rfmPropTypes??={});'];
         for (const [sid, props] of propTypesRegistry) {
-          lines.push(`globalThis.__goriPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
+          lines.push(`globalThis.__rfmPropTypes[${JSON.stringify(sid)}]=${JSON.stringify(props)};`);
         }
         finalCode += lines.join('\n');
       }

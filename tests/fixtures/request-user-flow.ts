@@ -1,6 +1,6 @@
-import type { GoriGraph } from '../../src/core/types/graph';
+import type { FlowmapGraph } from '../../src/core/types/graph';
 
-export const requestUserFlow: GoriGraph = {
+export const requestUserFlow: FlowmapGraph = {
   nodes: [
     {
       id: 'file:src/pages/user-page.tsx',

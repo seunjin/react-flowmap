@@ -1,8 +1,8 @@
-# Gori Data Schema
+# React Flowmap Data Schema
 
 ## Purpose
 
-이 문서는 Gori v1에서 사용하는 데이터 구조를 정의합니다.  
+이 문서는 React Flowmap v1에서 사용하는 데이터 구조를 정의합니다.  
 목표는 아키텍처 문서에서 합의한 개념을 실제 저장 가능하고 구현 가능한 스키마로 구체화하는 것입니다.
 
 이 문서는 다음 네 가지를 다룹니다.
@@ -26,7 +26,7 @@
 
 ## Runtime Event Schema
 
-Gori는 먼저 실행 중 발생한 관측값을 `Runtime Event`로 수집하고, 이후 이를 그래프로 정규화합니다.
+React Flowmap는 먼저 실행 중 발생한 관측값을 `Runtime Event`로 수집하고, 이후 이를 그래프로 정규화합니다.
 
 ### Base Event
 
@@ -175,7 +175,7 @@ type ExportRef = {
 
 ## Graph Schema
 
-정규화된 그래프는 Gori의 source of truth입니다.
+정규화된 그래프는 React Flowmap의 source of truth입니다.
 
 ### Node Types
 
@@ -205,7 +205,7 @@ type ApiNode = {
   label: string;
 };
 
-type GoriNode = FileNode | SymbolNode | ApiNode;
+type FlowmapNode = FileNode | SymbolNode | ApiNode;
 ```
 
 ID 규칙 예시:
@@ -254,7 +254,7 @@ type RequestEdge = {
   target: string;
 };
 
-type GoriEdge =
+type FlowmapEdge =
   | ContainsEdge
   | RenderEdge
   | UseEdge
@@ -273,9 +273,9 @@ ID 규칙 예시:
 ### Graph Container
 
 ```ts
-type GoriGraph = {
-  nodes: GoriNode[];
-  edges: GoriEdge[];
+type FlowmapGraph = {
+  nodes: FlowmapNode[];
+  edges: FlowmapEdge[];
 };
 ```
 
@@ -442,7 +442,7 @@ export function UserPage() {
 이때 원본 graph는 개념적으로 다음과 같습니다.
 
 ```ts
-const graph: GoriGraph = {
+const graph: FlowmapGraph = {
   nodes: [
     {
       id: 'file:src/pages/user-page.tsx',
@@ -605,10 +605,10 @@ const view: FileLevelView = {
 
 ## Summary
 
-Gori v1의 데이터 스키마는 다음 구조를 가집니다.
+React Flowmap v1의 데이터 스키마는 다음 구조를 가집니다.
 
 - 원시 입력 = `RuntimeEvent`
-- 원본 저장 = `GoriGraph`
+- 원본 저장 = `FlowmapGraph`
 - 화면 출력 = `FileLevelView`
 - 사용자 선택 = `SelectionState`
 - 상세 패널 = `InspectorPayload`

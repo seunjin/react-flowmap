@@ -27,7 +27,7 @@ export type ApiNode = {
   label: string;
 };
 
-export type GoriNode = FileNode | SymbolNode | ApiNode;
+export type FlowmapNode = FileNode | SymbolNode | ApiNode;
 
 export type ContainsEdge = {
   id: string;
@@ -64,16 +64,16 @@ export type RequestEdge = {
   target: string;
 };
 
-export type GoriEdge =
+export type FlowmapEdge =
   | ContainsEdge
   | RenderEdge
   | UseEdge
   | CallEdge
   | RequestEdge;
 
-export type RuntimeEdge = Exclude<GoriEdge, ContainsEdge>;
+export type RuntimeEdge = Exclude<FlowmapEdge, ContainsEdge>;
 
-export type GoriGraph = {
-  nodes: GoriNode[];
-  edges: GoriEdge[];
+export type FlowmapGraph = {
+  nodes: FlowmapNode[];
+  edges: FlowmapEdge[];
 };

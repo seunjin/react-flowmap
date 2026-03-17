@@ -1,25 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { buildGraph, type GoriGraph, attachFetchInterceptor, ComponentOverlay } from 'gori';
-import type { RuntimeEvent } from 'gori';
+import { buildGraph, type FlowmapGraph, attachFetchInterceptor, ComponentOverlay } from 'react-flowmap';
+import type { RuntimeEvent } from 'react-flowmap';
 import { NotificationToast } from './features/notification-toast';
 import { HomePage } from './pages/home-page';
 import { ProductPage } from './pages/product-page';
 import { CartPage } from './pages/cart-page';
 import { UserMenu } from './entities/user/user-menu';
-import { demoCollector, demoRuntimeSession } from './gori-runtime';
+import { demoCollector, demoRuntimeSession } from './rfm-runtime';
 import type { Product, CartItem, User } from './shared/types';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 const TOP_BAR_H = 52;
-const emptyGraph: GoriGraph = { nodes: [], edges: [] };
+const emptyGraph: FlowmapGraph = { nodes: [], edges: [] };
 
 const globalStyle = `
   *, *::before, *::after { box-sizing: border-box; scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
   html, body, #root { margin: 0; padding: 0; height: 100%; width: 100%; }
-  @keyframes gori-spin { to { transform: rotate(360deg); } }
-  @keyframes gori-fadein { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes rfm-spin { to { transform: rotate(360deg); } }
+  @keyframes rfm-fadein { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 `;
 
 const MOCK_PRODUCTS: Product[] = [
@@ -37,7 +37,7 @@ type Page = 'home' | 'product' | 'cart';
 export function App() {
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   void events;
-  const [graph, setGraph] = useState<GoriGraph>(emptyGraph);
+  const [graph, setGraph] = useState<FlowmapGraph>(emptyGraph);
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [activePage, setActivePage] = useState<Page>('home');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export function App() {
 
       // GET /api/user
       if (url.pathname === '/api/user' && method === 'GET') {
-        return new Response(JSON.stringify({ id: '1', name: 'Gori User', email: 'user@gori.dev' }), {
+        return new Response(JSON.stringify({ id: '1', name: 'Flowmap User', email: 'user@react-flowmap.dev' }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }

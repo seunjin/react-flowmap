@@ -1,8 +1,8 @@
-# Gori Commit Convention
+# React Flowmap Commit Convention
 
 ## 목적
 
-이 문서는 Gori 저장소에서 사용하는 커밋 메시지 규칙을 정의합니다.
+이 문서는 React Flowmap 저장소에서 사용하는 커밋 메시지 규칙을 정의합니다.
 
 목표는 두 가지입니다.
 
@@ -13,7 +13,7 @@
 
 ## 기본 형식
 
-Gori의 커밋 메시지는 아래 형식을 사용합니다.
+React Flowmap의 커밋 메시지는 아래 형식을 사용합니다.
 
 ```text
 type: 한국어 요약
@@ -170,7 +170,7 @@ feat: 요청 기반 런타임 수집기 PoC 추가
 
 ## Summary
 
-Gori의 커밋 메시지는 다음 규칙을 따릅니다.
+React Flowmap의 커밋 메시지는 다음 규칙을 따릅니다.
 
 - 형식: `type: 한국어 요약`
 - type은 표준 토큰을 사용한다

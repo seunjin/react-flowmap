@@ -4,5 +4,5 @@ declare module '*.css?inline' {
   export default content;
 }
 
-type GoriTypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, GoriTypeFieldEntry> };
-declare var __goriPropTypes: Record<string, Record<string, GoriTypeFieldEntry>> | undefined;
+type RfmTypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, RfmTypeFieldEntry> };
+declare var __rfmPropTypes: Record<string, Record<string, RfmTypeFieldEntry>> | undefined;

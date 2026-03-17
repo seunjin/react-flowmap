@@ -2,7 +2,7 @@ export function Spinner({ size = 20, color = '#3b82f6' }: { size?: number; color
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24"
-      style={{ animation: 'gori-spin 0.7s linear infinite', display: 'block' }}
+      style={{ animation: 'rfm-spin 0.7s linear infinite', display: 'block' }}
     >
       <circle cx="12" cy="12" r="10" stroke={`${color}30`} strokeWidth="3" fill="none" />
       <path
