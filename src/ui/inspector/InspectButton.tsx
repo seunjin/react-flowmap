@@ -1,5 +1,24 @@
 import type React from 'react';
 
+// ─── Brand Symbol ─────────────────────────────────────────────────────────────
+
+function RfmLogoIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* root node */}
+      <circle cx="10" cy="3.5" r="2.5" stroke="white" strokeWidth="1.5" />
+      {/* leaf node — left */}
+      <circle cx="3.5" cy="16.5" r="2.5" stroke="white" strokeWidth="1.5" />
+      {/* leaf node — right */}
+      <circle cx="16.5" cy="16.5" r="2.5" stroke="white" strokeWidth="1.5" />
+      {/* edge: root → left */}
+      <line x1="8.9" y1="5.7" x2="4.6" y2="14.3" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      {/* edge: root → right */}
+      <line x1="11.1" y1="5.7" x2="15.4" y2="14.3" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 export type FlowmapConfig = {
@@ -34,16 +53,7 @@ export function InspectButton({
         ...(left  !== undefined ? { left  } : {}),
       } as React.CSSProperties}
     >
-      <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
-        {/* 오른쪽 링: 전체 원 */}
-        <circle cx="14" cy="7" r="5" stroke="white" strokeWidth="2" fill="none" />
-        {/* 마스크: 겹침 구간 상단 — 오른쪽 링 가림 */}
-        <rect x="8.5" y="1" width="3.5" height="7" fill="#3b82f6" />
-        {/* 왼쪽 링: 전체 원 (겹침 상단에서 앞으로) */}
-        <circle cx="6" cy="7" r="5" stroke="white" strokeWidth="2" fill="none" />
-        {/* 오른쪽 링 겹침 하단 재드로우 (겹침 하단에서 앞으로) */}
-        <path d="M 9 7 A 5 5 0 0 1 10 10" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
-      </svg>
+      <RfmLogoIcon />
     </button>
   );
 }
