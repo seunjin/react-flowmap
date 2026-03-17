@@ -18,35 +18,11 @@ const generate  = generateModule.default ?? generateModule;
 export const DEFAULT_CONTEXT_IMPORT = 'virtual:rfm/context';
 
 const DEFAULT_EXCLUDE = [
-  /component-overlay/,
+  /\/ui\/inspector\//,  // inspector UI 소스 — 라이브러리 내부
   /vite-plugin/,
   /rfm-context/,
   /rfm-runtime/,
 ];
-
-// ─── JSX에 data-rfm-id / data-rfm-loc 속성 추가 ──────────────────────────────
-function addAttr(node: unknown, symbolId: string, line: number): void {
-  if (t.isJSXElement(node)) {
-    const el = node as { openingElement: { attributes: unknown[] } };
-    const alreadyHas = el.openingElement.attributes.some(
-      (a: unknown) =>
-        t.isJSXAttribute(a) &&
-        t.isJSXIdentifier((a as { name: unknown }).name) &&
-        (a as { name: { name: string } }).name.name === 'data-rfm-id',
-    );
-    if (alreadyHas) return;
-    el.openingElement.attributes.unshift(
-      t.jsxAttribute(t.jsxIdentifier('data-rfm-id'),  t.stringLiteral(symbolId)),
-      t.jsxAttribute(t.jsxIdentifier('data-rfm-loc'), t.stringLiteral(String(line))),
-    );
-  } else if (t.isConditionalExpression(node)) {
-    const n = node as { consequent: unknown; alternate: unknown };
-    addAttr(n.consequent, symbolId, line);
-    addAttr(n.alternate,  symbolId, line);
-  } else if (t.isLogicalExpression(node) && (node as { operator: string }).operator === '&&') {
-    addAttr((node as { right: unknown }).right, symbolId, line);
-  }
-}
 
 // ─── JSX를 __RfmCtx.Provider로 감싸기 ────────────────────────────────────────
 function createProviderElement(child: unknown, symbolId: string): unknown {
@@ -81,7 +57,7 @@ function wrapWithProvider(node: unknown, symbolId: string): unknown {
 }
 
 // ─── 함수에 Context 훅 주입 + Provider 래핑 ──────────────────────────────────
-function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: string): void {
+function injectIntoFn(fnPath: unknown, symbolId: string, _line: number, fileRef: string): void {
   const fn = fnPath as {
     node: { type: string; body: unknown };
     traverse: (v: unknown) => void;
@@ -112,7 +88,6 @@ function injectIntoFn(fnPath: unknown, symbolId: string, line: number, fileRef: 
   fn.traverse({
     ReturnStatement(retPath: { node: { argument: unknown } }) {
       if (retPath.node.argument) {
-        addAttr(retPath.node.argument, symbolId, line);
         retPath.node.argument = wrapWithProvider(retPath.node.argument, symbolId);
       }
     },
@@ -159,6 +134,8 @@ export function transformFlowmap(
 
   const { relPath, contextImport = DEFAULT_CONTEXT_IMPORT } = opts;
   const symbolLocs = new Map<string, number>();
+  // Collect component defs to add __rfm_symbolId / __rfm_loc static props at module level
+  const componentDefs: { name: string; symbolId: string; line: number }[] = [];
 
   let ast: unknown;
   try {
@@ -177,7 +154,10 @@ export function transformFlowmap(
     Program: {
       exit(path: unknown) {
         if (!modified) return;
-        const p = path as { unshiftContainer: (key: string, nodes: unknown[]) => void };
+        const p = path as {
+          unshiftContainer: (key: string, nodes: unknown[]) => void;
+          pushContainer: (key: string, nodes: unknown[]) => void;
+        };
         p.unshiftContainer('body', [
           t.importDeclaration(
             [t.importSpecifier(t.identifier('__rfmUseContext'), t.identifier('useContext'))],
@@ -191,6 +171,23 @@ export function transformFlowmap(
             t.stringLiteral(contextImport),
           ),
         ]);
+        // Assign __rfm_symbolId and __rfm_loc to each component function
+        for (const { name, symbolId, line } of componentDefs) {
+          p.pushContainer('body', [
+            t.expressionStatement(
+              t.assignmentExpression('=',
+                t.memberExpression(t.identifier(name), t.identifier('__rfm_symbolId')),
+                t.stringLiteral(symbolId),
+              ),
+            ),
+            t.expressionStatement(
+              t.assignmentExpression('=',
+                t.memberExpression(t.identifier(name), t.identifier('__rfm_loc')),
+                t.stringLiteral(String(line)),
+              ),
+            ),
+          ]);
+        }
       },
     },
 
@@ -200,6 +197,7 @@ export function transformFlowmap(
       const line = path.node.loc?.start.line ?? 1;
       const symbolId = `symbol:${relPath}#${name}`;
       symbolLocs.set(symbolId, line);
+      componentDefs.push({ name, symbolId, line });
       injectIntoFn(path, symbolId, line, `file:${relPath}`);
       modified = true;
     },
@@ -223,6 +221,7 @@ export function transformFlowmap(
       const line = path.node.loc?.start.line ?? 1;
       const symbolId = `symbol:${relPath}#${name}`;
       symbolLocs.set(symbolId, line);
+      componentDefs.push({ name, symbolId, line });
       const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
       injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
       modified = true;

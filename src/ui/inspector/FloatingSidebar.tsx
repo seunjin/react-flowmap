@@ -3,7 +3,7 @@ import type React from 'react';
 import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
-import { sidebarStyle, openInEditor } from './utils';
+import { sidebarStyle, openInEditor, findAllMountedRfmComponents } from './utils';
 import { buildFolderTree, flattenTreeEntries } from './tree-utils';
 import { DockDropdown } from './DockDropdown';
 import { TreeNodeView } from './TreeView';
@@ -63,12 +63,8 @@ export function FloatingSidebar({
   const [treeHoveredId, setTreeHoveredId] = useState('');
 
   const displayEntries = useMemo(() => {
-    const domIds = new Set(
-      [...document.querySelectorAll('[data-rfm-id]')]
-        .filter(el => !el.closest('[data-rfm-overlay]'))
-        .map(el => el.getAttribute('data-rfm-id')!)
-    );
-    return allEntries.filter(e => domIds.has(e.symbolId));
+    const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
+    return allEntries.filter(e => mountedIds.has(e.symbolId));
   }, [allEntries]);
 
   const filteredEntries = useMemo(() => {
@@ -143,11 +139,10 @@ export function FloatingSidebar({
       {/* 헤더 */}
       <div
         onMouseDown={onHeaderMouseDown}
-        className={`h-9 min-h-9 flex items-center justify-between px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0 select-none ${
-          dockPosition === 'float'
-            ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
-            : 'bg-[rgba(249,250,251,0.6)] cursor-default'
-        }`}
+        className={`h-9 min-h-9 flex items-center justify-between px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0 select-none ${dockPosition === 'float'
+          ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
+          : 'bg-[rgba(249,250,251,0.6)] cursor-default'
+          }`}
       >
         <div className="flex items-center gap-1">
           {/* 요소 선택 픽 버튼 */}
@@ -155,11 +150,10 @@ export function FloatingSidebar({
             type="button"
             onClick={onPickToggle}
             title={picking ? 'Cancel (Escape)' : 'Pick element'}
-            className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${
-              picking
-                ? 'bg-rfm-bg-100 text-rfm-text-700'
-                : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
-            }`}
+            className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${picking
+              ? 'bg-rfm-bg-100 text-rfm-text-700'
+              : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
+              }`}
           >
             <SquareMousePointer size={14} />
           </button>
@@ -204,7 +198,7 @@ export function FloatingSidebar({
           </div>
 
           {/* 폴더 트리 */}
-          <div ref={treeScrollRef} className="flex-1 overflow-y-auto py-1">
+          <div ref={treeScrollRef} className="flex-1 overflow-y-auto pt-2 pb-4">
             {filteredEntries.length === 0 ? (
               <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400 leading-relaxed">
                 {searchQuery ? `No results for "${searchQuery}"` : 'No components rendered on screen'}
@@ -259,15 +253,15 @@ export function FloatingSidebar({
           <div className="flex-1 overflow-y-auto">
             {selectedEntry
               ? <EntryDetail
-                  entry={selectedEntry}
-                  selectedEl={selectedEl}
-                  onNavigate={(name) => {
-                    const target = allEntries.find(e => e.name === name);
-                    if (target) onSelect(target.symbolId);
-                  }}
-                  onHover={(symbolId) => onHighlight(symbolId)}
-                  onHoverEnd={onHighlightEnd}
-                />
+                entry={selectedEntry}
+                selectedEl={selectedEl}
+                onNavigate={(name) => {
+                  const target = allEntries.find(e => e.name === name);
+                  if (target) onSelect(target.symbolId);
+                }}
+                onHover={(symbolId) => onHighlight(symbolId)}
+                onHoverEnd={onHighlightEnd}
+              />
               : <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400">No data</p>
             }
           </div>

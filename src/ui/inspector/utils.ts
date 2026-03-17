@@ -85,38 +85,85 @@ export function openInEditor(filePath: string, symbolId: string, loc?: string | 
   fetch(`/__rfm-open?${params.toString()}`).catch(() => {});
 }
 
-// ─── React Fiber Props ────────────────────────────────────────────────────────
+// ─── React Fiber types & helpers ─────────────────────────────────────────────
+
+type RfmFn = ((...args: unknown[]) => unknown) & {
+  __rfm_symbolId?: string;
+  __rfm_loc?: string;
+};
+type FiberNode = {
+  type: unknown;
+  return: FiberNode | null;
+  child: FiberNode | null;
+  sibling: FiberNode | null;
+  stateNode: unknown;
+  memoizedProps: Record<string, unknown> | null;
+};
+
+function getFiberFromEl(el: Element): FiberNode | null {
+  const key = Object.keys(el).find(
+    k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'),
+  );
+  return key ? ((el as unknown as Record<string, FiberNode>)[key] ?? null) : null;
+}
+
+/** First host DOM element in a fiber's subtree (follows .child chain). */
+function getFirstHostEl(fiber: FiberNode | null): HTMLElement | null {
+  let f = fiber;
+  while (f) {
+    if (typeof f.type === 'string' && f.stateNode instanceof HTMLElement) return f.stateNode;
+    f = f.child;
+  }
+  return null;
+}
+
+/** Walk up fiber chain to find the nearest ancestor component fiber with __rfm_symbolId. */
+function getCompFiber(fiber: FiberNode | null): FiberNode | null {
+  let f = fiber;
+  while (f) {
+    if (typeof (f.type as RfmFn)?.__rfm_symbolId === 'string') return f;
+    f = f.return;
+  }
+  return null;
+}
 
 export function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | null {
-  const key = Object.keys(el).find(k =>
-    k.startsWith('__reactFiber$') ||
-    k.startsWith('__reactInternalInstance$')
-  );
-  if (!key) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let fiber = (el as any)[key];
+  let fiber = getFiberFromEl(el);
   while (fiber) {
     if (typeof fiber.type === 'function' && fiber.memoizedProps) {
-      return fiber.memoizedProps as Record<string, unknown>;
+      return fiber.memoizedProps;
     }
     fiber = fiber.return;
   }
   return null;
 }
 
-// ─── Component finder ────────────────────────────────────────────────────────
+// ─── Component finder (Fiber-based) ──────────────────────────────────────────
 
 export function findComponentsAt(x: number, y: number): FoundComp[] {
   const found: FoundComp[] = [];
   const seen = new Set<string>();
-  for (const el of document.elementsFromPoint(x, y)) {
-    const id = el.getAttribute('data-rfm-id');
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    const rect = (el as HTMLElement).getBoundingClientRect();
-    if (!isVisible(rect)) continue;
-    const loc = (el as HTMLElement).getAttribute('data-rfm-loc');
-    found.push({ symbolId: id, el: el as HTMLElement, rect, depth: getDomDepth(el as HTMLElement), loc });
+
+  for (const domEl of document.elementsFromPoint(x, y)) {
+    let f: FiberNode | null = getFiberFromEl(domEl);
+    while (f) {
+      const fn = f.type as RfmFn | null;
+      if (typeof fn === 'function' && fn.__rfm_symbolId && !seen.has(fn.__rfm_symbolId)) {
+        seen.add(fn.__rfm_symbolId);
+        const hostEl = getFirstHostEl(f.child) ?? (domEl as HTMLElement);
+        const rect = hostEl.getBoundingClientRect();
+        if (isVisible(rect)) {
+          found.push({
+            symbolId: fn.__rfm_symbolId,
+            el: hostEl,
+            rect,
+            depth: getDomDepth(hostEl),
+            loc: fn.__rfm_loc ?? null,
+          });
+        }
+      }
+      f = f.return;
+    }
   }
   return found.sort((a, b) => {
     const da = a.rect.width * a.rect.height - b.rect.width * b.rect.height;
@@ -125,39 +172,167 @@ export function findComponentsAt(x: number, y: number): FoundComp[] {
   });
 }
 
-// ─── DOM relation finders ─────────────────────────────────────────────────────
+// ─── Fiber-based relation finders ────────────────────────────────────────────
 
 export function findDomParent(el: HTMLElement): { name: string; symbolId: string } | null {
-  const selfId = el.getAttribute('data-rfm-id');
-  let cur: Element | null = el.parentElement;
-  while (cur) {
-    const id = cur.getAttribute('data-rfm-id');
-    if (id && id !== selfId) {
-      return { name: id.split('#').at(-1) ?? id, symbolId: id };
+  const selfComp = getCompFiber(getFiberFromEl(el));
+  if (!selfComp) return null;
+  // Walk above selfComp to find first parent component
+  let f: FiberNode | null = selfComp.return;
+  while (f) {
+    const fn = f.type as RfmFn | null;
+    if (typeof fn === 'function' && fn.__rfm_symbolId) {
+      return { symbolId: fn.__rfm_symbolId, name: fn.__rfm_symbolId.split('#').at(-1) ?? '' };
     }
-    cur = cur.parentElement;
+    f = f.return;
   }
   return null;
 }
 
 export function findDomChildren(el: HTMLElement): { name: string; symbolId: string }[] {
-  const rootId = el.getAttribute('data-rfm-id');
-  const seen = new Set<string>();
+  const compFiber = getCompFiber(getFiberFromEl(el));
+  if (!compFiber) return [];
+
   const results: { name: string; symbolId: string }[] = [];
-  function walk(node: Element) {
-    for (const child of node.children) {
-      const id = child.getAttribute('data-rfm-id');
-      if (id && id !== rootId) {
-        if (!seen.has(id)) {
-          seen.add(id);
-          results.push({ name: id.split('#').at(-1) ?? id, symbolId: id });
+  const seen = new Set<string>();
+  // Iterative DFS through child fibers, stopping at component boundaries
+  const stack: FiberNode[] = compFiber.child ? [compFiber.child] : [];
+  while (stack.length > 0) {
+    const f = stack.pop()!;
+    const fn = f.type as RfmFn | null;
+    if (typeof fn === 'function' && fn.__rfm_symbolId) {
+      if (!seen.has(fn.__rfm_symbolId)) {
+        seen.add(fn.__rfm_symbolId);
+        results.push({ symbolId: fn.__rfm_symbolId, name: fn.__rfm_symbolId.split('#').at(-1) ?? '' });
+      }
+      // Don't recurse into this component's children (immediate children only)
+    } else {
+      if (f.child) stack.push(f.child);
+    }
+    if (f.sibling) stack.push(f.sibling);
+  }
+  return results;
+}
+
+// ─── Fiber-based element finders ─────────────────────────────────────────────
+
+/** Find the first mounted DOM element for a component by symbolId. */
+export function findElBySymbolId(symbolId: string): HTMLElement | null {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+          return getFirstHostEl(f.child) ?? (node as HTMLElement);
         }
-        // 이 컴포넌트의 서브트리는 더 깊이 탐색하지 않음
-      } else {
-        walk(child);
+        f = f.return;
       }
     }
+    node = walker.nextNode();
   }
-  walk(el);
+  return null;
+}
+
+/** Find all mounted DOM elements for a component by symbolId (multiple instances). */
+export function findAllElsBySymbolId(symbolId: string): HTMLElement[] {
+  const results: HTMLElement[] = [];
+  const seenFibers = new Set<FiberNode>();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        if (seenFibers.has(f)) break;
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+          seenFibers.add(f);
+          results.push(getFirstHostEl(f.child) ?? (node as HTMLElement));
+          break;
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
+  }
+  return results;
+}
+
+/** Find a component's DOM element within a fiber subtree rooted at `root`. */
+export function findElBySymbolIdInSubtree(root: HTMLElement, symbolId: string): HTMLElement | null {
+  const rootCompFiber = getCompFiber(getFiberFromEl(root));
+  if (!rootCompFiber) return null;
+  const stack: FiberNode[] = rootCompFiber.child ? [rootCompFiber.child] : [];
+  while (stack.length > 0) {
+    const f = stack.pop()!;
+    const fn = f.type as RfmFn | null;
+    if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+      return getFirstHostEl(f.child) ?? getFirstHostEl(f) ?? null;
+    }
+    if (f.child) stack.push(f.child);
+    if (f.sibling) stack.push(f.sibling);
+  }
+  return null;
+}
+
+/** Find ancestor component DOM element by symbolId (walk up fiber chain). */
+export function findAncestorElBySymbolId(el: HTMLElement, symbolId: string): HTMLElement | null {
+  const selfComp = getCompFiber(getFiberFromEl(el));
+  if (!selfComp) return null;
+  let f: FiberNode | null = selfComp.return;
+  while (f) {
+    const fn = f.type as RfmFn | null;
+    if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+      return getFirstHostEl(f.child) ?? null;
+    }
+    f = f.return;
+  }
+  return null;
+}
+
+/** Get loc (line number string) for a symbolId from its fiber. */
+export function getLocForSymbolId(el: HTMLElement, symbolId: string): string | null {
+  let f: FiberNode | null = getFiberFromEl(el);
+  while (f) {
+    const fn = f.type as RfmFn | null;
+    if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) return fn.__rfm_loc ?? null;
+    f = f.return;
+  }
+  return null;
+}
+
+/** Walk all DOM nodes to collect all mounted RFM components.
+ *  Skips [data-rfm-overlay] subtrees (inspector UI itself). */
+export function findAllMountedRfmComponents(): { symbolId: string; loc: string | null }[] {
+  const seen = new Set<string>();
+  const results: { symbolId: string; loc: string | null }[] = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node) {
+      return (node as HTMLElement).hasAttribute('data-rfm-overlay')
+        ? NodeFilter.FILTER_REJECT   // skip entire inspector subtree
+        : NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId && !seen.has(fn.__rfm_symbolId)) {
+          seen.add(fn.__rfm_symbolId);
+          results.push({ symbolId: fn.__rfm_symbolId, loc: fn.__rfm_loc ?? null });
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
+  }
   return results;
 }

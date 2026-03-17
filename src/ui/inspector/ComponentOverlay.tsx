@@ -2,9 +2,15 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
-import { loadDock, saveDock, saveFloatPos, findComponentsAt, isVisible } from './utils';
+import {
+  loadDock, saveDock, saveFloatPos,
+  findComponentsAt, findElBySymbolId, findAllElsBySymbolId,
+  findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
+  findAllMountedRfmComponents, isVisible,
+} from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
+import { SIDEBAR_W } from './tokens';
 import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.css?inline';
 
@@ -60,11 +66,9 @@ export function ComponentOverlay({
   const allEntries = useMemo(() => {
     const graphIds = new Set(graphEntries.map(e => e.symbolId));
     const extra: DocEntry[] = [];
-    document.querySelectorAll('[data-rfm-id]').forEach((el) => {
-      const symbolId = el.getAttribute('data-rfm-id');
-      const loc = el.getAttribute('data-rfm-loc');
-      if (symbolId && loc) locCacheRef.current.set(symbolId, loc);
-      if (!symbolId || graphIds.has(symbolId)) return;
+    findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
+      if (loc) locCacheRef.current.set(symbolId, loc);
+      if (graphIds.has(symbolId)) return;
       const match = symbolId.match(/^symbol:(.+)#(.+)$/);
       if (!match) return;
       const name = match[2]!;
@@ -102,15 +106,28 @@ export function ComponentOverlay({
     };
   }, [active]);
 
+  // 뷰포트 리사이즈 시 float 사이드바가 화면 밖으로 벗어나지 않도록 clamp
+  useEffect(() => {
+    if (!active || dockPosition !== 'float') return;
+    function clamp() {
+      setFloatPos(pos => {
+        const newX = Math.min(pos.x, Math.max(8, window.innerWidth  - SIDEBAR_W - 8));
+        const newY = Math.min(pos.y, Math.max(8, window.innerHeight - 120));
+        return newX === pos.x && newY === pos.y ? pos : { x: newX, y: newY };
+      });
+    }
+    clamp(); // 즉시 실행 (DevTools 열린 상태에서 인스펙터 활성화할 때 대비)
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, [active, dockPosition]);
+
   // 선택된 DOM 요소가 unmount(페이지 전환·필터)되면 대체 인스턴스 탐색 or 선택 해제
   useEffect(() => {
     if (!active) return;
     const observer = new MutationObserver(() => {
       if (!selectedElRef.current || selectedElRef.current.isConnected) return;
       const id = selectedIdRef.current;
-      const fallback = id
-        ? (document.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null)
-        : null;
+      const fallback = id ? findElBySymbolId(id) : null;
       if (fallback) {
         // 같은 컴포넌트의 다른 인스턴스가 남아 있으면 교체 후 re-render 강제
         selectedElRef.current = fallback;
@@ -193,18 +210,18 @@ export function ComponentOverlay({
   ) ?? null;
   let selectedRect: DOMRect | null = selectedComp?.rect ?? null;
   if (!selectedRect && selectedId) {
-    const el = selectedElRef.current ?? document.querySelector(`[data-rfm-id="${selectedId}"]`);
-    if (el) selectedRect = (el as HTMLElement).getBoundingClientRect();
+    const el = selectedElRef.current ?? findElBySymbolId(selectedId);
+    if (el) selectedRect = el.getBoundingClientRect();
   }
 
-  // 선택된 컴포넌트 loc: DOM에서 먼저, 없으면 캐시
+  // 선택된 컴포넌트 loc: Fiber에서 먼저, 없으면 캐시
   const selectedLoc = useMemo(() => {
     if (!selectedId) return null;
     const fromStack = stack.find(c => c.symbolId === selectedId)?.loc;
     if (fromStack) { locCacheRef.current.set(selectedId, fromStack); return fromStack; }
-    const el = document.querySelector(`[data-rfm-id="${selectedId}"]`);
-    const fromDom = el?.getAttribute('data-rfm-loc');
-    if (fromDom) { locCacheRef.current.set(selectedId, fromDom); return fromDom; }
+    const el = selectedElRef.current ?? findElBySymbolId(selectedId);
+    const fromFiber = el ? getLocForSymbolId(el, selectedId) : null;
+    if (fromFiber) { locCacheRef.current.set(selectedId, fromFiber); return fromFiber; }
     return locCacheRef.current.get(selectedId) ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, stack]);
@@ -231,7 +248,7 @@ export function ComponentOverlay({
     <>
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightId && (() => {
-        const els = [...document.querySelectorAll(`[data-rfm-id="${highlightId}"]`)] as HTMLElement[];
+        const els = findAllElsBySymbolId(highlightId);
         const label = highlightId.split('#').at(-1) ?? '';
         return els.map((el, i) => {
           const rect = el.getBoundingClientRect();
@@ -275,24 +292,21 @@ export function ComponentOverlay({
             // 2) 없으면 조상에서 탐색 (부모 방향) → n번째 인스턴스 유지
             const currentEl = selectedElRef.current;
             if (currentEl) {
-              const inSubtree = currentEl.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null;
+              const inSubtree = findElBySymbolIdInSubtree(currentEl, id);
               if (inSubtree) {
                 selectedElRef.current = inSubtree;
               } else {
-                let ancestor: Element | null = currentEl.parentElement;
-                while (ancestor) {
-                  if (ancestor.getAttribute('data-rfm-id') === id) {
-                    selectedElRef.current = ancestor as HTMLElement;
-                    break;
-                  }
-                  ancestor = ancestor.parentElement;
+                const ancestor = findAncestorElBySymbolId(currentEl, id);
+                if (ancestor) {
+                  selectedElRef.current = ancestor;
+                } else {
+                  // 서브트리·조상 모두 없음 → 전역 Fiber 탐색으로 fallback
+                  selectedElRef.current = findElBySymbolId(id);
                 }
-                if (!ancestor) selectedElRef.current = null;
               }
             } else {
-              // currentEl이 없을 때 (트리에서 직접 선택): DOM 쿼리로 첫 번째 인스턴스 사용
-              selectedElRef.current =
-                (document.querySelector(`[data-rfm-id="${id}"]`) as HTMLElement | null) ?? null;
+              // currentEl이 없을 때 (트리에서 직접 선택): Fiber로 첫 번째 인스턴스 탐색
+              selectedElRef.current = findElBySymbolId(id);
             }
           }
         }}
