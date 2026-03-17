@@ -359,8 +359,8 @@ export function ComponentOverlay({
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
 
-      {/* 플로팅 사이드바 */}
-      <FloatingSidebar
+      {/* 플로팅 사이드바 — 그래프 창 열려있을 때는 숨김 */}
+      {!graphWindowOpen && <FloatingSidebar
         stack={stack}
         selectedId={selectedId}
         selectedLoc={selectedLoc}
@@ -369,7 +369,6 @@ export function ComponentOverlay({
         dockPosition={dockPosition}
         floatPos={floatPos}
         picking={picking}
-        graphWindowOpen={graphWindowOpen}
         onOpenGraphWindow={openGraphWindow}
         onPickToggle={() => {
           if (picking) { setPicking(false); setStack([]); }
@@ -414,7 +413,7 @@ export function ComponentOverlay({
         }}
         onHighlight={setHighlightId}
         onHighlightEnd={() => setHighlightId('')}
-      />
+      />}
     </>
   );
 }
