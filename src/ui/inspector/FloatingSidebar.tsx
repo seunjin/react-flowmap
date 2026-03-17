@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type React from 'react';
-import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink } from 'lucide-react';
+import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink, Maximize2 } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
 import { sidebarStyle, openInEditor, findAllMountedRfmComponents } from './utils';
@@ -16,6 +16,7 @@ export function FloatingSidebar({
   dockPosition, floatPos, onDockChange, onFloatMove,
   onHighlight, onHighlightEnd,
   picking, onPickToggle,
+  graphWindowOpen, onOpenGraphWindow,
 }: {
   stack: FoundComp[];
   selectedId: string;
@@ -32,6 +33,8 @@ export function FloatingSidebar({
   onHighlightEnd: () => void;
   picking: boolean;
   onPickToggle: () => void;
+  graphWindowOpen: boolean;
+  onOpenGraphWindow: () => void;
 }) {
   const [view, setView] = useState<'tree' | 'detail'>('tree');
   const [focusedIdx, setFocusedIdx] = useState(-1);
@@ -136,6 +139,50 @@ export function FloatingSidebar({
     return () => document.removeEventListener('keydown', onKey, true);
   }, [view, treeOrderedEntries, focusedIdx, onSelect]);
 
+  // 미니 독 모드: 그래프 창이 열려있을 때 헤더만 표시
+  if (graphWindowOpen) {
+    return (
+      <div
+        data-rfm-overlay
+        style={sidebarStyle(dockPosition, floatPos)}
+      >
+        <div
+          onMouseDown={onHeaderMouseDown}
+          className={`h-9 min-h-9 flex items-center justify-between px-2 shrink-0 select-none rounded-[inherit] ${dockPosition === 'float'
+            ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
+            : 'bg-[rgba(249,250,251,0.6)] cursor-default'
+            }`}
+        >
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onPickToggle}
+              title={picking ? 'Cancel (Escape)' : 'Pick element'}
+              className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${picking
+                ? 'bg-rfm-bg-100 text-rfm-text-700'
+                : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
+                }`}
+            >
+              <SquareMousePointer size={14} />
+            </button>
+            <div className="w-px h-3.5 bg-rfm-border-light" />
+            <DockDropdown current={dockPosition} onChange={onDockChange} />
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onClose}
+              title="Close inspector"
+              className="w-6 h-6 rounded-[4px] border-none bg-transparent text-rfm-text-400 cursor-pointer flex items-center justify-center transition-all duration-100 hover:bg-rfm-bg-100 hover:text-rfm-text-700"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       data-rfm-overlay
@@ -167,6 +214,15 @@ export function FloatingSidebar({
           <DockDropdown current={dockPosition} onChange={onDockChange} />
         </div>
         <div className="flex items-center gap-1">
+          {/* 새 창으로 전체 그래프 열기 */}
+          <button
+            type="button"
+            onClick={onOpenGraphWindow}
+            title="Open full graph in new window"
+            className="w-6 h-6 rounded-[4px] border-none bg-transparent text-rfm-text-400 cursor-pointer flex items-center justify-center transition-all duration-100 hover:bg-rfm-bg-100 hover:text-rfm-text-700"
+          >
+            <Maximize2 size={12} />
+          </button>
           <button
             type="button"
             onClick={onClose}

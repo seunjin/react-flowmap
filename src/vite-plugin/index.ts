@@ -8,9 +8,11 @@ import { transformFlowmap } from '../../packages/babel-plugin/src/index.js';
 
 const _require = createRequire(import.meta.url);
 
-// Virtual module ID
+// Virtual module IDs
 const RFM_CONTEXT_ID = 'virtual:rfm/context';
 const RESOLVED_RFM_CONTEXT_ID = '\0' + RFM_CONTEXT_ID;
+
+const RFM_GRAPH_ENTRY_ID = '/@rfm/graph-entry';
 
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
 
@@ -191,15 +193,50 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
 
     resolveId(id) {
       if (id === RFM_CONTEXT_ID) return RESOLVED_RFM_CONTEXT_ID;
+      if (id === RFM_GRAPH_ENTRY_ID) return RFM_GRAPH_ENTRY_ID;
     },
 
     load(id) {
-      if (id !== RESOLVED_RFM_CONTEXT_ID) return null;
-      const contextPath = resolve(_pluginDir, '../runtime/rfm-context');
-      return `export * from ${JSON.stringify(contextPath)};`;
+      if (id === RESOLVED_RFM_CONTEXT_ID) {
+        const contextPath = resolve(_pluginDir, '../runtime/rfm-context');
+        return `export * from ${JSON.stringify(contextPath)};`;
+      }
+      if (id === RFM_GRAPH_ENTRY_ID) {
+        const graphWindowPath = resolve(_pluginDir, '../ui/graph-window/GraphWindow');
+        return [
+          `import React from 'react';`,
+          `import { createRoot } from 'react-dom/client';`,
+          `import { GraphWindow } from ${JSON.stringify(graphWindowPath)};`,
+          `const el = document.getElementById('rfm-root');`,
+          `if (el) createRoot(el).render(React.createElement(GraphWindow));`,
+        ].join('\n');
+      }
+      return null;
     },
 
     configureServer(server) {
+      // /rfm-graph — 그래프 창 페이지
+      server.middlewares.use('/rfm-graph', (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React Flowmap — Graph</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body, #rfm-root { margin: 0; padding: 0; height: 100%; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="rfm-root"></div>
+    <script type="module" src="${RFM_GRAPH_ENTRY_ID}"></script>
+  </body>
+</html>`);
+      });
+
       server.middlewares.use('/__rfm-open', (req, res) => {
         const qs = req.url?.split('?')[1] ?? '';
         const params = new URLSearchParams(qs);

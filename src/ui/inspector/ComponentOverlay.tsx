@@ -13,6 +13,8 @@ import { FloatingSidebar } from './FloatingSidebar';
 import { SIDEBAR_W } from './tokens';
 import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.css?inline';
+import type { MainToGraph, GraphToMain } from './channel';
+import { RFM_CHANNEL } from './channel';
 
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
@@ -22,9 +24,12 @@ export function ComponentOverlay({
   graph: FlowmapGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
   config?: FlowmapConfig;
 }) {
-  const [stack,      setStack]      = useState<FoundComp[]>([]);
-  const [selectedId, setSelectedId] = useState<string>('');
-  const [highlightId, setHighlightId] = useState<string>('');
+  const [stack,           setStack]           = useState<FoundComp[]>([]);
+  const [selectedId,      setSelectedId]      = useState<string>('');
+  const [highlightId,     setHighlightId]     = useState<string>('');
+  const [graphWindowOpen, setGraphWindowOpen] = useState(false);
+  const graphWinRef   = useRef<Window | null>(null);
+  const channelRef    = useRef<BroadcastChannel | null>(null);
   const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(() => {
@@ -56,6 +61,35 @@ export function ComponentOverlay({
     return () => { el.remove(); };
   }, []);
 
+  // ── BroadcastChannel (그래프 창 연동) ─────────────────────────────────────
+  useEffect(() => {
+    if (!active) return;
+    const ch = new BroadcastChannel(RFM_CHANNEL);
+    channelRef.current = ch;
+
+    ch.onmessage = (ev: MessageEvent<GraphToMain>) => {
+      const msg = ev.data;
+      if (msg.type === 'select') {
+        setSelectedId(msg.symbolId);
+        selectedElRef.current = findElBySymbolId(msg.symbolId);
+      } else if (msg.type === 'hover') {
+        setHighlightId(msg.symbolId);
+      } else if (msg.type === 'hover-end') {
+        setHighlightId('');
+      } else if (msg.type === 'pick-start') {
+        setPicking(true);
+      } else if (msg.type === 'window-close') {
+        setGraphWindowOpen(false);
+        graphWinRef.current = null;
+      }
+    };
+
+    return () => {
+      ch.close();
+      channelRef.current = null;
+    };
+  }, [active]);
+
   const index      = useMemo(() => buildDocIndex(graph), [graph]);
   const graphEntries = useMemo(() => [...index.pages, ...index.components], [index]);
 
@@ -83,6 +117,42 @@ export function ComponentOverlay({
     });
     return [...graphEntries, ...extra];
   }, [graphEntries]);
+
+  // allEntries / selectedId 변경 시 그래프 창에 브로드캐스트
+  useEffect(() => {
+    if (!graphWindowOpen || !channelRef.current) return;
+    channelRef.current.postMessage({
+      type: 'graph-update',
+      allEntries,
+      selectedId,
+    } satisfies MainToGraph);
+  }, [allEntries, selectedId, graphWindowOpen]);
+
+  // pick 완료 시 그래프 창으로 결과 전달
+  const prevPickingRef = useRef(false);
+  useEffect(() => {
+    if (prevPickingRef.current && !picking && selectedId && graphWindowOpen && channelRef.current) {
+      channelRef.current.postMessage({ type: 'pick-result', symbolId: selectedId } satisfies MainToGraph);
+    }
+    prevPickingRef.current = picking;
+  }, [picking, selectedId, graphWindowOpen]);
+
+  function openGraphWindow() {
+    if (graphWinRef.current && !graphWinRef.current.closed) {
+      graphWinRef.current.focus();
+      return;
+    }
+    const win = window.open('/rfm-graph', 'rfm-graph', 'width=1200,height=800');
+    graphWinRef.current = win;
+    setGraphWindowOpen(true);
+    setTimeout(() => {
+      channelRef.current?.postMessage({
+        type: 'graph-update',
+        allEntries,
+        selectedId,
+      } satisfies MainToGraph);
+    }, 600);
+  }
 
   // 패널 열림/닫힘
   useEffect(() => {
@@ -298,6 +368,8 @@ export function ComponentOverlay({
         dockPosition={dockPosition}
         floatPos={floatPos}
         picking={picking}
+        graphWindowOpen={graphWindowOpen}
+        onOpenGraphWindow={openGraphWindow}
         onPickToggle={() => {
           if (picking) { setPicking(false); setStack([]); }
           else { setPicking(true); }
