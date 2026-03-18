@@ -1,10 +1,18 @@
 {
   "name": "react-flowmap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Runtime component inspector and visual graph explorer for React + Vite.",
   "license": "MIT",
-  "keywords": ["react", "vite", "devtools", "inspector", "component", "flowmap", "debug"],
+  "keywords": [
+    "react",
+    "vite",
+    "devtools",
+    "inspector",
+    "component",
+    "flowmap",
+    "debug"
+  ],
   "main": "./dist/index.js",
   "exports": {
     ".": {
