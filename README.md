@@ -51,13 +51,22 @@ Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
 ## Editor integration
 
-Set `VITE_EDITOR` in `.env.local` to jump directly to source from the inspector:
+Set the `editor` option in the plugin to jump directly to source from the inspector:
+
+```ts
+flowmapInspect({
+  editor: 'cursor',       // Cursor
+  editor: 'code',         // VS Code
+  editor: 'windsurf',     // Windsurf
+  editor: 'zed',          // Zed
+  editor: 'antigravity',  // Google Antigravity
+})
+```
+
+You can also override it per-machine via `.env.local` without touching `vite.config.ts`:
 
 ```bash
-VITE_EDITOR=cursor      # Cursor
-VITE_EDITOR=code        # VS Code
-VITE_EDITOR=windsurf    # Windsurf
-VITE_EDITOR=zed         # Zed
+VITE_EDITOR=cursor
 ```
 
 ## Options
@@ -66,7 +75,7 @@ VITE_EDITOR=zed         # Zed
 
 ```ts
 flowmapInspect({
-  editor: 'cursor',         // override VITE_EDITOR env var
+  editor: 'cursor',         // editor to open source files
   exclude: [/my-pattern/],  // skip files matching these patterns
 })
 ```
