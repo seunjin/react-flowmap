@@ -1,5 +1,13 @@
 # react-flowmap
 
+## 0.1.4
+
+### Patch Changes
+
+- fix: Fragment를 사용하는 컴포넌트의 선택 영역이 첫 번째 자식만 표시되는 문제 수정
+
+  `<>...</>` Fragment로 여러 요소를 렌더링하는 컴포넌트(App 등) 선택 시 Fragment fiber를 올바르게 순회하여 전체 영역이 하이라이트되도록 수정.
+
 ## 0.1.3
 
 ### Patch Changes
