@@ -24,8 +24,9 @@ export default defineConfig(({ mode }) => ({
           react(),
           dts({
             include: ['src'],
-            exclude: ['src/vite-env.d.ts'],
             tsconfigPath: './tsconfig.json',
+            entryRoot: 'src',
+            rollupTypes: true,
           }),
         ],
         build: {
