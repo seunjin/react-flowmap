@@ -1,5 +1,15 @@
 # react-flowmap
 
+## 0.2.0
+
+### Minor Changes
+
+- feat: TanStack Router / 라우터 라이브러리의 익명 component 패턴 지원
+
+  `createRootRoute`, `createFileRoute` 등에서 사용하는 `component: () => <JSX />` 패턴을
+  자동 감지하여 인스펙터에 표시. `errorComponent`, `pendingComponent`, `notFoundComponent`도 동일하게 지원.
+  합성 이름은 파일 경로 기반으로 생성 (예: `routes/__root.tsx` → `_Root`).
+
 ## 0.1.5
 
 ### Patch Changes
