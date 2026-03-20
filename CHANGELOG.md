@@ -1,5 +1,15 @@
 # react-flowmap
 
+## 0.1.5
+
+### Patch Changes
+
+- fix: 인스펙터 UI 개선
+
+  - 트리뷰 hover 시 Fragment 컴포넌트도 전체 영역 하이라이트 (union rect 적용)
+  - 기본 패널 위치를 `right` 고정으로 변경
+  - float 모드 최대 높이 `80vh` → `90dvh`로 변경
+
 ## 0.1.4
 
 ### Patch Changes
