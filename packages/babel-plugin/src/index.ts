@@ -260,6 +260,62 @@ export function transformFlowmap(
       injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
       modified = true;
     },
+
+    // router/library 패턴: { component: () => <JSX /> }
+    // e.g. createRootRoute({ component: () => <Outlet /> })
+    ObjectProperty(
+      path: {
+        node: {
+          computed: boolean;
+          key: { name?: string; value?: string };
+          value: { type: string };
+          loc?: { start: { line: number } };
+        };
+        get: (k: string) => unknown;
+      },
+    ) {
+      if (path.node.computed) return;
+      const keyName = path.node.key.name ?? path.node.key.value ?? '';
+      const componentKeys = ['component', 'errorComponent', 'pendingComponent', 'notFoundComponent'];
+      if (!componentKeys.includes(keyName)) return;
+
+      const valueType = path.node.value.type;
+      if (valueType !== 'ArrowFunctionExpression' && valueType !== 'FunctionExpression') return;
+
+      // 파일명 기반으로 합성 이름 생성 (e.g. routes/__root.tsx → _Root)
+      const baseName = relPath
+        .replace(/\.[jt]sx?$/, '')
+        .split(/[/\\]/).pop()!
+        .replace(/^_+/, '')
+        .replace(/[^a-zA-Z0-9]/g, '_')
+        || 'Unknown';
+      const cap = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+      const suffix = keyName === 'component' ? ''
+        : keyName.replace('Component', '').replace(/^(.)/, (_: string, c: string) => c.toUpperCase());
+      const syntheticName = `_${cap}${suffix}`;
+
+      const line = path.node.loc?.start.line ?? 1;
+      const symbolId = `symbol:${relPath}#${syntheticName}`;
+      symbolLocs.set(symbolId, line);
+
+      const valuePath = path.get('value');
+      scanJsxComponents(valuePath, symbolId);
+      injectIntoFn(valuePath, symbolId, line, `file:${relPath}`);
+
+      // Object.assign으로 __rfm_symbolId / __rfm_loc 인라인 주입
+      path.node.value = t.callExpression(
+        t.memberExpression(t.identifier('Object'), t.identifier('assign')),
+        [
+          path.node.value,
+          t.objectExpression([
+            t.objectProperty(t.identifier('__rfm_symbolId'), t.stringLiteral(symbolId)),
+            t.objectProperty(t.identifier('__rfm_loc'), t.stringLiteral(String(line))),
+          ]),
+        ],
+      );
+
+      modified = true;
+    },
   });
 
   if (!modified) return null;
