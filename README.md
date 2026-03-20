@@ -7,6 +7,7 @@ An in-app runtime component inspector and visual graph explorer for React + Vite
 - **Props** — live prop values with TypeScript type hints and jump-to-source
 - **Relations** — visual parent / child / hook relationship graph per component
 - **Graph window** — full component map in a dedicated window, top-down flow layout
+- **Fragment support** — components rendering multiple root elements are highlighted across their full area
 
 > Dev-only. The Vite plugin runs only in `dev` mode — zero code injected in production builds.
 
@@ -60,8 +61,11 @@ flowmapInspect({
   editor: 'windsurf',     // Windsurf
   editor: 'zed',          // Zed
   editor: 'antigravity',  // Google Antigravity
+  editor: 'codium',       // VSCodium (or 'vscodium')
 })
 ```
+
+Each value is fully autocompleted in TypeScript. You can also pass any custom binary name or path.
 
 You can also override it per-machine via `.env.local` without touching `vite.config.ts`:
 
@@ -107,10 +111,10 @@ The inspector panel can be docked or floated. Click the dock icon in the panel h
 
 | Mode | Description |
 |---|---|
-| `float` | draggable floating panel (default) |
-| `right` | pinned to the right edge |
+| `right` | pinned to the right edge (default) |
 | `left` | pinned to the left edge |
 | `bottom` | pinned to the bottom edge |
+| `float` | draggable floating panel |
 
 Position is saved to `localStorage` automatically.
 

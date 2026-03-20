@@ -4,9 +4,10 @@ import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
 import {
   loadDock, saveDock, saveFloatPos,
-  findComponentsAt, findElBySymbolId, findAllElsBySymbolId,
+  findComponentsAt, findElBySymbolId,
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
-  findAllMountedRfmComponents, isVisible, getPropsForSymbolId, findUnionRectBySymbolId,
+  findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
+  findUnionRectBySymbolId, findAllInstanceRectsBySymbolId,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -486,12 +487,11 @@ export function ComponentOverlay({
     <>
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightId && (() => {
-        const els = findAllElsBySymbolId(highlightId);
+        const rects = findAllInstanceRectsBySymbolId(highlightId);
         const label = highlightId.split('#').at(-1) ?? '';
-        return els.map((el, i) => {
-          const rect = el.getBoundingClientRect();
-          return isVisible(rect) ? <HoverPreviewBox key={i} rect={rect} label={label} /> : null;
-        });
+        return rects.map((rect, i) => (
+          isVisible(rect) ? <HoverPreviewBox key={i} rect={rect} label={label} /> : null
+        ));
       })()}
 
       {/* 호버 프리뷰: 점선 — 피킹 중일 때만 */}

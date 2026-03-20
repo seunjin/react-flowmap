@@ -4,7 +4,7 @@ import { SIDEBAR_W, BOTTOM_H } from './tokens';
 // ─── Dock persistence ─────────────────────────────────────────────────────────
 
 export function loadDock(): DockPosition {
-  try { return (localStorage.getItem('rfm-dock') as DockPosition) ?? 'float'; } catch { return 'float'; }
+  try { return (localStorage.getItem('rfm-dock') as DockPosition) ?? 'right'; } catch { return 'right'; }
 }
 
 export function saveDock(pos: DockPosition) {
@@ -34,7 +34,7 @@ export function sidebarStyle(dock: DockPosition, floatPos: { x: number; y: numbe
   return {
     ...base,
     top: floatPos.y, left: floatPos.x,
-    width: SIDEBAR_W, maxHeight: '80vh',
+    width: SIDEBAR_W, maxHeight: '90dvh',
     borderRadius: 14,
     border: '1px solid rgba(229,231,235,0.8)',
     boxShadow: '0 4px 6px rgba(23,37,84,0.04), 0 12px 32px rgba(23,37,84,0.10), 0 32px 64px rgba(23,37,84,0.06)',
@@ -340,6 +340,34 @@ export function findAllElsBySymbolId(symbolId: string): HTMLElement[] {
     node = walker.nextNode();
   }
   return results;
+}
+
+/** Union rects for each mounted instance of a component (for highlight overlay). */
+export function findAllInstanceRectsBySymbolId(symbolId: string): DOMRect[] {
+  const rects: DOMRect[] = [];
+  const seenFibers = new Set<FiberNode>();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        if (seenFibers.has(f)) break;
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+          seenFibers.add(f);
+          const rootEls = getRootHostEls(f.child);
+          const rect = unionRects(rootEls);
+          if (rect) rects.push(rect);
+          break;
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
+  }
+  return rects;
 }
 
 /** Find a component's DOM element within a fiber subtree rooted at `root`. */
