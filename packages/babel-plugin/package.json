@@ -1,5 +1,6 @@
 {
   "name": "@react-flowmap/babel-plugin",
+  "private": true,
   "version": "0.1.0",
   "type": "module",
   "description": "Babel AST transform core for react-flowmap.",
