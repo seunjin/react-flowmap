@@ -71,6 +71,7 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
       active={active}
       onDeactivate={() => { setActive(false); persist(false); }}
       onToggle={() => setActive(p => { const next = !p; persist(next); return next; })}
+      onGraphWindowOpen={() => persist(false)}
       config={overlayConfig}
     />
   );

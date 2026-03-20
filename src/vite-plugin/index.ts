@@ -115,9 +115,19 @@ function openInEditor(absPath: string, line: number, editor: string): void {
 }
 
 // ─── 플러그인 ─────────────────────────────────────────────────────────────────
+export type EditorName =
+  | 'code'
+  | 'cursor'
+  | 'antigravity'
+  | 'windsurf'
+  | 'codium'
+  | 'vscodium'
+  | 'zed'
+  | (string & {});
+
 export type FlowmapInspectOptions = {
   exclude?: RegExp[];
-  editor?: string;
+  editor?: EditorName;
 };
 
 export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {

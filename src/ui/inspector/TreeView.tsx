@@ -94,28 +94,27 @@ export function TreeNodeView({
         style={{ padding: `4px 10px 3px ${8 + depth * 14}px` }}
       >
         <FileIcon hovered={fileHovered} selected={fileSelected} />
-        <span className={`text-[11px] truncate flex-1 ${fileSelected ? 'font-semibold text-rfm-text-900' : fileHovered ? 'font-medium text-rfm-text-700' : 'font-normal text-rfm-text-400'}`}>
+        <span className={`text-[11px] truncate flex-1 text-left ${fileSelected ? 'font-semibold text-rfm-text-900' : fileHovered ? 'font-medium text-rfm-text-700' : 'font-normal text-rfm-text-400'}`}>
           {node.name}
         </span>
       </div>
 
       {node.entries.map((entry: DocEntry) => {
-        const isHovered  = hoveredIds.has(entry.symbolId) || treeHoveredId === entry.symbolId;
+        const isHovered = hoveredIds.has(entry.symbolId) || treeHoveredId === entry.symbolId;
         const isSelected = entry.symbolId === selectedId;
-        const isFocused  = entry.symbolId === focusedSymbolId && !isSelected;
+        const isFocused = entry.symbolId === focusedSymbolId && !isSelected;
 
         return (
           <div
             key={entry.symbolId}
-            className={`flex items-center transition-[background] duration-60 ${
-              isSelected
+            className={`flex items-center transition-[background] duration-60 ${isSelected
                 ? 'border-l-2 border-rfm-blue bg-rfm-blue-light'
                 : isFocused
                   ? 'border-l-2 border-rfm-blue-border bg-rfm-bg-100'
                   : isHovered
                     ? 'border-l-2 border-rfm-text-400 bg-rfm-bg-100'
                     : 'border-l-2 border-transparent bg-transparent'
-            }`}
+              }`}
           >
             <button
               data-tree-entry

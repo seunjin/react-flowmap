@@ -6,7 +6,7 @@ import {
   loadDock, saveDock, saveFloatPos,
   findComponentsAt, findElBySymbolId, findAllElsBySymbolId,
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
-  findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
+  findAllMountedRfmComponents, isVisible, getPropsForSymbolId, findUnionRectBySymbolId,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -125,9 +125,10 @@ function broadcastToGraph(
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
 export function ComponentOverlay({
-  graph, active, onDeactivate, onToggle, config = {},
+  graph, active, onDeactivate, onToggle, onGraphWindowOpen, config = {},
 }: {
   graph: FlowmapGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
+  onGraphWindowOpen?: () => void;
   config?: FlowmapConfig;
 }) {
   const [stack,           setStack]           = useState<FoundComp[]>([]);
@@ -288,6 +289,7 @@ export function ComponentOverlay({
     const win = window.open('/rfm-graph', 'rfm-graph', 'width=1200,height=800');
     graphWinRef.current = win;
     setGraphWindowOpen(true);
+    onGraphWindowOpen?.();
     setTimeout(() => {
       const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
       channelRef.current?.postMessage({
@@ -447,8 +449,7 @@ export function ComponentOverlay({
   ) ?? null;
   let selectedRect: DOMRect | null = selectedComp?.rect ?? null;
   if (!selectedRect && selectedId) {
-    const el = selectedElRef.current ?? findElBySymbolId(selectedId);
-    if (el) selectedRect = el.getBoundingClientRect();
+    selectedRect = findUnionRectBySymbolId(selectedId);
   }
 
   // 선택된 컴포넌트 loc: Fiber에서 먼저, 없으면 캐시

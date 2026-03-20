@@ -117,6 +117,32 @@ function getFirstHostEl(fiber: FiberNode | null): HTMLElement | null {
   return null;
 }
 
+/** All top-level host elements in a fiber's direct children (child + siblings). */
+function getRootHostEls(fiber: FiberNode | null): HTMLElement[] {
+  const els: HTMLElement[] = [];
+  let f = fiber;
+  while (f) {
+    const hostEl = getFirstHostEl(f);
+    if (hostEl) els.push(hostEl);
+    f = f.sibling;
+  }
+  return els;
+}
+
+/** Union DOMRect of multiple elements. Falls back to first element's rect if only one. */
+function unionRects(els: HTMLElement[]): DOMRect | null {
+  if (els.length === 0) return null;
+  let top = Infinity, left = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const el of els) {
+    const r = el.getBoundingClientRect();
+    top = Math.min(top, r.top);
+    left = Math.min(left, r.left);
+    right = Math.max(right, r.right);
+    bottom = Math.max(bottom, r.bottom);
+  }
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 /** Walk up fiber chain to find the nearest ancestor component fiber with __rfm_symbolId. */
 function getCompFiber(fiber: FiberNode | null): FiberNode | null {
   let f = fiber;
@@ -175,8 +201,9 @@ export function findComponentsAt(x: number, y: number): FoundComp[] {
       const fn = f.type as RfmFn | null;
       if (typeof fn === 'function' && fn.__rfm_symbolId && !seen.has(fn.__rfm_symbolId)) {
         seen.add(fn.__rfm_symbolId);
-        const hostEl = getFirstHostEl(f.child) ?? (domEl as HTMLElement);
-        const rect = hostEl.getBoundingClientRect();
+        const rootEls = getRootHostEls(f.child);
+        const hostEl = rootEls[0] ?? (domEl as HTMLElement);
+        const rect = unionRects(rootEls) ?? hostEl.getBoundingClientRect();
         if (isVisible(rect)) {
           found.push({
             symbolId: fn.__rfm_symbolId,
@@ -330,6 +357,28 @@ export function findAncestorElBySymbolId(el: HTMLElement, symbolId: string): HTM
       return getFirstHostEl(f.child) ?? null;
     }
     f = f.return;
+  }
+  return null;
+}
+
+/** Union rect for all root-level host elements of a component by symbolId. */
+export function findUnionRectBySymbolId(symbolId: string): DOMRect | null {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        const fn = f.type as RfmFn | null;
+        if (typeof fn === 'function' && fn.__rfm_symbolId === symbolId) {
+          const rootEls = getRootHostEls(f.child);
+          return unionRects(rootEls) ?? (rootEls[0]?.getBoundingClientRect() ?? null);
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
   }
   return null;
 }
