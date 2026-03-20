@@ -117,15 +117,28 @@ function getFirstHostEl(fiber: FiberNode | null): HTMLElement | null {
   return null;
 }
 
-/** All top-level host elements in a fiber's direct children (child + siblings). */
+/** All top-level host elements of a component's render output.
+ *  Traverses Fragment wrappers but stops at child component boundaries. */
 function getRootHostEls(fiber: FiberNode | null): HTMLElement[] {
   const els: HTMLElement[] = [];
-  let f = fiber;
-  while (f) {
-    const hostEl = getFirstHostEl(f);
-    if (hostEl) els.push(hostEl);
-    f = f.sibling;
+  function collect(f: FiberNode | null) {
+    let cur = f;
+    while (cur) {
+      if (typeof cur.type === 'string' && cur.stateNode instanceof HTMLElement) {
+        // host element (div, section, etc.)
+        els.push(cur.stateNode);
+      } else if (typeof cur.type !== 'function') {
+        // Fragment or other wrapper — descend into children
+        collect(cur.child);
+      } else {
+        // child component — take its first host el, don't recurse inside
+        const hostEl = getFirstHostEl(cur.child);
+        if (hostEl) els.push(hostEl);
+      }
+      cur = cur.sibling;
+    }
   }
+  collect(fiber);
   return els;
 }
 
