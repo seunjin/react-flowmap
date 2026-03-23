@@ -37,67 +37,64 @@ interface Layout {
 function buildLayout(entries: DocEntry[], staticJsx: Record<string, string[]>): Layout {
   if (entries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
 
-  const byId = new Map(entries.map(e => [e.symbolId, e]));
+  const byId  = new Map(entries.map(e => [e.symbolId, e]));
+  const byName = new Map(entries.map(e => [e.name, e]));
 
-  // BFS from roots to assign column depth
+  // ── Build combined adjacency from runtime renders/uses + staticJsx ─────────
+  // Combining both ensures depth assignment works even when runtime events are
+  // absent (fiber-walk-only entries have empty renders[]/renderedBy[]).
+  const childEdges  = new Map<string, string[]>(); // parentId → [childId]
+  const parentEdges = new Map<string, string[]>(); // childId  → [parentId]
+  const edgeDedup   = new Set<string>();
+
+  function addEdge(fromId: string, toId: string) {
+    const key = `${fromId}|${toId}`;
+    if (edgeDedup.has(key) || !byId.has(fromId) || !byId.has(toId) || fromId === toId) return;
+    edgeDedup.add(key);
+    if (!childEdges.has(fromId))  childEdges.set(fromId, []);
+    if (!parentEdges.has(toId))   parentEdges.set(toId, []);
+    childEdges.get(fromId)!.push(toId);
+    parentEdges.get(toId)!.push(fromId);
+  }
+
+  for (const entry of entries) {
+    for (const c of [...entry.renders, ...entry.uses]) addEdge(entry.symbolId, c.symbolId);
+  }
+  for (const [fromId, names] of Object.entries(staticJsx)) {
+    for (const name of names) {
+      const child = byName.get(name);
+      if (child) addEdge(fromId, child.symbolId);
+    }
+  }
+
+  // ── Topological longest-path depth assignment (Kahn's algorithm) ──────────
+  // Processes each node only after all its parents are done, so the assigned
+  // depth is always the maximum depth reachable from any root.
   const depthMap = new Map<string, number>();
-  const roots = entries.filter(e => e.renderedBy.length === 0);
-  const actualRoots = roots.length > 0 ? roots : entries.filter(e => e.category === 'page');
-  const startNodes = actualRoots.length > 0 ? actualRoots : [entries[0]!];
+  const inDeg    = new Map<string, number>();
+  for (const e of entries) inDeg.set(e.symbolId, (parentEdges.get(e.symbolId) ?? []).length);
 
-  const bfsQueue: Array<{ id: string; depth: number }> = startNodes.map(r => ({ id: r.symbolId, depth: 0 }));
-  const visited = new Set<string>();
+  // Roots = in-degree 0 in the combined graph
+  const topoQueue: string[] = [];
+  for (const e of entries) {
+    if (inDeg.get(e.symbolId) === 0) { depthMap.set(e.symbolId, 0); topoQueue.push(e.symbolId); }
+  }
 
-  while (bfsQueue.length > 0) {
-    const item = bfsQueue.shift()!;
-    if (visited.has(item.id)) continue;
-    visited.add(item.id);
-    // Use maximum depth when encountered multiple times
-    const existing = depthMap.get(item.id) ?? -1;
-    if (item.depth > existing) depthMap.set(item.id, item.depth);
-
-    const entry = byId.get(item.id);
-    if (!entry) continue;
-    for (const child of [...entry.renders, ...entry.uses]) {
-      if (!visited.has(child.symbolId)) {
-        bfsQueue.push({ id: child.symbolId, depth: item.depth + 1 });
-      }
+  while (topoQueue.length > 0) {
+    const id = topoQueue.shift()!;
+    const d  = depthMap.get(id) ?? 0;
+    for (const childId of childEdges.get(id) ?? []) {
+      depthMap.set(childId, Math.max(depthMap.get(childId) ?? 0, d + 1));
+      const deg = (inDeg.get(childId) ?? 1) - 1;
+      inDeg.set(childId, deg);
+      if (deg === 0) topoQueue.push(childId);
     }
   }
 
-  // 정적 JSX 관계로 depth 보완 (런타임 부모가 없는 컴포넌트용)
-  if (Object.keys(staticJsx).length > 0) {
-    // child name → [parentSymbolId] 역방향 맵
-    const staticParentIds = new Map<string, string[]>();
-    for (const [fromId, childNames] of Object.entries(staticJsx)) {
-      for (const name of childNames) {
-        if (!staticParentIds.has(name)) staticParentIds.set(name, []);
-        staticParentIds.get(name)!.push(fromId);
-      }
-    }
-    // 반복: 부모 depth가 확정된 후 자식 depth 할당
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const entry of entries) {
-        if (depthMap.has(entry.symbolId)) continue;
-        for (const parentId of staticParentIds.get(entry.name) ?? []) {
-          if (depthMap.has(parentId)) {
-            depthMap.set(entry.symbolId, depthMap.get(parentId)! + 1);
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // Assign disconnected nodes to last column
+  // Assign nodes not reached (cycles / fully disconnected) to their own row
   let maxDepth = depthMap.size > 0 ? Math.max(...depthMap.values()) : 0;
   for (const entry of entries) {
-    if (!depthMap.has(entry.symbolId)) {
-      depthMap.set(entry.symbolId, ++maxDepth);
-    }
+    if (!depthMap.has(entry.symbolId)) depthMap.set(entry.symbolId, ++maxDepth);
   }
 
   // Group by depth, sort: pages first, then hooks last, then alphabetical
