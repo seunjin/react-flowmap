@@ -3,7 +3,7 @@ import type React from 'react';
 import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink, Maximize2 } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
-import { sidebarStyle, openInEditor, findAllMountedRfmComponents } from './utils';
+import { sidebarStyle, openInEditor, findAllMountedRfmComponents, deriveDisplayName } from './utils';
 import { buildFolderTree, flattenTreeEntries } from './tree-utils';
 import { DockDropdown } from './DockDropdown';
 import { TreeNodeView } from './TreeView';
@@ -73,9 +73,10 @@ export function FloatingSidebar({
       if (existing) return existing;
       const match = c.symbolId.match(/^symbol:(.+)#(.+)$/);
       if (!match) return null;
-      const name = match[2]!;
+      const filePath = match[1]!;
+      const name = deriveDisplayName(match[2]!, filePath);
       return {
-        symbolId: c.symbolId, name, filePath: match[1]!,
+        symbolId: c.symbolId, name, filePath,
         category: (name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component') as DocEntry['category'],
         renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
       };
@@ -91,7 +92,9 @@ export function FloatingSidebar({
   const tree = useMemo(() => buildFolderTree(filteredEntries), [filteredEntries]);
   // 트리 시각 순서 기준 플랫 리스트 (키보드 nav 용)
   const treeOrderedEntries = useMemo(() => flattenTreeEntries(tree), [tree]);
-  const selectedEntry = allEntries.find(e => e.symbolId === selectedId) ?? null;
+  const selectedEntry = allEntries.find(e => e.symbolId === selectedId)
+    ?? displayEntries.find(e => e.symbolId === selectedId)
+    ?? null;
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
   // selectedId가 초기화되면(라우터 전환 등) 트리뷰로 복귀

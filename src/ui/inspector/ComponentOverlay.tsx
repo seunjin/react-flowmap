@@ -7,7 +7,7 @@ import {
   findComponentsAt, findElBySymbolId,
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
-  findUnionRectBySymbolId, findAllInstanceRectsBySymbolId,
+  findUnionRectBySymbolId, findAllInstanceRectsBySymbolId, deriveDisplayName,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -242,11 +242,12 @@ export function ComponentOverlay({
         if (graphIds.has(symbolId)) return;
         const match = symbolId.match(/^symbol:(.+)#(.+)$/);
         if (!match) return;
-        const name = match[2]!;
+        const filePath = match[1]!;
+        const name = deriveDisplayName(match[2]!, filePath);
         extra.push({
           symbolId,
           name,
-          filePath: match[1]!,
+          filePath,
           category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
           renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
         });
