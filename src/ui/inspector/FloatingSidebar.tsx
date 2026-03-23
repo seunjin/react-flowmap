@@ -65,8 +65,21 @@ export function FloatingSidebar({
   const [treeHoveredId, setTreeHoveredId] = useState('');
 
   const displayEntries = useMemo(() => {
-    const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
-    return allEntries.filter(e => mountedIds.has(e.symbolId));
+    const mountedComponents = findAllMountedRfmComponents();
+    if (mountedComponents.length === 0) return [];
+    const allById = new Map(allEntries.map(e => [e.symbolId, e]));
+    return mountedComponents.map(c => {
+      const existing = allById.get(c.symbolId);
+      if (existing) return existing;
+      const match = c.symbolId.match(/^symbol:(.+)#(.+)$/);
+      if (!match) return null;
+      const name = match[2]!;
+      return {
+        symbolId: c.symbolId, name, filePath: match[1]!,
+        category: (name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component') as DocEntry['category'],
+        renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
+      };
+    }).filter((e): e is DocEntry => e !== null);
   }, [allEntries]);
 
   const filteredEntries = useMemo(() => {
