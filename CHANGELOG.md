@@ -1,5 +1,20 @@
 # react-flowmap
 
+## 0.2.1
+
+### Patch Changes
+
+- fix: detect components wrapped with React.memo / React.forwardRef in fiber tree
+
+  Previously, `findAllMountedRfmComponents` and all related fiber-walk helpers
+  only checked `typeof f.type === 'function'`, so components rendered through
+  React.memo or React.forwardRef wrappers (e.g. TanStack Router wrapping route
+  components internally) were silently skipped, causing "No components rendered
+  on screen" even when the babel transform was working correctly.
+
+  Also fixes `getRootHostEls` to treat React.memo/forwardRef fibers as component
+  boundaries instead of descending into them like Fragment nodes.
+
 ## 0.2.0
 
 ### Minor Changes
