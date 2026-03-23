@@ -45,7 +45,7 @@ function GraphConnector() {
 
 function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
   items: { name: string; symbolId: string }[];
-  onNavigate?: ((n: string) => void) | undefined;
+  onNavigate?: ((symbolId: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
@@ -54,7 +54,7 @@ function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
       {items.map(({ name, symbolId }) => (
         <GraphNode
           key={symbolId} name={name}
-          onClick={() => onNavigate?.(name)}
+          onClick={() => onNavigate?.(symbolId)}
           onHover={() => onHover?.(symbolId)}
           onHoverEnd={onHoverEnd}
         />
@@ -68,13 +68,15 @@ function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
 export function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd }: {
   entry: DocEntry;
   selectedEl: HTMLElement | null;
-  onNavigate?: ((name: string) => void) | undefined;
+  onNavigate?: ((symbolId: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   const connectedEl = selectedEl?.isConnected ? selectedEl : null;
-  const parent = connectedEl ? findDomParent(connectedEl) : null;
-  const children = connectedEl ? findDomChildren(connectedEl) : [];
+  // Pass entry.symbolId so parent/child finders start from the correct component fiber,
+  // not the nearest RFM ancestor of the (potentially nested) selectedEl.
+  const parent = connectedEl ? findDomParent(connectedEl, entry.symbolId) : null;
+  const children = connectedEl ? findDomChildren(connectedEl, entry.symbolId) : [];
   const noRelations = !parent && children.length === 0;
 
   if (noRelations) {

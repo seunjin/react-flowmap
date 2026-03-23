@@ -1,6 +1,6 @@
 {
   "name": "react-flowmap",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "type": "module",
   "description": "Runtime component inspector and visual graph explorer for React + Vite.",
   "license": "MIT",

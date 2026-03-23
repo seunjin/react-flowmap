@@ -288,8 +288,49 @@ export function findComponentsAt(x: number, y: number): FoundComp[] {
 
 // ─── Fiber-based relation finders ────────────────────────────────────────────
 
-export function findDomParent(el: HTMLElement): { name: string; symbolId: string } | null {
-  const selfComp = getCompFiber(getFiberFromEl(el));
+/** Walk fiber chain up from `el` to find the specific component fiber for `selfSymbolId`.
+ *  Falls back to the nearest RFM component if selfSymbolId is not provided. */
+function resolveSelfFiber(el: HTMLElement, selfSymbolId?: string): FiberNode | null {
+  const base = getFiberFromEl(el);
+  if (selfSymbolId) {
+    let f: FiberNode | null = base;
+    while (f) {
+      const fn = getRfmFn(f.type);
+      if (fn && fn.__rfm_symbolId === selfSymbolId) return f;
+      f = f.return;
+    }
+    return null;
+  }
+  return getCompFiber(base);
+}
+
+/** Walk fiber subtree to collect direct (nearest) RFM child components. */
+function collectDirectRfmChildren(
+  fiber: FiberNode | null,
+  selfId: string,
+  results: { name: string; symbolId: string }[],
+  seen: Set<string>,
+) {
+  let cur = fiber;
+  while (cur) {
+    const fn = getRfmFn(cur.type);
+    if (fn && fn.__rfm_symbolId !== selfId) {
+      const id = fn.__rfm_symbolId!;
+      if (!seen.has(id)) {
+        seen.add(id);
+        results.push({ symbolId: id, name: id.split('#').at(-1) ?? '' });
+      }
+      // Don't recurse — its children are its own responsibility
+    } else {
+      // Transparent wrapper or same component — recurse into children
+      collectDirectRfmChildren(cur.child, selfId, results, seen);
+    }
+    cur = cur.sibling;
+  }
+}
+
+export function findDomParent(el: HTMLElement, selfSymbolId?: string): { name: string; symbolId: string } | null {
+  const selfComp = resolveSelfFiber(el, selfSymbolId);
   if (!selfComp) return null;
   // Walk above selfComp to find first parent component
   let f: FiberNode | null = selfComp.return;
@@ -303,18 +344,23 @@ export function findDomParent(el: HTMLElement): { name: string; symbolId: string
   return null;
 }
 
-export function findDomChildren(el: HTMLElement): { name: string; symbolId: string }[] {
-  // Find which component el belongs to
-  const selfComp = getCompFiber(getFiberFromEl(el));
+export function findDomChildren(el: HTMLElement, selfSymbolId?: string): { name: string; symbolId: string }[] {
+  const selfComp = resolveSelfFiber(el, selfSymbolId);
   if (!selfComp) return [];
-  const selfSymbolId = getRfmFn(selfComp.type)?.__rfm_symbolId;
-  if (!selfSymbolId) return [];
+  const selfId = selfSymbolId ?? getRfmFn(selfComp.type)?.__rfm_symbolId;
+  if (!selfId) return [];
 
+  if (selfSymbolId) {
+    // Fiber-based: walk the component's fiber subtree directly (avoids DOM position issues)
+    const results: { name: string; symbolId: string }[] = [];
+    const seen = new Set<string>();
+    collectDirectRfmChildren(selfComp.child, selfId, results, seen);
+    return results;
+  }
+
+  // Original DOM-based approach for pick-mode (el is directly the component's root element)
   const results: { name: string; symbolId: string }[] = [];
   const seen = new Set<string>();
-
-  // Walk DOM subtree — for each element, check if it's the root of a *direct* child component.
-  // "Direct child" means: the nearest RFM ancestor in the fiber chain is selfComp.
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
   let node: Node | null = el;
   while (node) {
@@ -322,17 +368,16 @@ export function findDomChildren(el: HTMLElement): { name: string; symbolId: stri
     const compFiber = getCompFiber(getFiberFromEl(domEl));
     if (compFiber) {
       const symbolId = getRfmFn(compFiber.type)?.__rfm_symbolId;
-      if (symbolId && symbolId !== selfSymbolId && !seen.has(symbolId)) {
-        // Walk up from this component to find its nearest RFM parent
+      if (symbolId && symbolId !== selfId && !seen.has(symbolId)) {
         let f: FiberNode | null = compFiber.return;
         while (f) {
           const fn = getRfmFn(f.type);
           if (fn) {
-            if (fn.__rfm_symbolId === selfSymbolId) {
+            if (fn.__rfm_symbolId === selfId) {
               seen.add(symbolId);
               results.push({ symbolId, name: symbolId.split('#').at(-1) ?? '' });
             }
-            break; // stop at first RFM ancestor regardless
+            break;
           }
           f = f.return;
         }

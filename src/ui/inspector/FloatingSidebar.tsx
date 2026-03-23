@@ -287,9 +287,8 @@ export function FloatingSidebar({
               ? <EntryDetail
                 entry={selectedEntry}
                 selectedEl={selectedEl}
-                onNavigate={(name) => {
-                  const target = allEntries.find(e => e.name === name);
-                  if (target) onSelect(target.symbolId);
+                onNavigate={(symbolId) => {
+                  onSelect(symbolId);
                 }}
                 onHover={(symbolId) => onHighlight(symbolId)}
                 onHoverEnd={onHighlightEnd}

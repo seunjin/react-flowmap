@@ -22,7 +22,7 @@ export function DetailSection({ label, children }: { label: string; children: Re
 export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd }: {
   entry: DocEntry;
   selectedEl?: HTMLElement | null;
-  onNavigate?: ((name: string) => void) | undefined;
+  onNavigate?: ((symbolId: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
