@@ -229,33 +229,44 @@ export function ComponentOverlay({
   // DOM 커밋 이후 fiber-walk를 재실행하기 위한 trigger
   // useMemo는 render 도중 실행되므로 최초 렌더 시 DOM이 없어 fiber-walk 결과가 비어있음.
   // mount 후 setState로 deps를 변경해 allEntries를 DOM이 존재하는 시점에 다시 계산함.
-  const [domReady, setDomReady] = useState(false);
-  useEffect(() => { setDomReady(true); }, []);
+  // domVersion은 라우트 전환 등 DOM 변경 시 fiber-walk를 재실행하기 위한 카운터.
+  const [domVersion, setDomVersion] = useState(0);
+  useEffect(() => {
+    // 첫 마운트 후 즉시 실행 (domReady 역할 포함)
+    setDomVersion(v => v + 1);
+    if (!active) return;
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    const obs = new MutationObserver(() => {
+      if (debounceId) clearTimeout(debounceId);
+      debounceId = setTimeout(() => setDomVersion(v => v + 1), 200);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => { obs.disconnect(); if (debounceId) clearTimeout(debounceId); };
+  }, [active]);
 
   // 그래프에 없지만 DOM에 존재하는 컴포넌트 (App 등 루트 컴포넌트)
   const allEntries = useMemo(() => {
+    if (domVersion === 0) return [...graphEntries];
     const graphIds = new Set(graphEntries.map(e => e.symbolId));
     const extra: DocEntry[] = [];
-    if (domReady) {
-      findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
-        if (loc) locCacheRef.current.set(symbolId, loc);
-        if (graphIds.has(symbolId)) return;
-        const match = symbolId.match(/^symbol:(.+)#(.+)$/);
-        if (!match) return;
-        const filePath = match[1]!;
-        const name = deriveDisplayName(match[2]!, filePath);
-        extra.push({
-          symbolId,
-          name,
-          filePath,
-          category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
-          renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
-        });
-        graphIds.add(symbolId);
+    findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
+      if (loc) locCacheRef.current.set(symbolId, loc);
+      if (graphIds.has(symbolId)) return;
+      const match = symbolId.match(/^symbol:(.+)#(.+)$/);
+      if (!match) return;
+      const filePath = match[1]!;
+      const name = deriveDisplayName(match[2]!, filePath);
+      extra.push({
+        symbolId,
+        name,
+        filePath,
+        category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
+        renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
       });
-    }
+      graphIds.add(symbolId);
+    });
     return [...graphEntries, ...extra];
-  }, [graphEntries, domReady]);
+  }, [graphEntries, domVersion]);
 
   // 채널 핸들러에서 최신 값 참조용 ref 동기화
   useEffect(() => {

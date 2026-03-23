@@ -119,19 +119,15 @@ function getRfmFn(type: unknown): RfmFn | null {
   return null;
 }
 
-// React built-in $$typeof for Context.Provider
-const REACT_PROVIDER_TYPEOF = Symbol.for('react.provider');
-
-/** True for transparent wrapper fibers (Fragment, Context.Provider, etc.) —
- *  should be traversed, not treated as a component boundary.
- *  Note: Context.Provider is injected by the babel plugin around every component's
- *  return value (__RfmCtx.Provider), so we must descend through it to reach actual
- *  root host elements. */
-function isFragmentType(type: unknown): boolean {
-  if (type === null || typeof type === 'symbol') return true;
+/** True for fiber types that represent a real component boundary.
+ *  Only plain functions and React.memo/forwardRef object wrappers are boundaries.
+ *  Everything else (Fragment, null, Context.Provider, Consumer, Lazy, Offscreen, etc.)
+ *  is treated as a transparent wrapper that should be descended through. */
+function isComponentBoundary(type: unknown): boolean {
+  if (typeof type === 'function') return true;
   if (type && typeof type === 'object') {
     const $t = (type as { $$typeof?: unknown }).$$typeof;
-    if ($t === REACT_PROVIDER_TYPEOF) return true;
+    return $t === Symbol.for('react.memo') || $t === Symbol.for('react.forward_ref');
   }
   return false;
 }
@@ -167,22 +163,24 @@ function getFirstHostEl(fiber: FiberNode | null): HTMLElement | null {
 }
 
 /** All top-level host elements of a component's render output.
- *  Traverses Fragment wrappers but stops at child component boundaries. */
+ *  Stops at component boundaries (functions, memo, forwardRef).
+ *  Descends through everything else: Fragment, Context.Provider/Consumer,
+ *  React.lazy, Offscreen, etc. */
 function getRootHostEls(fiber: FiberNode | null): HTMLElement[] {
   const els: HTMLElement[] = [];
   function collect(f: FiberNode | null) {
     let cur = f;
     while (cur) {
       if (typeof cur.type === 'string' && cur.stateNode instanceof HTMLElement) {
-        // host element (div, section, etc.)
+        // Host element (div, nav, section, …)
         els.push(cur.stateNode);
-      } else if (isFragmentType(cur.type)) {
-        // Fragment — descend into children
-        collect(cur.child);
-      } else {
-        // child component (function, React.memo, React.forwardRef, etc.) — take first host el
+      } else if (isComponentBoundary(cur.type)) {
+        // Component boundary — take first host el, don't recurse deeper
         const hostEl = getFirstHostEl(cur.child);
         if (hostEl) els.push(hostEl);
+      } else {
+        // Transparent wrapper (Fragment, null, Context.Provider, lazy, …) — recurse
+        collect(cur.child);
       }
       cur = cur.sibling;
     }
