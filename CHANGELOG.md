@@ -1,5 +1,21 @@
 # react-flowmap
 
+## 0.2.2
+
+### Patch Changes
+
+- fix: 컴포넌트 목록이 비어있는 문제 수정 (TanStack Router 등)
+
+  두 가지 근본 원인을 수정합니다:
+
+  1. **collector reset 타이밍**: ReactFlowMap의 `useEffect`보다 먼저 실행된
+     라우트 컴포넌트들의 이벤트가 `reset()`으로 지워지던 문제.
+     `subscribe()`를 먼저 호출(기존 이벤트 즉시 전달)하고 cleanup에서만 reset합니다.
+
+  2. **DOM 커밋 전 fiber-walk**: `allEntries`가 React 첫 렌더(DOM 커밋 전)에
+     계산되어 fiber-walk 결과가 비어있던 문제.
+     mount 이후 `domReady` state로 재계산을 트리거합니다.
+
 ## 0.2.1
 
 ### Patch Changes

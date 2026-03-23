@@ -226,27 +226,35 @@ export function ComponentOverlay({
   // symbolId → loc(줄번호) 캐시: 한 번 DOM에서 본 loc은 계속 기억
   const locCacheRef = useRef(new Map<string, string>());
 
+  // DOM 커밋 이후 fiber-walk를 재실행하기 위한 trigger
+  // useMemo는 render 도중 실행되므로 최초 렌더 시 DOM이 없어 fiber-walk 결과가 비어있음.
+  // mount 후 setState로 deps를 변경해 allEntries를 DOM이 존재하는 시점에 다시 계산함.
+  const [domReady, setDomReady] = useState(false);
+  useEffect(() => { setDomReady(true); }, []);
+
   // 그래프에 없지만 DOM에 존재하는 컴포넌트 (App 등 루트 컴포넌트)
   const allEntries = useMemo(() => {
     const graphIds = new Set(graphEntries.map(e => e.symbolId));
     const extra: DocEntry[] = [];
-    findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
-      if (loc) locCacheRef.current.set(symbolId, loc);
-      if (graphIds.has(symbolId)) return;
-      const match = symbolId.match(/^symbol:(.+)#(.+)$/);
-      if (!match) return;
-      const name = match[2]!;
-      extra.push({
-        symbolId,
-        name,
-        filePath: match[1]!,
-        category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
-        renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
+    if (domReady) {
+      findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
+        if (loc) locCacheRef.current.set(symbolId, loc);
+        if (graphIds.has(symbolId)) return;
+        const match = symbolId.match(/^symbol:(.+)#(.+)$/);
+        if (!match) return;
+        const name = match[2]!;
+        extra.push({
+          symbolId,
+          name,
+          filePath: match[1]!,
+          category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
+          renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
+        });
+        graphIds.add(symbolId);
       });
-      graphIds.add(symbolId);
-    });
+    }
     return [...graphEntries, ...extra];
-  }, [graphEntries]);
+  }, [graphEntries, domReady]);
 
   // 채널 핸들러에서 최신 값 참조용 ref 동기화
   useEffect(() => {

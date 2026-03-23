@@ -44,7 +44,12 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
   // collector 구독 + fetch 인터셉터
   const detachRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    __rfmCollector.reset();
+    // reset()을 mount 시점에 호출하면 자신보다 먼저 effect가 실행된 형제·자식 컴포넌트
+    // (라우트 등)가 이미 기록한 이벤트가 지워집니다.
+    // subscribe()는 기존 이벤트를 즉시 전달하므로, 구독 후 cleanup에서만 reset합니다.
+    const unsub = __rfmCollector.subscribe((events: RuntimeEvent[]) => {
+      setGraph(buildGraph(events));
+    });
 
     if (!disableFetchInterceptor) {
       detachRef.current = attachFetchInterceptor({
@@ -53,14 +58,11 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
       });
     }
 
-    const unsub = __rfmCollector.subscribe((events: RuntimeEvent[]) => {
-      setGraph(buildGraph(events));
-    });
-
     return () => {
       unsub();
       detachRef.current?.();
       detachRef.current = null;
+      __rfmCollector.reset();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
