@@ -1,6 +1,6 @@
 {
   "name": "react-flowmap",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "description": "Runtime component inspector and visual graph explorer for React + Vite.",
   "license": "MIT",
@@ -35,6 +35,7 @@
   "scripts": {
     "dev": "pnpm demo:dev",
     "demo:dev": "vite --mode demo",
+    "demo:tanstack": "pnpm --filter react-flowmap-demo-tanstack dev",
     "build": "pnpm typecheck && vite build --mode library",
     "build:demo": "pnpm typecheck && vite build --mode demo",
     "demo:preview": "vite preview",
