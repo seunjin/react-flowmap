@@ -141,24 +141,30 @@ function buildLayout(
     });
   }
 
-  // Build edges (deduplicated)
+  // Build edges (deduplicated) — mirrors addEdge logic above so all relation sources are visible
   const edgeSet = new Set<string>();
   const edges: LayoutEdge[] = [];
+
+  function addVisualEdge(fromId: string, toId: string, kind: LayoutEdge['kind']) {
+    const key = `${fromId}>${toId}:${kind}`;
+    if (!edgeSet.has(key) && posMap.has(fromId) && posMap.has(toId) && fromId !== toId) {
+      edgeSet.add(key);
+      edges.push({ fromId, toId, kind });
+    }
+  }
+
   for (const entry of entries) {
-    for (const child of entry.renders) {
-      const key = `${entry.symbolId}>${child.symbolId}:render`;
-      if (!edgeSet.has(key) && posMap.has(child.symbolId)) {
-        edgeSet.add(key);
-        edges.push({ fromId: entry.symbolId, toId: child.symbolId, kind: 'render' });
-      }
+    for (const child of entry.renders) addVisualEdge(entry.symbolId, child.symbolId, 'render');
+    for (const hook  of entry.uses)    addVisualEdge(entry.symbolId, hook.symbolId,  'use');
+  }
+  for (const [fromId, names] of Object.entries(staticJsx)) {
+    for (const name of names) {
+      const child = byName.get(name);
+      if (child) addVisualEdge(fromId, child.symbolId, 'render');
     }
-    for (const hook of entry.uses) {
-      const key = `${entry.symbolId}>${hook.symbolId}:use`;
-      if (!edgeSet.has(key) && posMap.has(hook.symbolId)) {
-        edgeSet.add(key);
-        edges.push({ fromId: entry.symbolId, toId: hook.symbolId, kind: 'use' });
-      }
-    }
+  }
+  for (const [fromId, childIds] of Object.entries(fiberRelations)) {
+    for (const childId of childIds) addVisualEdge(fromId, childId, 'render');
   }
 
   const nodes: LayoutNode[] = entries

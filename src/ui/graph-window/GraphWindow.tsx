@@ -5,7 +5,7 @@ import type { MainToGraph, GraphToMain, PropTypesMap } from '../inspector/channe
 import { RFM_CHANNEL } from '../inspector/channel';
 import { PropRow } from '../inspector/PropRow';
 import { FullGraph } from './FullGraph';
-import inspectorCss from '../inspector/inspector.css?inline';
+import inspectorCss from '../inspector/inspector.compiled.css?raw';
 
 // ─── RelGraph (entry 데이터 기반 관계 시각화) ─────────────────────────────────
 

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
 import type { DockPosition, FoundComp } from './types';
@@ -14,7 +15,7 @@ import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
 import { SIDEBAR_W } from './tokens';
 import { InspectButton, type FlowmapConfig } from './InspectButton';
-import inspectorCss from './inspector.css?inline';
+import inspectorCss from './inspector.compiled.css?raw';
 import type { MainToGraph, GraphToMain, PropTypesMap } from './channel';
 import { RFM_CHANNEL } from './channel';
 
@@ -141,6 +142,7 @@ export function ComponentOverlay({
   const [graphWindowOpen, setGraphWindowOpen] = useState(false);
   const graphWinRef   = useRef<Window | null>(null);
   const channelRef    = useRef<BroadcastChannel | null>(null);
+  const [shadowContainer, setShadowContainer] = useState<HTMLElement | null>(null);
   const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(() => {
@@ -168,15 +170,49 @@ export function ComponentOverlay({
     selectedId: string;
   }>({ mountedEntries: [], selectedId: '' });
 
-  // CSS 주입 — 한 번만 실행
-  useEffect(() => {
-    if (document.querySelector('style[data-rfm-inspector]')) return;
-    const el = document.createElement('style');
-    el.setAttribute('data-rfm-inspector', '');
-    el.textContent = inspectorCss;
-    document.head.appendChild(el);
-    return () => { el.remove(); };
+  // shadow root ref — CSS 동기화에 재사용
+  const shadowRootRef = useRef<ShadowRoot | null>(null);
+
+  // inspectorCss를 shadow root에 주입
+  // inspector.css는 @source inline()으로 필요한 모든 유틸리티 클래스를 자체 포함.
+  // 호스트 앱 CSS는 복사하지 않음 — 호스트의 unlayered 전역 스타일(* { padding:0 } 등)이
+  // shadow DOM 안의 @layer utilities 클래스를 덮어쓰는 것을 막기 위함.
+  function syncShadowStyles(shadow: ShadowRoot) {
+    shadow.querySelectorAll('style[data-rfm-shadow]').forEach(el => el.remove());
+    const style = document.createElement('style');
+    style.setAttribute('data-rfm-shadow', '');
+    style.textContent = inspectorCss;
+    shadow.appendChild(style);
+  }
+
+  // Shadow DOM 설정 — 한 번만 실행 (페인트 전에 동기 실행)
+  useLayoutEffect(() => {
+    const host = document.createElement('div');
+    host.setAttribute('data-rfm-overlay', '');
+    host.setAttribute('data-rfm-shadow-host', '');
+    host.style.cssText = 'position:fixed;top:0;left:0;overflow:visible;z-index:2147483647;';
+    document.body.appendChild(host);
+
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadowRootRef.current = shadow;
+    syncShadowStyles(shadow);
+
+    const container = document.createElement('div');
+    shadow.appendChild(container);
+    setShadowContainer(container);
+
+    return () => {
+      host.remove();
+      shadowRootRef.current = null;
+      setShadowContainer(null);
+    };
   }, []);
+
+  // dev HMR: inspectorCss 자체가 바뀌면 재동기화
+  useEffect(() => {
+    if (shadowRootRef.current) syncShadowStyles(shadowRootRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inspectorCss]);
 
   // ── BroadcastChannel (그래프 창 연동) ─────────────────────────────────────
   useEffect(() => {
@@ -500,13 +536,16 @@ export function ComponentOverlay({
     onToggle?.();
   }
 
+  if (!shadowContainer) return null;
+
   if (!active) {
-    return (
-      <InspectButton onClick={handleButtonClick} positionOverride={config.buttonPosition} />
+    return createPortal(
+      <InspectButton onClick={handleButtonClick} positionOverride={config.buttonPosition} />,
+      shadowContainer,
     );
   }
 
-  return (
+  return createPortal(
     <>
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightId && (() => {
@@ -582,6 +621,7 @@ export function ComponentOverlay({
         onHighlight={setHighlightId}
         onHighlightEnd={() => setHighlightId('')}
       />}
-    </>
+    </>,
+    shadowContainer,
   );
 }

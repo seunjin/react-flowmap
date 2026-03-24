@@ -1,7 +1,9 @@
-@import "tailwindcss";
+/* Preflight(base reset)은 제외 — 호스트/그래프 창의 SVG 렌더링에 영향을 줄 수 있음 */
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities";
 
 @source "./";
-
+@source "../graph-window/";
 
 @theme {
   --color-rfm-blue: #3b82f6;
