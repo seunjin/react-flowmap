@@ -1,5 +1,12 @@
 # react-flowmap-demo
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies
+  - react-flowmap@0.2.9
+
 ## 0.1.8
 
 ### Patch Changes
