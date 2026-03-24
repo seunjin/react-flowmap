@@ -190,6 +190,7 @@ export function GraphWindow() {
   const [selectedId, setSelectedId] = useState('');
   const [propTypesMap, setPropTypesMap] = useState<PropTypesMap>({});
   const [staticJsx, setStaticJsx] = useState<Record<string, string[]>>({});
+  const [fiberRelations, setFiberRelations] = useState<Record<string, string[]>>({});
   const [currentProps, setCurrentProps] = useState<Record<string, unknown> | null>(null);
   const [picking, setPicking] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -218,6 +219,7 @@ export function GraphWindow() {
         setAllEntries(msg.allEntries);
         setPropTypesMap(msg.propTypesMap ?? {});
         if (msg.staticJsx) setStaticJsx(msg.staticJsx);
+        if (msg.fiberRelations) setFiberRelations(msg.fiberRelations);
         if (msg.selectedId) setSelectedId(prev => msg.selectedId || prev);
       } else if (msg.type === 'pick-result') {
         setSelectedId(msg.symbolId);
@@ -335,6 +337,7 @@ export function GraphWindow() {
           entries={allEntries}
           selectedId={selectedId}
           staticJsx={staticJsx}
+          fiberRelations={fiberRelations}
           onSelect={handleSelect}
           onHover={handleHover}
           onHoverEnd={handleHoverEnd}

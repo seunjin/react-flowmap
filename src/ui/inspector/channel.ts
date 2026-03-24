@@ -17,6 +17,8 @@ export type MainToGraph =
       propTypesMap: PropTypesMap;
       /** symbolId → 이 컴포넌트가 JSX에서 렌더하는 컴포넌트 이름 목록 */
       staticJsx?: Record<string, string[]>;
+      /** symbolId → 실제 fiber 트리에서 직접 렌더하는 자식 symbolId 목록 (alias import 포함) */
+      fiberRelations?: Record<string, string[]>;
     }
   | { type: 'pick-result'; symbolId: string }
   | {

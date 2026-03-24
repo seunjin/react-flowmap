@@ -528,6 +528,56 @@ export function getLocForSymbolId(el: HTMLElement, symbolId: string): string | n
   return null;
 }
 
+/** Walk the live fiber tree to extract direct parent→child relationships between RFM components.
+ *  Returns a map of parentSymbolId → [childSymbolId, ...].
+ *  This is used to supplement (or replace) staticJsx edges in the graph layout,
+ *  covering alias imports and Outlet-mediated route rendering that staticJsx misses. */
+export function buildFiberRelationships(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const seenIds = new Set<string>(); // dedup by symbolId (one relationship per symbol is enough)
+
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node) {
+      return (node as HTMLElement).hasAttribute('data-rfm-overlay')
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let node: Node | null = document.body;
+  while (node) {
+    const fiber = getFiberFromEl(node as Element);
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+      while (f) {
+        const fn = getRfmFn(f.type);
+        if (fn && fn.__rfm_symbolId) {
+          const childId = fn.__rfm_symbolId;
+          if (!seenIds.has(childId)) {
+            seenIds.add(childId);
+            // Walk further up to find the nearest RFM ancestor
+            let parent: FiberNode | null = f.return;
+            while (parent) {
+              const pfn = getRfmFn(parent.type);
+              if (pfn && pfn.__rfm_symbolId && pfn.__rfm_symbolId !== childId) {
+                const parentId = pfn.__rfm_symbolId;
+                if (!result[parentId]) result[parentId] = [];
+                if (!result[parentId].includes(childId)) result[parentId].push(childId);
+                break;
+              }
+              parent = parent.return;
+            }
+          }
+        }
+        f = f.return;
+      }
+    }
+    node = walker.nextNode();
+  }
+
+  return result;
+}
+
 /** Walk all DOM nodes to collect all mounted RFM components.
  *  Skips [data-rfm-overlay] subtrees (inspector UI itself). */
 export function findAllMountedRfmComponents(): { symbolId: string; loc: string | null }[] {

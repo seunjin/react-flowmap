@@ -8,6 +8,7 @@ import {
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
   findUnionRectBySymbolId, findAllInstanceRectsBySymbolId, deriveDisplayName,
+  buildFiberRelationships,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -110,12 +111,14 @@ function broadcastToGraph(
   const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
   const staticJsx = (globalThis as unknown as { __rfmStaticJsx?: Record<string, string[]> }).__rfmStaticJsx;
   if (staticJsx) mountedEntries = applyStaticEdges(mountedEntries, staticJsx);
+  const fiberRelations = buildFiberRelationships();
   ch.postMessage({
     type: 'graph-update',
     allEntries: mountedEntries,
     selectedId,
     propTypesMap,
     ...(staticJsx ? { staticJsx } : {}),
+    fiberRelations,
   } satisfies MainToGraph);
   if (selectedId) {
     const props = serializeProps(getPropsForSymbolId(selectedId));

@@ -34,15 +34,19 @@ interface Layout {
 
 // ─── Layout builder ───────────────────────────────────────────────────────────
 
-function buildLayout(entries: DocEntry[], staticJsx: Record<string, string[]>): Layout {
+function buildLayout(
+  entries: DocEntry[],
+  staticJsx: Record<string, string[]>,
+  fiberRelations: Record<string, string[]>,
+): Layout {
   if (entries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
 
   const byId  = new Map(entries.map(e => [e.symbolId, e]));
   const byName = new Map(entries.map(e => [e.name, e]));
 
-  // ── Build combined adjacency from runtime renders/uses + staticJsx ─────────
-  // Combining both ensures depth assignment works even when runtime events are
-  // absent (fiber-walk-only entries have empty renders[]/renderedBy[]).
+  // ── Build combined adjacency: runtime renders/uses + staticJsx + fiberRelations ──
+  // fiberRelations is the live fiber tree — covers alias imports and Outlet-mediated
+  // route rendering that staticJsx (relative-import-only) misses.
   const childEdges  = new Map<string, string[]>(); // parentId → [childId]
   const parentEdges = new Map<string, string[]>(); // childId  → [parentId]
   const edgeDedup   = new Set<string>();
@@ -64,6 +68,11 @@ function buildLayout(entries: DocEntry[], staticJsx: Record<string, string[]>): 
     for (const name of names) {
       const child = byName.get(name);
       if (child) addEdge(fromId, child.symbolId);
+    }
+  }
+  for (const [fromId, childIds] of Object.entries(fiberRelations)) {
+    for (const childId of childIds) {
+      addEdge(fromId, childId);
     }
   }
 
@@ -187,6 +196,7 @@ export function FullGraph({
   entries,
   selectedId,
   staticJsx,
+  fiberRelations,
   onSelect,
   onHover,
   onHoverEnd,
@@ -194,11 +204,15 @@ export function FullGraph({
   entries: DocEntry[];
   selectedId: string;
   staticJsx: Record<string, string[]>;
+  fiberRelations: Record<string, string[]>;
   onSelect: (symbolId: string) => void;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
 }) {
-  const layout = useMemo(() => buildLayout(entries, staticJsx), [entries, staticJsx]);
+  const layout = useMemo(
+    () => buildLayout(entries, staticJsx, fiberRelations),
+    [entries, staticJsx, fiberRelations],
+  );
 
   // Pan & zoom
   const [pan, setPan] = useState({ x: 0, y: 0 });
