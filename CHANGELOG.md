@@ -1,5 +1,14 @@
 # react-flowmap
 
+## 0.2.9
+
+### Patch Changes
+
+- - Inspector overlay: Shadow DOM CSS isolation 개선 — 호스트 앱의 전역 스타일이 inspector 유틸리티 클래스를 덮어쓰던 문제 수정
+  - CSS pre-compilation 도입 — 소비자 앱의 Tailwind 인스턴스와 무관하게 항상 올바른 스타일 보장
+  - Tailwind Preflight 제외 — 그래프 창 SVG 렌더링 간섭 문제 해결
+  - 그래프 뷰: staticJsx/fiberRelations 기반 연결선도 렌더링 (일부 노드 간 선이 누락되던 버그 수정)
+
 ## 0.2.8
 
 ### Patch Changes
