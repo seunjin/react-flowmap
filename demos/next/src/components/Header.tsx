@@ -1,3 +1,5 @@
+'use client';
+
 export function Header() {
   return (
     <header style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '12px 16px' }}>

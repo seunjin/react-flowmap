@@ -30,5 +30,12 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
+    {
+      name: 'demo-next',
+      command: 'pnpm demo:next',
+      port: 3003,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
   ],
 });

@@ -23,6 +23,18 @@
     "./vite": {
       "import": "./dist/vite-plugin.js",
       "types": "./dist/vite-plugin.d.ts"
+    },
+    "./next": {
+      "import": "./dist/next-plugin.js",
+      "types": "./dist/next-plugin.d.ts"
+    },
+    "./rfm-context": {
+      "import": "./dist/rfm-context.js",
+      "types": "./dist/rfm-context.d.ts"
+    },
+    "./graph-window": {
+      "import": "./dist/graph-window.js",
+      "types": "./dist/graph-window.d.ts"
     }
   },
   "files": [
@@ -42,7 +54,8 @@
     "demo:next": "cd demos/next && npm run dev",
     "demo:next:install": "cd demos/next && npm install --legacy-peer-deps",
     "build:css": "node scripts/build-inspector-css.mjs",
-    "build": "pnpm build:css && pnpm typecheck && vite build --mode library",
+    "build:copy-loader": "cp src/next-plugin/rfm-loader.cjs dist/rfm-loader.cjs",
+    "build": "pnpm build:css && pnpm typecheck && vite build --mode library && pnpm build:copy-loader",
     "build:demo": "pnpm typecheck && vite build --mode demo",
     "demo:preview": "vite preview",
     "typecheck": "tsc --noEmit",
