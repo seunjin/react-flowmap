@@ -13,4 +13,5 @@ export default defineConfig({
       enabled: process.env.NODE_ENV === 'development',
     }),
   ],
+  server: { port: 3004 },
 });

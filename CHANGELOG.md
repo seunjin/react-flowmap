@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 0.3.0
+
+### Minor Changes
+
+- Next.js App Router support via `withFlowmap` webpack plugin. Adds `react-flowmap/next` export with `withFlowmap()` config wrapper and `openInEditor()` helper for API routes.
+
 ## 0.2.9
 
 ### Patch Changes
