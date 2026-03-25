@@ -157,6 +157,7 @@ export function FloatingSidebar({
   return (
     <div
       data-rfm-overlay
+      data-rfm-sidebar
       style={sidebarStyle(dockPosition, floatPos)}
     >
       {/* 헤더 */}
