@@ -82,6 +82,31 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.15.30)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.31.1)
 
+  demos/react:
+    dependencies:
+      '@tanstack/react-router':
+        specifier: ^1.167.4
+        version: 1.167.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      lucide-react:
+        specifier: ^0.577.0
+        version: 0.577.0(react@19.1.1)
+      react:
+        specifier: 19.1.1
+        version: 19.1.1
+      react-dom:
+        specifier: 19.1.1
+        version: 19.1.1(react@19.1.1)
+      react-flowmap:
+        specifier: workspace:*
+        version: link:../..
+    devDependencies:
+      '@types/react':
+        specifier: 19.1.12
+        version: 19.1.12
+      '@types/react-dom':
+        specifier: 19.1.9
+        version: 19.1.9(@types/react@19.1.12)
+
   demos/tanstack:
     dependencies:
       '@hookform/resolvers':
@@ -151,31 +176,6 @@ importers:
       vite:
         specifier: ^7.0.0
         version: 7.1.4(@types/node@22.15.30)(jiti@2.6.1)(lightningcss@1.31.1)
-
-  demos/vite:
-    dependencies:
-      '@tanstack/react-router':
-        specifier: ^1.167.4
-        version: 1.167.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      lucide-react:
-        specifier: ^0.577.0
-        version: 0.577.0(react@19.1.1)
-      react:
-        specifier: 19.1.1
-        version: 19.1.1
-      react-dom:
-        specifier: 19.1.1
-        version: 19.1.1(react@19.1.1)
-      react-flowmap:
-        specifier: workspace:*
-        version: link:../..
-    devDependencies:
-      '@types/react':
-        specifier: 19.1.12
-        version: 19.1.12
-      '@types/react-dom':
-        specifier: 19.1.9
-        version: 19.1.9(@types/react@19.1.12)
 
   packages/babel-plugin:
     dependencies:

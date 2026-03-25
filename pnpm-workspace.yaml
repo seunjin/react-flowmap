@@ -1,5 +1,5 @@
 packages:
   - '.'
-  - 'demos/vite'
+  - 'demos/react'
   - 'demos/tanstack'
   - 'packages/*'

@@ -35,6 +35,7 @@
   "scripts": {
     "dev": "pnpm demo:dev",
     "demo:dev": "vite --mode demo",
+    "demo:react": "pnpm --filter react-flowmap-demo-react dev",
     "demo:tanstack": "pnpm --filter react-flowmap-demo-tanstack dev",
     "build:css": "node scripts/build-inspector-css.mjs",
     "build": "pnpm build:css && pnpm typecheck && vite build --mode library",
