@@ -1,0 +1,5 @@
+{
+  "_comment": "demos/next is managed independently with npm (not pnpm workspace) due to Next.js webpack bundler isolation requirements.",
+  "install": "npm install --legacy-peer-deps",
+  "dev": "npm run dev"
+}
