@@ -37,6 +37,8 @@
     "demo:dev": "vite --mode demo",
     "demo:react": "pnpm --filter react-flowmap-demo-react dev",
     "demo:tanstack": "pnpm --filter react-flowmap-demo-tanstack dev",
+    "demo:start": "cd demos/start && npm run dev",
+    "demo:start:install": "cd demos/start && npm install",
     "build:css": "node scripts/build-inspector-css.mjs",
     "build": "pnpm build:css && pnpm typecheck && vite build --mode library",
     "build:demo": "pnpm typecheck && vite build --mode demo",
