@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type React from 'react';
-import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink, Maximize2 } from 'lucide-react';
+import { SquareMousePointer, X, Search, ChevronLeft, ChevronRight, ExternalLink, Maximize2 } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
-import type { DockPosition, FoundComp } from './types';
+import type { DockPosition, FoundComp, RfmNextRoute } from './types';
 import { sidebarStyle, openInEditor, findAllMountedRfmComponents, deriveDisplayName } from './utils';
 import { buildFolderTree, flattenTreeEntries } from './tree-utils';
 import { DockDropdown } from './DockDropdown';
@@ -17,6 +17,7 @@ export function FloatingSidebar({
   onHighlight, onHighlightEnd,
   picking, onPickToggle,
   onOpenGraphWindow,
+  nextRoutes,
 }: {
   stack: FoundComp[];
   selectedId: string;
@@ -34,10 +35,12 @@ export function FloatingSidebar({
   picking: boolean;
   onPickToggle: () => void;
   onOpenGraphWindow: () => void;
+  nextRoutes: RfmNextRoute[] | null;
 }) {
   const [view, setView] = useState<'tree' | 'detail'>('tree');
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pagesExpanded, setPagesExpanded] = useState(true);
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 플로팅 드래그
@@ -229,6 +232,61 @@ export function FloatingSidebar({
               )}
             </div>
           </div>
+
+          {/* Next.js Pages 섹션 */}
+          {nextRoutes && nextRoutes.length > 0 && (
+            <div className="border-b border-rfm-border shrink-0">
+              <button
+                type="button"
+                onClick={() => setPagesExpanded(p => !p)}
+                className="w-full flex items-center gap-1 px-2 py-1.5 border-none bg-transparent cursor-pointer text-left"
+              >
+                <ChevronRight
+                  size={10}
+                  className={`text-rfm-text-400 transition-transform duration-100 ${pagesExpanded ? 'rotate-90' : ''}`}
+                />
+                <span className="text-[10px] font-semibold text-rfm-text-400 uppercase tracking-wide">
+                  Pages
+                </span>
+                <span className="ml-auto text-[10px] text-rfm-text-300">
+                  {nextRoutes.filter(r => r.type === 'layout' || r.type === 'page').length}
+                </span>
+              </button>
+              {pagesExpanded && (
+                <div className="pb-1">
+                  {nextRoutes
+                    .filter(r => r.type === 'layout' || r.type === 'page')
+                    .map(route => (
+                      <button
+                        key={route.filePath}
+                        type="button"
+                        onClick={() => openInEditor(route.filePath, '', '1')}
+                        title={route.filePath}
+                        className="w-full flex items-center gap-1.5 px-3 py-[3px] border-none bg-transparent cursor-pointer text-left hover:bg-rfm-bg-100 group"
+                      >
+                        <span
+                          title={route.isServer ? 'Server Component' : 'Client Component'}
+                          className={`text-[9px] font-semibold px-[3px] rounded ${
+                            route.isServer
+                              ? 'text-rfm-text-400 bg-[rgba(0,0,0,0.05)]'
+                              : 'text-rfm-blue bg-rfm-blue-xlight'
+                          }`}
+                        >
+                          {route.isServer ? 'S' : 'C'}
+                        </span>
+                        <span className="text-[11px] text-rfm-text-700 truncate flex-1">
+                          {route.componentName}
+                        </span>
+                        <span className="text-[10px] text-rfm-text-300 group-hover:text-rfm-text-400 shrink-0">
+                          {route.urlPath}
+                        </span>
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 폴더 트리 */}
           <div ref={treeScrollRef} className="flex-1 overflow-y-auto pt-2 pb-4">

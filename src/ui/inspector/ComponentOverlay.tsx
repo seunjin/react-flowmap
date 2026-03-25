@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
-import type { DockPosition, FoundComp } from './types';
+import type { DockPosition, FoundComp, RfmNextRoute } from './types';
 import {
   loadDock, saveDock, saveFloatPos,
   findComponentsAt, findElBySymbolId,
@@ -143,6 +143,10 @@ export function ComponentOverlay({
   const graphWinRef   = useRef<Window | null>(null);
   const channelRef    = useRef<BroadcastChannel | null>(null);
   const [shadowContainer, setShadowContainer] = useState<HTMLElement | null>(null);
+
+  // Next.js App Router 라우트 트리 — withFlowmap의 DefinePlugin이 주입, Vite에서는 undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nextRoutes: RfmNextRoute[] | null = (globalThis as any).__rfmNextRouteTree ?? null;
   const [picking,    setPicking]    = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
   const [floatPos,     setFloatPos]     = useState(() => {
@@ -185,6 +189,19 @@ export function ComponentOverlay({
     shadow.appendChild(style);
   }
 
+  // @property 규칙을 main document에 주입
+  // Chrome은 shadow DOM 안의 @property를 무시하므로 main document에 별도 주입 필요.
+  // 호스트 앱에 Tailwind가 없으면 --tw-translate-y 등 CSS 변수가 초기화되지 않아 transform이 깨짐.
+  function syncPropertyRules() {
+    document.head.querySelector('style[data-rfm-props]')?.remove();
+    const matches = inspectorCss.match(/@property\s+[^{]+\{[^}]+\}/g);
+    if (!matches) return;
+    const style = document.createElement('style');
+    style.setAttribute('data-rfm-props', '');
+    style.textContent = matches.join('\n');
+    document.head.appendChild(style);
+  }
+
   // Shadow DOM 설정 — 한 번만 실행 (페인트 전에 동기 실행)
   useLayoutEffect(() => {
     const host = document.createElement('div');
@@ -196,6 +213,7 @@ export function ComponentOverlay({
     const shadow = host.attachShadow({ mode: 'open' });
     shadowRootRef.current = shadow;
     syncShadowStyles(shadow);
+    syncPropertyRules();
 
     const container = document.createElement('div');
     shadow.appendChild(container);
@@ -203,6 +221,7 @@ export function ComponentOverlay({
 
     return () => {
       host.remove();
+      document.head.querySelector('style[data-rfm-props]')?.remove();
       shadowRootRef.current = null;
       setShadowContainer(null);
     };
@@ -211,6 +230,7 @@ export function ComponentOverlay({
   // dev HMR: inspectorCss 자체가 바뀌면 재동기화
   useEffect(() => {
     if (shadowRootRef.current) syncShadowStyles(shadowRootRef.current);
+    syncPropertyRules();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectorCss]);
 
@@ -346,7 +366,10 @@ export function ComponentOverlay({
       graphWinRef.current.focus();
       return;
     }
-    const win = window.open('/rfm-graph', 'rfm-graph', 'width=1200,height=800');
+    // 현재 URL에 ?__rfm=graph 추가 — 별도 라우트 불필요, 모든 프레임워크 동작
+    const url = new URL(window.location.href);
+    url.searchParams.set('__rfm', 'graph');
+    const win = window.open(url.toString(), 'rfm-graph', 'width=1200,height=800');
     graphWinRef.current = win;
     setGraphWindowOpen(true);
     onGraphWindowOpen?.();
@@ -573,6 +596,7 @@ export function ComponentOverlay({
         selectedLoc={selectedLoc}
         allEntries={allEntries}
         selectedEl={selectedElRef.current}
+        nextRoutes={nextRoutes}
         dockPosition={dockPosition}
         floatPos={floatPos}
         picking={picking}

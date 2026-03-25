@@ -1,7 +1,9 @@
+import { createServer } from 'node:http';
 import { exec } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scanAppDirectory } from './scan-app-dir.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NextConfig = Record<string, any>;
@@ -40,10 +42,53 @@ function openInEditor(absPath: string, line: number, editor: string): void {
   });
 }
 
+// ─── 사이드카 서버 ─────────────────────────────────────────────────────────────
+// HMR 재컴파일 시 중복 실행 방지를 위한 모듈 레벨 싱글톤
+let _sidecarStarted = false;
+
+function startSidecar(port: number, root: string, editorCmd: string): void {
+  if (_sidecarStarted) return;
+  _sidecarStarted = true;
+
+  const server = createServer((req, res) => {
+    const qs = req.url?.split('?')[1] ?? '';
+    const params = new URLSearchParams(qs);
+    const file = params.get('file');
+    const line = parseInt(params.get('line') ?? '1', 10) || 1;
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+
+    if (!file) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, error: 'missing file' }));
+      return;
+    }
+
+    openInEditor(resolve(root, file), line, editorCmd);
+    res.end(JSON.stringify({ ok: true }));
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[react-flowmap] sidecar port ${port} already in use — editor open disabled`);
+    }
+    _sidecarStarted = false;
+  });
+
+  server.listen(port, '127.0.0.1', () => {
+    // silent start — dev tool
+  });
+
+  process.on('exit', () => server.close());
+}
+
 // ─── withFlowmap ──────────────────────────────────────────────────────────────
 export type WithFlowmapOptions = {
   editor?: string;
   exclude?: RegExp[];
+  /** 사이드카 서버 포트 (기본: 51423) */
+  sidecarPort?: number;
 };
 
 export function withFlowmap(
@@ -53,26 +98,24 @@ export function withFlowmap(
   const root = process.cwd();
   const editorCmd =
     process.env['NEXT_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
+  const port = options.sidecarPort ?? 51423;
 
-  // 로더 경로 — dist/rfm-loader.cjs (패키지 설치 시) 또는 src/next-plugin/rfm-loader.cjs (소스 실행 시)
   const loaderPath = _pluginDir.endsWith('/dist') || _pluginDir.includes('/dist/')
     ? resolve(_pluginDir, 'rfm-loader.cjs')
-    : resolve(_pluginDir, 'rfm-loader.cjs'); // src/ 에서도 같은 상대 경로
+    : resolve(_pluginDir, 'rfm-loader.cjs');
 
   return {
     ...nextConfig,
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    webpack(config: any, ctx: { dev: boolean; isServer: boolean }) {
-      // 원본 webpack 설정 먼저 적용
+    webpack(config: any, ctx: { dev: boolean; isServer: boolean; webpack?: { DefinePlugin: new (defs: Record<string, string>) => unknown } }) {
       if (typeof nextConfig.webpack === 'function') {
         config = nextConfig.webpack(config, ctx);
       }
 
-      // dev 모드에서만 활성화 (server 컴파일에도 적용 — 클라이언트 컴포넌트 SSR 일관성 유지)
       if (!ctx.dev) return config;
 
-      // rfm-loader 추가 — 가장 먼저 실행되도록 unshift
+      // rfm-loader — 'use client' 파일만 변환
       if (!Array.isArray(config.module)) {
         config.module ??= { rules: [] };
         (config.module.rules as unknown[]).unshift({
@@ -88,25 +131,28 @@ export function withFlowmap(
         });
       }
 
-      return config;
-    },
+      // 클라이언트 번들에만 주입 (서버 번들 제외)
+      if (!ctx.isServer && ctx.webpack) {
+        // 사이드카 서버 시작 — 에디터 열기를 API route 없이 처리
+        startSidecar(port, root, editorCmd);
 
-    // /__rfm-open → API route로 처리
-    async rewrites() {
-      const existing = await (nextConfig.rewrites?.() ?? Promise.resolve([]));
-      const base = Array.isArray(existing) ? existing : (existing as { beforeFiles?: unknown[] }).beforeFiles ?? [];
-      return [
-        ...(base as object[]),
-        {
-          source: '/__rfm-open',
-          destination: '/api/rfm-open',
-        },
-      ];
+        // 클라이언트에 사이드카 URL + App Router 라우트 트리 주입
+        const routes = scanAppDirectory(root);
+        config.plugins ??= [];
+        config.plugins.push(
+          new ctx.webpack.DefinePlugin({
+            'globalThis.__rfmOpenUrl': JSON.stringify(`http://127.0.0.1:${port}`),
+            'globalThis.__rfmNextRouteTree': JSON.stringify(routes),
+          }),
+        );
+      }
+
+      return config;
     },
   };
 }
 
-// 에디터 열기 함수 — API route에서 사용
+// 에디터 열기 함수 — 하위 호환성을 위해 export 유지 (기존 api/rfm-open/route.ts 사용자)
 export { openInEditor };
 
 // suppress unused import warning

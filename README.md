@@ -1,6 +1,6 @@
 # react-flowmap
 
-An in-app runtime component inspector and visual graph explorer for React. Works with Vite and Next.js App Router.
+An in-app runtime component inspector and visual graph explorer for React.
 
 - **Pick mode** — click any element on screen to inspect it (DevTools-style crosshair)
 - **Component tree** — browse all mounted components with search and folder grouping
@@ -10,6 +10,16 @@ An in-app runtime component inspector and visual graph explorer for React. Works
 - **Fragment support** — components rendering multiple root elements are highlighted across their full area
 
 > Dev-only. Instrumentation runs only in development mode — zero code injected in production builds.
+
+## Framework support
+
+| Framework | Status | What's tracked |
+|---|---|---|
+| Vite + React | ✅ Full | All components |
+| Vite + TanStack Router | ✅ Full | All components including route pages |
+| Vite + React Router | ✅ Full | All components |
+| TanStack Start | ✅ Full | All components including route pages |
+| Next.js App Router | ⚠️ Partial | `'use client'` components only — server components are not tracked |
 
 ## Install
 
@@ -21,7 +31,7 @@ pnpm add -D react-flowmap
 
 ## Setup
 
-### Vite
+### Vite (React / TanStack Router / React Router)
 
 **1. Add the Vite plugin** (`vite.config.ts`):
 
@@ -35,7 +45,7 @@ export default defineConfig({
 });
 ```
 
-**2. Add `<ReactFlowMap />` anywhere in your app root**:
+**2. Add `<ReactFlowMap />` to your app root**:
 
 ```tsx
 import { ReactFlowMap } from 'react-flowmap';
@@ -50,7 +60,45 @@ function App() {
 }
 ```
 
+Works the same way with TanStack Router or React Router — just place `<ReactFlowMap />` in the root component that wraps your router.
+
+### TanStack Start
+
+**1. Add the Vite plugin** (`vite.config.ts`):
+
+```ts
+import { defineConfig } from 'vite';
+import viteReact from '@vitejs/plugin-react';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import { flowmapInspect } from 'react-flowmap/vite';
+
+export default defineConfig({
+  plugins: [tanstackStart(), viteReact(), flowmapInspect()],
+});
+```
+
+**2. Add `<ReactFlowMap />` to your root route** (`app/routes/__root.tsx`):
+
+```tsx
+import { ReactFlowMap } from 'react-flowmap';
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <head><HeadContent /></head>
+      <body>
+        {children}
+        <ReactFlowMap />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
 ### Next.js App Router
+
+> **Limitation**: Only `'use client'` components are tracked. Server components (`app/layout.tsx`, `app/page.tsx`, etc.) are not instrumented — they run on the server and have no runtime presence in the browser.
 
 **1. Wrap your Next.js config** (`next.config.ts`):
 
@@ -62,29 +110,9 @@ export default withFlowmap({
 });
 ```
 
-**2. Add an API route** (`app/api/rfm-open/route.ts`):
+**2. Add `<ReactFlowMap />` to your root layout** (`app/layout.tsx`):
 
-```ts
-import { type NextRequest, NextResponse } from 'next/server';
-import { openInEditor } from 'react-flowmap/next';
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const file = searchParams.get('file');
-  const line = parseInt(searchParams.get('line') ?? '1', 10) || 1;
-  const editor = process.env['NEXT_EDITOR'] ?? process.env['EDITOR'] ?? 'code';
-
-  if (!file) return NextResponse.json({ ok: false, error: 'missing file' }, { status: 400 });
-
-  const { resolve } = await import('node:path');
-  openInEditor(resolve(process.cwd(), file), line, editor);
-  return NextResponse.json({ ok: true });
-}
-```
-
-**3. Add `<ReactFlowMap />` to your root layout** (`app/layout.tsx`):
-
-Only works inside a `'use client'` component — create a wrapper:
+`<ReactFlowMap />` must be inside a `'use client'` component — create a wrapper:
 
 ```tsx
 // components/FlowmapProvider.tsx
@@ -109,7 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-> **Note**: `withFlowmap` only activates in dev mode (`next dev`). In production builds it's a pass-through. Run with `next dev --webpack` (Turbopack is not yet supported).
+> **Note**: Run with `next dev --webpack`. Turbopack is not yet supported.
 
 Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
@@ -117,38 +145,35 @@ Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
 Set the `editor` option to jump directly to source from the inspector:
 
-**Vite** (`vite.config.ts`):
+**Vite / TanStack Start** (`vite.config.ts`):
 ```ts
 flowmapInspect({
   editor: 'cursor',       // Cursor
-  editor: 'code',         // VS Code
-  editor: 'windsurf',     // Windsurf
-  editor: 'zed',          // Zed
-  editor: 'antigravity',  // Google Antigravity
-  editor: 'codium',       // VSCodium (or 'vscodium')
+  // editor: 'code',      // VS Code
+  // editor: 'windsurf',  // Windsurf
+  // editor: 'zed',       // Zed
+  // editor: 'antigravity', // Google Antigravity
+  // editor: 'codium',    // VSCodium (or 'vscodium')
 })
 ```
 
-Each value is fully autocompleted in TypeScript. You can also pass any custom binary name or path.
-
-Override per-machine via `.env.local`:
-
-```bash
-# Vite
-VITE_EDITOR=cursor
-
-# Next.js
-NEXT_EDITOR=cursor
-```
-
-**Next.js** — pass `editor` to `withFlowmap`:
+**Next.js** (`next.config.ts`):
 ```ts
 withFlowmap({}, { editor: 'cursor' })
 ```
 
+Override per-machine without touching config files (`.env.local`):
+
+```bash
+VITE_EDITOR=cursor   # Vite / TanStack Start
+NEXT_EDITOR=cursor   # Next.js
+```
+
+Each editor name is fully autocompleted in TypeScript. You can also pass any custom binary name or absolute path.
+
 ## Options
 
-**Vite plugin:**
+**Vite / TanStack Start plugin:**
 
 ```ts
 flowmapInspect({
@@ -166,7 +191,7 @@ withFlowmap(nextConfig, {
 })
 ```
 
-**Component:**
+**`<ReactFlowMap />` component:**
 
 ```tsx
 <ReactFlowMap
@@ -208,7 +233,8 @@ The plugin instruments your React components at dev-time with a lightweight Babe
 - Sets static `__rfm_symbolId` properties on component functions for DOM-to-fiber lookups
 - Extracts TypeScript prop types via `ts-morph` at transform time for inline display
 - Performs static JSX analysis so the component graph is accurate even for conditionally-rendered components (e.g. auth-gated layouts)
+- The inspector UI renders inside a Shadow DOM to prevent any style conflicts with your app
 
-For **Vite**, the plugin runs only when `command === 'serve'`. For **Next.js**, it runs only in `dev` mode and only on files with `'use client'` directive (server components are never instrumented).
+For **Vite and TanStack Start**, all components are instrumented. For **Next.js**, only `'use client'` files are instrumented — server components are never touched.
 
 All instrumentation is removed in production builds.

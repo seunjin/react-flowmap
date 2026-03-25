@@ -9,9 +9,7 @@ export default defineConfig({
     tanstackStart({ srcDirectory: 'src' }),
     viteReact(),
     tailwindcss(),
-    flowmapInspect({
-      enabled: process.env.NODE_ENV === 'development',
-    }),
+    flowmapInspect(),
   ],
   server: { port: 3004 },
 });

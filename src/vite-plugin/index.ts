@@ -12,7 +12,6 @@ const _require = createRequire(import.meta.url);
 const RFM_CONTEXT_ID = 'virtual:rfm/context';
 const RESOLVED_RFM_CONTEXT_ID = '\0' + RFM_CONTEXT_ID;
 
-const RFM_GRAPH_ENTRY_ID = '/@rfm/graph-entry';
 
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
 // 빌드된 패키지(dist/)와 소스(src/vite-plugin/) 모두에서 경로를 올바르게 해석
@@ -165,7 +164,6 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
 
     resolveId(id) {
       if (id === RFM_CONTEXT_ID) return RESOLVED_RFM_CONTEXT_ID;
-      if (id === RFM_GRAPH_ENTRY_ID) return RFM_GRAPH_ENTRY_ID;
     },
 
     load(id) {
@@ -173,49 +171,10 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         const contextPath = _resolvePkg('rfm-context', '../runtime/rfm-context');
         return `export * from ${JSON.stringify(contextPath)};`;
       }
-      if (id === RFM_GRAPH_ENTRY_ID) {
-        const graphWindowPath = _resolvePkg('graph-window', '../ui/graph-window/GraphWindow');
-        return [
-          `import React from 'react';`,
-          `import { createRoot } from 'react-dom/client';`,
-          `import { GraphWindow } from ${JSON.stringify(graphWindowPath)};`,
-          `const el = document.getElementById('rfm-root');`,
-          `if (el) createRoot(el).render(React.createElement(GraphWindow));`,
-        ].join('\n');
-      }
       return null;
     },
 
     configureServer(server) {
-      // /rfm-graph — 그래프 창 페이지
-      server.middlewares.use('/rfm-graph', (req, res, next) => {
-        if (req.method !== 'GET') return next();
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end(`<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>React Flowmap — Graph</title>
-    <style>
-      *, *::before, *::after { box-sizing: border-box; }
-      html, body, #rfm-root { margin: 0; padding: 0; height: 100%; width: 100%; }
-    </style>
-  </head>
-  <body>
-    <div id="rfm-root"></div>
-    <script type="module">
-      import RefreshRuntime from '/@react-refresh';
-      RefreshRuntime.injectIntoGlobalHook(window);
-      window.$RefreshReg$ = () => {};
-      window.$RefreshSig$ = () => (type) => type;
-      window.__vite_plugin_react_preamble_installed__ = true;
-    </script>
-    <script type="module" src="${RFM_GRAPH_ENTRY_ID}"></script>
-  </body>
-</html>`);
-      });
-
       server.middlewares.use('/__rfm-open', (req, res) => {
         const qs = req.url?.split('?')[1] ?? '';
         const params = new URLSearchParams(qs);

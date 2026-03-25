@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { buildGraph } from '../../core/graph/index.js';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import type { RuntimeEvent } from '../../core/types/runtime-events.js';
 import { __rfmCollector, __rfmSession } from '../../runtime/rfm-context.js';
 import { attachFetchInterceptor } from '../../runtime/collector/index.js';
 import { ComponentOverlay } from './ComponentOverlay.js';
+import { GraphWindow } from '../graph-window/GraphWindow.js';
 import type { FlowmapConfig } from './InspectButton.js';
 
 // ─── ReactFlowMap ──────────────────────────────────────────────────────────────
@@ -28,25 +30,30 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
     ...overlayConfig
   } = config;
 
+  // ?__rfm=graph 감지 — window.open()으로 열린 그래프 창 팝업인 경우
+  // SSR hydration mismatch 방지를 위해 useEffect에서 감지
+  const [isGraphMode, setIsGraphMode] = useState(false);
+  useEffect(() => {
+    setIsGraphMode(new URLSearchParams(window.location.search).get('__rfm') === 'graph');
+  }, []);
+
   const [active, setActive] = useState(() => {
     if (!persistActive) return false;
     try { return localStorage.getItem(storageKey) === 'true'; } catch { return false; }
   });
   const [graph, setGraph] = useState<FlowmapGraph>(emptyGraph);
 
-  // 활성 상태 localStorage 동기화
   const persist = (next: boolean) => {
     if (persistActive) {
       try { localStorage.setItem(storageKey, String(next)); } catch {}
     }
   };
 
-  // collector 구독 + fetch 인터셉터
+  // 컴포넌트 트래킹 — 그래프 모드에서는 불필요하므로 건너뜀
   const detachRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    // reset()을 mount 시점에 호출하면 자신보다 먼저 effect가 실행된 형제·자식 컴포넌트
-    // (라우트 등)가 이미 기록한 이벤트가 지워집니다.
-    // subscribe()는 기존 이벤트를 즉시 전달하므로, 구독 후 cleanup에서만 reset합니다.
+    if (isGraphMode) return;
+
     const unsub = __rfmCollector.subscribe((events: RuntimeEvent[]) => {
       setGraph(buildGraph(events));
     });
@@ -65,7 +72,18 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
       __rfmCollector.reset();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isGraphMode]);
+
+  // 그래프 창 팝업 모드: 전체화면 오버레이로 GraphWindow 렌더
+  // 기존 라우트(/rfm-graph) 없이도 모든 프레임워크에서 동작
+  if (isGraphMode) {
+    return createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 2147483647, background: '#ffffff' }}>
+        <GraphWindow />
+      </div>,
+      document.body,
+    );
+  }
 
   return (
     <ComponentOverlay

@@ -39,8 +39,4 @@ test.describe('demos/next', () => {
     expect(sidebarText).toContain('ComponentA');
   });
 
-  test('/rfm-graph 페이지가 로드된다', async ({ page }) => {
-    const response = await page.goto(`${BASE}/rfm-graph`);
-    expect(response?.status()).toBe(200);
-  });
 });

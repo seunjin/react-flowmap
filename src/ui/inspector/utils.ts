@@ -80,9 +80,13 @@ export function normalizePath(filePath: string): string {
 // ─── Editor open ──────────────────────────────────────────────────────────────
 
 export function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
+  // Next.js: globalThis.__rfmOpenUrl = 'http://127.0.0.1:51423' (사이드카)
+  // Vite: undefined → 상대 URL로 fallback (Vite 미들웨어 처리)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const base: string = (globalThis as any).__rfmOpenUrl ?? '';
   const params = new URLSearchParams({ file: filePath, symbolId });
   if (loc) params.set('line', loc);
-  fetch(`/__rfm-open?${params.toString()}`).catch(() => {});
+  fetch(`${base}/__rfm-open?${params.toString()}`).catch(() => {});
 }
 
 // ─── React Fiber types & helpers ─────────────────────────────────────────────

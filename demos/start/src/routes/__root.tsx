@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { ReactFlowMap } from 'react-flowmap';
 import appCss from '../styles/app.css?url';
 
 export const Route = createRootRoute({
@@ -25,6 +26,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
+        <ReactFlowMap />
         <Scripts />
       </body>
     </html>
