@@ -1,5 +1,20 @@
 # react-flowmap
 
+## 0.3.1
+
+### Patch Changes
+
+- **그래프 뷰 Next.js 서버 컴포넌트 지원**
+  - 캔버스에 서버 라우트(layout / page) 노드 표시 — amber 색상으로 구분
+  - layout → page → CSR 컴포넌트 계층 연결선 렌더링
+  - 서버 노드 hover / 클릭 시 실제 화면에 rect 오버레이 표시 (layout·page 모두 full-viewport)
+  - 그래프 상세 패널에서 서버 라우트 선택 시 `ServerComponentDetail` 표시
+  - CSR 컴포넌트 상세에서 서버 부모 노드 자동 표시
+
+- **그래프 뷰 버그 수정**
+  - 그래프 창에서 노드를 선택한 뒤 메인 창의 `graph-update` 메시지가 선택을 덮어쓰던 문제 수정 (초기 동기화 시에만 적용)
+  - 상세 패널 Relations에서 센터 노드(자기 자신)가 사라지던 문제 수정
+
 ## 0.3.0
 
 ### Minor Changes
