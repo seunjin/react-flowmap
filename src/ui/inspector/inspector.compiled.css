@@ -195,6 +195,10 @@
   margin-block: calc(var(--spacing) * 1.5);
 }
 
+.mt-2 {
+  margin-top: calc(var(--spacing) * 2);
+}
+
 .mr-0\.5 {
   margin-right: calc(var(--spacing) * .5);
 }

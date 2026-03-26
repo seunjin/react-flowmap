@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { DocEntry } from '../doc/build-doc-index';
+import type { RfmNextRoute } from '../inspector/types';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -13,10 +14,13 @@ const PAD = 40;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export const SSR_PREFIX = 'ssr:';
+
 interface LayoutNode {
   entry: DocEntry;
   x: number;
   y: number;
+  isServer?: boolean;
 }
 
 interface LayoutEdge {
@@ -34,14 +38,34 @@ interface Layout {
 
 // ─── Layout builder ───────────────────────────────────────────────────────────
 
+// URL 유틸 (서버 라우트 계층 계산용)
+function urlDepth(p: string) { return p === '/' ? 0 : p.split('/').filter(Boolean).length; }
+function isUrlAncestor(a: string, d: string) {
+  if (a === d) return false;
+  if (a === '/') return true;
+  return d.startsWith(a + '/');
+}
+
 function buildLayout(
   entries: DocEntry[],
   staticJsx: Record<string, string[]>,
   fiberRelations: Record<string, string[]>,
+  nextRoutes: RfmNextRoute[] | null,
 ): Layout {
-  if (entries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
+  // 서버 라우트 → 합성 DocEntry
+  const serverEntries: DocEntry[] = (nextRoutes ?? []).map(route => ({
+    symbolId: SSR_PREFIX + route.filePath,
+    name: route.componentName,
+    filePath: route.filePath,
+    category: 'page' as const,
+    renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
+  }));
+  const serverIds = new Set(serverEntries.map(e => e.symbolId));
 
-  const byId  = new Map(entries.map(e => [e.symbolId, e]));
+  const allEntries = [...serverEntries, ...entries];
+  if (allEntries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
+
+  const byId  = new Map(allEntries.map(e => [e.symbolId, e]));
   const byName = new Map(entries.map(e => [e.name, e]));
 
   // ── Build combined adjacency: runtime renders/uses + staticJsx + fiberRelations ──
@@ -71,21 +95,39 @@ function buildLayout(
     }
   }
   for (const [fromId, childIds] of Object.entries(fiberRelations)) {
-    for (const childId of childIds) {
-      addEdge(fromId, childId);
+    for (const childId of childIds) addEdge(fromId, childId);
+  }
+  // 서버 라우트 엣지: 레이아웃→하위 라우트, 페이지→CSR import 자식
+  for (const route of nextRoutes ?? []) {
+    const fromId = SSR_PREFIX + route.filePath;
+    if (route.type === 'layout') {
+      const layoutDepth = urlDepth(route.urlPath);
+      for (const child of nextRoutes ?? []) {
+        if (child.filePath === route.filePath) continue;
+        if (child.urlPath === route.urlPath || isUrlAncestor(route.urlPath, child.urlPath)) {
+          if (urlDepth(child.urlPath) === layoutDepth + 1 || child.urlPath === route.urlPath) {
+            addEdge(fromId, SSR_PREFIX + child.filePath);
+          }
+        }
+      }
+    }
+    // 모든 라우트: CSR import 자식 연결
+    for (const child of route.children ?? []) {
+      if (child.isServer) continue;
+      const csrEntry = entries.find(e => e.filePath === child.filePath && e.name === child.componentName)
+        ?? entries.find(e => e.filePath === child.filePath);
+      if (csrEntry) addEdge(fromId, csrEntry.symbolId);
     }
   }
 
   // ── Topological longest-path depth assignment (Kahn's algorithm) ──────────
-  // Processes each node only after all its parents are done, so the assigned
-  // depth is always the maximum depth reachable from any root.
   const depthMap = new Map<string, number>();
   const inDeg    = new Map<string, number>();
-  for (const e of entries) inDeg.set(e.symbolId, (parentEdges.get(e.symbolId) ?? []).length);
+  for (const e of allEntries) inDeg.set(e.symbolId, (parentEdges.get(e.symbolId) ?? []).length);
 
   // Roots = in-degree 0 in the combined graph
   const topoQueue: string[] = [];
-  for (const e of entries) {
+  for (const e of allEntries) {
     if (inDeg.get(e.symbolId) === 0) { depthMap.set(e.symbolId, 0); topoQueue.push(e.symbolId); }
   }
 
@@ -102,13 +144,13 @@ function buildLayout(
 
   // Assign nodes not reached (cycles / fully disconnected) to their own row
   let maxDepth = depthMap.size > 0 ? Math.max(...depthMap.values()) : 0;
-  for (const entry of entries) {
+  for (const entry of allEntries) {
     if (!depthMap.has(entry.symbolId)) depthMap.set(entry.symbolId, ++maxDepth);
   }
 
   // Group by depth, sort: pages first, then hooks last, then alphabetical
   const colGroups = new Map<number, DocEntry[]>();
-  for (const entry of entries) {
+  for (const entry of allEntries) {
     const d = depthMap.get(entry.symbolId)!;
     if (!colGroups.has(d)) colGroups.set(d, []);
     colGroups.get(d)!.push(entry);
@@ -166,11 +208,32 @@ function buildLayout(
   for (const [fromId, childIds] of Object.entries(fiberRelations)) {
     for (const childId of childIds) addVisualEdge(fromId, childId, 'render');
   }
+  // 서버 라우트 visual 엣지 (topology와 동일 로직)
+  for (const route of nextRoutes ?? []) {
+    const fromId = SSR_PREFIX + route.filePath;
+    if (route.type === 'layout') {
+      const layoutDepth = urlDepth(route.urlPath);
+      for (const child of nextRoutes ?? []) {
+        if (child.filePath === route.filePath) continue;
+        if (child.urlPath === route.urlPath || isUrlAncestor(route.urlPath, child.urlPath)) {
+          if (urlDepth(child.urlPath) === layoutDepth + 1 || child.urlPath === route.urlPath) {
+            addVisualEdge(fromId, SSR_PREFIX + child.filePath, 'render');
+          }
+        }
+      }
+    }
+    for (const child of route.children ?? []) {
+      if (child.isServer) continue;
+      const csrEntry = entries.find(e => e.filePath === child.filePath && e.name === child.componentName)
+        ?? entries.find(e => e.filePath === child.filePath);
+      if (csrEntry) addVisualEdge(fromId, csrEntry.symbolId, 'render');
+    }
+  }
 
-  const nodes: LayoutNode[] = entries
+  const nodes: LayoutNode[] = allEntries
     .map(entry => {
       const pos = posMap.get(entry.symbolId);
-      return pos ? { entry, ...pos } : null;
+      return pos ? { entry, ...pos, isServer: serverIds.has(entry.symbolId) } : null;
     })
     .filter(Boolean) as LayoutNode[];
 
@@ -203,6 +266,7 @@ export function FullGraph({
   selectedId,
   staticJsx,
   fiberRelations,
+  nextRoutes,
   onSelect,
   onHover,
   onHoverEnd,
@@ -211,13 +275,14 @@ export function FullGraph({
   selectedId: string;
   staticJsx: Record<string, string[]>;
   fiberRelations: Record<string, string[]>;
+  nextRoutes: RfmNextRoute[] | null;
   onSelect: (symbolId: string) => void;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
 }) {
   const layout = useMemo(
-    () => buildLayout(entries, staticJsx, fiberRelations),
-    [entries, staticJsx, fiberRelations],
+    () => buildLayout(entries, staticJsx, fiberRelations, nextRoutes),
+    [entries, staticJsx, fiberRelations, nextRoutes],
   );
 
   // Pan & zoom
@@ -327,10 +392,11 @@ export function FullGraph({
         </svg>
 
         {/* Nodes */}
-        {layout.nodes.map(({ entry, x, y }) => {
+        {layout.nodes.map(({ entry, x, y, isServer }) => {
           const isSelected = entry.symbolId === selectedId;
-          const catColor =
-            entry.category === 'page'      ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
+          const catColor = isServer
+            ? { bg: '#fffbeb', border: '#fcd34d', text: '#92400e' }
+            : entry.category === 'page'      ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
             : entry.category === 'hook'    ? { bg: '#f5f3ff', border: '#ddd6fe', text: '#7c3aed' }
             : entry.category === 'function'? { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' }
             :                                { bg: '#f9fafb', border: '#e5e7eb', text: '#374151' };

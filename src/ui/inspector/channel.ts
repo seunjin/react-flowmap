@@ -1,5 +1,5 @@
 import type { DocEntry } from '../doc/build-doc-index';
-import type { ComponentPropTypes } from './types';
+import type { ComponentPropTypes, RfmNextRoute } from './types';
 
 // ─── BroadcastChannel 프로토콜 ─────────────────────────────────────────────────
 
@@ -19,6 +19,8 @@ export type MainToGraph =
       staticJsx?: Record<string, string[]>;
       /** symbolId → 실제 fiber 트리에서 직접 렌더하는 자식 symbolId 목록 (alias import 포함) */
       fiberRelations?: Record<string, string[]>;
+      /** Next.js App Router 라우트 트리 */
+      nextRoutes?: RfmNextRoute[] | null;
     }
   | { type: 'pick-result'; symbolId: string }
   | {

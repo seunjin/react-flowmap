@@ -101,10 +101,16 @@ function applyStaticEdges(
   });
 }
 
+function computeRouteRect(): DOMRect {
+  // 서버 컴포넌트는 DOM에 없으므로 항상 전체 뷰포트 반환
+  return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+}
+
 function broadcastToGraph(
   ch: BroadcastChannel,
   allEntries: import('../doc/build-doc-index').DocEntry[],
   selectedId: string,
+  nextRoutes?: import('./types').RfmNextRoute[] | null,
 ) {
   // 항상 fresh하게 계산 (unmount 반영)
   const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
@@ -120,6 +126,7 @@ function broadcastToGraph(
     propTypesMap,
     ...(staticJsx ? { staticJsx } : {}),
     fiberRelations,
+    nextRoutes: nextRoutes ?? null,
   } satisfies MainToGraph);
   if (selectedId) {
     const props = serializeProps(getPropsForSymbolId(selectedId));
@@ -247,21 +254,47 @@ export function ComponentOverlay({
       if (msg.type === 'ready') {
         // 그래프 창 준비 완료 → 현재 상태 즉시 전송
         const { mountedEntries, selectedId: sid } = currentDataRef.current;
-        broadcastToGraph(ch, mountedEntries, sid);
+        broadcastToGraph(ch, mountedEntries, sid, nextRoutes);
       } else if (msg.type === 'select') {
-        setSelectedId(msg.symbolId);
-        const el = findElBySymbolId(msg.symbolId);
-        selectedElRef.current = el;
-        const props = serializeProps(getPropsForSymbolId(msg.symbolId));
-        ch.postMessage({
-          type: 'props-update',
-          symbolId: msg.symbolId,
-          props,
-        } satisfies MainToGraph);
+        if (msg.symbolId.startsWith('ssr:')) {
+          // 그래프 창에서 서버 라우트 노드 선택 → routeRect 표시
+          const fp = msg.symbolId.slice('ssr:'.length);
+          const routes: RfmNextRoute[] = (globalThis as unknown as { __rfmNextRouteTree?: RfmNextRoute[] }).__rfmNextRouteTree ?? [];
+          const route = routes.find(r => r.filePath === fp) ?? null;
+          if (route) {
+            const rect = computeRouteRect();
+            setSelectedId('');
+            selectedElRef.current = null;
+            setRouteRect({ rect, label: route.componentName });
+          }
+        } else {
+          setSelectedId(msg.symbolId);
+          setRouteRect(null);
+          const el = findElBySymbolId(msg.symbolId);
+          selectedElRef.current = el;
+          const props = serializeProps(getPropsForSymbolId(msg.symbolId));
+          ch.postMessage({
+            type: 'props-update',
+            symbolId: msg.symbolId,
+            props,
+          } satisfies MainToGraph);
+        }
       } else if (msg.type === 'hover') {
-        setHighlightId(msg.symbolId);
+        if (msg.symbolId.startsWith('ssr:')) {
+          // 그래프 창에서 서버 라우트 노드 호버 → routeHoverRect 표시
+          const fp = msg.symbolId.slice('ssr:'.length);
+          const routes: RfmNextRoute[] = (globalThis as unknown as { __rfmNextRouteTree?: RfmNextRoute[] }).__rfmNextRouteTree ?? [];
+          const route = routes.find(r => r.filePath === fp) ?? null;
+          if (route) {
+            const rect = computeRouteRect();
+            setRouteHoverRect({ rect, label: route.componentName });
+          }
+        } else {
+          setHighlightId(msg.symbolId);
+        }
       } else if (msg.type === 'hover-end') {
         setHighlightId('');
+        setRouteHoverRect(null);
       } else if (msg.type === 'pick-start') {
         setPicking(true);
       } else if (msg.type === 'back-to-overlay') {
@@ -337,8 +370,8 @@ export function ComponentOverlay({
   // allEntries / selectedId 변경 시 그래프 창에 브로드캐스트
   useEffect(() => {
     if (!graphWindowOpen || !channelRef.current) return;
-    broadcastToGraph(channelRef.current, allEntries, selectedId);
-  }, [allEntries, selectedId, graphWindowOpen]);
+    broadcastToGraph(channelRef.current, allEntries, selectedId, nextRoutes);
+  }, [allEntries, selectedId, graphWindowOpen, nextRoutes]);
 
   // DOM 변화(mount/unmount) 감지 → 그래프창 재동기화
   useEffect(() => {
@@ -347,7 +380,7 @@ export function ComponentOverlay({
     const obs = new MutationObserver(() => {
       if (debounceId) clearTimeout(debounceId);
       debounceId = setTimeout(() => {
-        if (channelRef.current) broadcastToGraph(channelRef.current, allEntries, selectedIdRef.current);
+        if (channelRef.current) broadcastToGraph(channelRef.current, allEntries, selectedIdRef.current, nextRoutes);
       }, 100);
     });
     obs.observe(document.body, { childList: true, subtree: true });

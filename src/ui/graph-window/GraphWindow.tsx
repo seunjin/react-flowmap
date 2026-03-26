@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SquareMousePointer, ArrowLeft, ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { MainToGraph, GraphToMain, PropTypesMap } from '../inspector/channel';
 import { RFM_CHANNEL } from '../inspector/channel';
+import type { RfmNextRoute } from '../inspector/types';
 import { PropRow } from '../inspector/PropRow';
-import { FullGraph } from './FullGraph';
+import { ServerComponentDetail } from '../inspector/ServerComponentDetail';
+import { FullGraph, SSR_PREFIX } from './FullGraph';
 import inspectorCss from '../inspector/inspector.compiled.css?raw';
 
 // ─── RelGraph (entry 데이터 기반 관계 시각화) ─────────────────────────────────
@@ -52,10 +54,6 @@ function EntryRelGraph({ entry, onSelect, onHover, onHoverEnd }: {
   const children = entry.renders;
   const hooks = entry.uses;
 
-  if (parents.length === 0 && children.length === 0 && hooks.length === 0) {
-    return <p className="text-[11px] text-rfm-text-400">No relations recorded yet.</p>;
-  }
-
   return (
     <div className="flex flex-col items-center gap-0 py-1">
       {parents.length > 0 && (
@@ -94,16 +92,20 @@ function EntryRelGraph({ entry, onSelect, onHover, onHoverEnd }: {
           </div>
         </>
       )}
+      {parents.length === 0 && children.length === 0 && hooks.length === 0 && (
+        <p className="text-[11px] text-rfm-text-400 mt-2">No other relations recorded.</p>
+      )}
     </div>
   );
 }
 
 // ─── GraphEntryDetail ─────────────────────────────────────────────────────────
 
-function GraphEntryDetail({ entry, props, propTypesMap, onSelect, onHover, onHoverEnd }: {
+function GraphEntryDetail({ entry, props, propTypesMap, serverParent, onSelect, onHover, onHoverEnd }: {
   entry: DocEntry;
   props: Record<string, unknown> | null;
   propTypesMap: PropTypesMap;
+  serverParent?: RfmNextRoute | null;
   onSelect: (id: string) => void;
   onHover: (id: string) => void;
   onHoverEnd: () => void;
@@ -129,6 +131,17 @@ function GraphEntryDetail({ entry, props, propTypesMap, onSelect, onHover, onHov
         <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase block mb-3">
           Relations
         </span>
+        {serverParent && (
+          <div className="flex flex-col items-center mb-0">
+            <RelNode
+              name={serverParent.componentName}
+              onClick={() => onSelect(SSR_PREFIX + serverParent.filePath)}
+              onHover={() => onHover(SSR_PREFIX + serverParent.filePath)}
+              onHoverEnd={onHoverEnd}
+            />
+            <RelConnector />
+          </div>
+        )}
         <EntryRelGraph
           entry={entry}
           onSelect={onSelect}
@@ -191,6 +204,7 @@ export function GraphWindow() {
   const [propTypesMap, setPropTypesMap] = useState<PropTypesMap>({});
   const [staticJsx, setStaticJsx] = useState<Record<string, string[]>>({});
   const [fiberRelations, setFiberRelations] = useState<Record<string, string[]>>({});
+  const [nextRoutes, setNextRoutes] = useState<RfmNextRoute[] | null>(null);
   const [currentProps, setCurrentProps] = useState<Record<string, unknown> | null>(null);
   const [picking, setPicking] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -220,7 +234,12 @@ export function GraphWindow() {
         setPropTypesMap(msg.propTypesMap ?? {});
         if (msg.staticJsx) setStaticJsx(msg.staticJsx);
         if (msg.fiberRelations) setFiberRelations(msg.fiberRelations);
-        if (msg.selectedId) setSelectedId(prev => msg.selectedId || prev);
+        if (msg.nextRoutes !== undefined) setNextRoutes(msg.nextRoutes);
+        // 초기 선택만 동기화 — 이미 선택이 있으면 덮어쓰지 않음
+        if (msg.selectedId && !selectedIdRef.current) {
+          setSelectedId(msg.selectedId);
+          selectedIdRef.current = msg.selectedId;
+        }
       } else if (msg.type === 'pick-result') {
         setSelectedId(msg.symbolId);
         selectedIdRef.current = msg.symbolId;
@@ -278,6 +297,19 @@ export function GraphWindow() {
   }, [sendToMain]);
 
   const selectedEntry = allEntries.find(e => e.symbolId === selectedId) ?? null;
+
+  // 서버 라우트 선택 여부
+  const selectedRoute = useMemo<RfmNextRoute | null>(() => {
+    if (!selectedId.startsWith(SSR_PREFIX) || !nextRoutes) return null;
+    const fp = selectedId.slice(SSR_PREFIX.length);
+    return nextRoutes.find(r => r.filePath === fp) ?? null;
+  }, [selectedId, nextRoutes]);
+
+  // CSR 컴포넌트의 서버 부모 자동 계산
+  const csrServerParent = useMemo<RfmNextRoute | null>(() => {
+    if (!selectedEntry || !nextRoutes) return null;
+    return nextRoutes.find(r => r.children?.some(c => c.filePath === selectedEntry.filePath)) ?? null;
+  }, [selectedEntry, nextRoutes]);
 
   return (
     <div
@@ -338,6 +370,7 @@ export function GraphWindow() {
           selectedId={selectedId}
           staticJsx={staticJsx}
           fiberRelations={fiberRelations}
+          nextRoutes={nextRoutes}
           onSelect={handleSelect}
           onHover={handleHover}
           onHoverEnd={handleHoverEnd}
@@ -345,45 +378,66 @@ export function GraphWindow() {
 
         {/* 상세 패널 */}
         <div className="w-[320px] min-w-[320px] border-l border-rfm-border flex flex-col overflow-hidden bg-white">
-          {selectedEntry ? (
+          {(selectedRoute || selectedEntry) ? (
             <>
               {/* 상세 헤더 */}
               <div className="h-10 min-h-10 flex items-center justify-between px-4 border-b border-rfm-border shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[13px] font-semibold text-rfm-text-900 truncate">
-                    {selectedEntry.name}
+                    {selectedRoute?.componentName ?? selectedEntry?.name}
                   </span>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-rfm-text-400 px-1.5 py-0.5 rounded bg-rfm-bg-100 shrink-0">
-                    {selectedEntry.category}
+                  <span className="text-[9px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded shrink-0 bg-rfm-bg-100 text-rfm-text-400">
+                    {selectedRoute ? (selectedRoute.type === 'layout' ? 'layout' : 'page') : selectedEntry?.category}
                   </span>
                 </div>
-                {selectedEntry.filePath && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = new URL('/__rfm-open', window.location.origin);
-                      url.searchParams.set('file', selectedEntry.filePath!);
-                      url.searchParams.set('symbolId', selectedEntry.symbolId);
-                      fetch(url.toString()).catch(() => {});
-                    }}
-                    title="Open in editor"
-                    className="w-6 h-6 ml-1 flex items-center justify-center rounded border-none bg-transparent text-rfm-text-400 hover:text-rfm-text-700 hover:bg-rfm-bg-100 cursor-pointer transition-all shrink-0"
-                  >
-                    <ExternalLink size={11} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fp = selectedRoute?.filePath ?? selectedEntry?.filePath;
+                    if (!fp) return;
+                    const url = new URL('/__rfm-open', window.location.origin);
+                    url.searchParams.set('file', fp);
+                    fetch(url.toString()).catch(() => {});
+                  }}
+                  title="Open in editor"
+                  className="w-6 h-6 ml-1 flex items-center justify-center rounded border-none bg-transparent text-rfm-text-400 hover:text-rfm-text-700 hover:bg-rfm-bg-100 cursor-pointer transition-all shrink-0"
+                >
+                  <ExternalLink size={11} />
+                </button>
               </div>
 
               {/* 상세 본문 */}
-              <div className="flex-1 overflow-hidden">
-                <GraphEntryDetail
-                  entry={selectedEntry}
-                  props={currentProps}
-                  propTypesMap={propTypesMap}
-                  onSelect={handleSelect}
-                  onHover={handleHover}
-                  onHoverEnd={handleHoverEnd}
-                />
+              <div className="flex-1 overflow-y-auto">
+                {selectedRoute ? (
+                  <ServerComponentDetail
+                    route={selectedRoute}
+                    allRoutes={nextRoutes ?? []}
+                    onSelectRoute={(r) => handleSelect(SSR_PREFIX + r.filePath)}
+                    onHoverRoute={(r) => handleHover(SSR_PREFIX + r.filePath)}
+                    onHoverRouteEnd={handleHoverEnd}
+                    onSelectImportChild={(child) => {
+                      const entry = allEntries.find(e => e.filePath === child.filePath && e.name === child.componentName)
+                        ?? allEntries.find(e => e.filePath === child.filePath);
+                      if (entry) handleSelect(entry.symbolId);
+                    }}
+                    onHoverImportChild={(child) => {
+                      const entry = allEntries.find(e => e.filePath === child.filePath && e.name === child.componentName)
+                        ?? allEntries.find(e => e.filePath === child.filePath);
+                      if (entry) handleHover(entry.symbolId);
+                    }}
+                    onHoverImportChildEnd={handleHoverEnd}
+                  />
+                ) : selectedEntry ? (
+                  <GraphEntryDetail
+                    entry={selectedEntry}
+                    props={currentProps}
+                    propTypesMap={propTypesMap}
+                    serverParent={csrServerParent}
+                    onSelect={handleSelect}
+                    onHover={handleHover}
+                    onHoverEnd={handleHoverEnd}
+                  />
+                ) : null}
               </div>
             </>
           ) : (
