@@ -180,6 +180,7 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         const params = new URLSearchParams(qs);
         const file     = params.get('file');
         const symbolId = params.get('symbolId');
+        const editorParam = params.get('editor');
         const line = symbolId && symbolLocMap.has(symbolId)
           ? symbolLocMap.get(symbolId)!
           : parseInt(params.get('line') ?? '1', 10) || 1;
@@ -194,7 +195,7 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         }
 
         const absPath = resolve(root, file);
-        openInEditor(absPath, line, editorCmd);
+        openInEditor(absPath, line, editorParam ?? editorCmd);
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, file: absPath, line, editor: editorCmd }));
       });

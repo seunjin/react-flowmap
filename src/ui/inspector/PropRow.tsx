@@ -35,7 +35,12 @@ export function primitiveLabel(value: unknown): string {
 
 // ─── PropRow ──────────────────────────────────────────────────────────────────
 
-export function PropRow({ name, value, typeEntry }: { name: string; value: unknown; typeEntry?: PropTypeEntry | undefined }) {
+export function PropRow({ name, value, typeEntry, typeOnly }: {
+  name: string;
+  value: unknown;
+  typeEntry?: PropTypeEntry | undefined;
+  typeOnly?: boolean;
+}) {
   const isObj = value !== null && typeof value === 'object' && !isRfmFn(value);
   const isArr = Array.isArray(value);
   const isExpandable = isObj || isArr;
@@ -44,7 +49,7 @@ export function PropRow({ name, value, typeEntry }: { name: string; value: unkno
   return (
     <div className="rounded-[5px] border border-[rgba(229,231,235,0.7)] overflow-hidden bg-[rgba(255,255,255,0.5)]">
       {/* 헤더: name? : TypeName */}
-      <div className="flex items-center gap-1 px-2 py-1 bg-[rgba(243,244,246,0.7)] border-b border-[rgba(229,231,235,0.6)]">
+      <div className={`flex items-center gap-1 px-2 py-1 bg-[rgba(243,244,246,0.7)] ${typeOnly ? '' : 'border-b border-[rgba(229,231,235,0.6)]'}`}>
         <span className="font-mono text-[11px] text-rfm-text-900 font-semibold">{name}</span>
         {typeEntry?.optional && <span className="font-mono text-[11px] text-rfm-text-400">?</span>}
         {typeName && (
@@ -58,17 +63,19 @@ export function PropRow({ name, value, typeEntry }: { name: string; value: unkno
       </div>
 
       {/* 런타임 값 */}
-      <div className="px-2 pt-1 pb-1.5">
-        {!isExpandable ? (
-          <span className={`font-mono text-[11px] ${primitiveColorClass(value)}`}>
-            {primitiveLabel(value)}
-          </span>
-        ) : (
-          <pre className="m-0 font-mono text-[10px] leading-relaxed text-rfm-text-700 whitespace-pre-wrap">
-            {JSON.stringify(value, (_k, v) => typeof v === 'function' ? primitiveLabel(v) : v, 2)}
-          </pre>
-        )}
-      </div>
+      {!typeOnly && (
+        <div className="px-2 pt-1 pb-1.5">
+          {!isExpandable ? (
+            <span className={`font-mono text-[11px] ${primitiveColorClass(value)}`}>
+              {primitiveLabel(value)}
+            </span>
+          ) : (
+            <pre className="m-0 font-mono text-[10px] leading-relaxed text-rfm-text-700 whitespace-pre-wrap">
+              {JSON.stringify(value, (_k, v) => typeof v === 'function' ? primitiveLabel(v) : v, 2)}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }

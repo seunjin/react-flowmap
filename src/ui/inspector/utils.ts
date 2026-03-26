@@ -79,6 +79,13 @@ export function normalizePath(filePath: string): string {
 
 // ─── Editor open ──────────────────────────────────────────────────────────────
 
+let _editorOverride: string | null = null;
+
+/** ReactFlowMap config.editor에서 설정된 에디터 커맨드를 저장 */
+export function setEditorOverride(editor: string | undefined) {
+  _editorOverride = editor ?? null;
+}
+
 export function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
   // Next.js: globalThis.__rfmOpenUrl = 'http://127.0.0.1:51423' (사이드카)
   // Vite: undefined → 상대 URL로 fallback (Vite 미들웨어 처리)
@@ -86,6 +93,7 @@ export function openInEditor(filePath: string, symbolId: string, loc?: string | 
   const base: string = (globalThis as any).__rfmOpenUrl ?? '';
   const params = new URLSearchParams({ file: filePath, symbolId });
   if (loc) params.set('line', loc);
+  if (_editorOverride) params.set('editor', _editorOverride);
   fetch(`${base}/__rfm-open?${params.toString()}`).catch(() => {});
 }
 

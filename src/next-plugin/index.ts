@@ -17,11 +17,26 @@ function openInEditor(absPath: string, line: number, editor: string): void {
   const vscodeFamily = ['code', 'cursor', 'antigravity', 'windsurf', 'codium', 'vscodium'];
   const isVscodeFamily = vscodeFamily.some(e => editor === e || editor.endsWith(`/${e}`));
 
-  const cmd = isVscodeFamily
-    ? `"${editor}" -g "${target}"`
-    : editor === 'zed'
-      ? `zed "${target}"`
-      : `"${editor}" "${absPath}"`;
+  const vimFamily = ['vim', 'vi', 'nvim', 'neovim'];
+  const isVimFamily = vimFamily.some(e => editor === e || editor.endsWith(`/${e}`));
+
+  let cmd: string;
+  if (isVscodeFamily) {
+    cmd = `"${editor}" -g "${target}"`;
+  } else if (editor === 'zed') {
+    cmd = `zed "${target}"`;
+  } else if (isVimFamily) {
+    // TTY 없이 실행 시 .swp 파일 생성 방지: -n (no swap), +N (line jump)
+    // macOS: Terminal.app에서 열어서 실제로 편집 가능하게 함
+    if (process.platform === 'darwin') {
+      const escaped = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      cmd = `osascript -e 'tell application "Terminal" to do script "${editor} +${line} \\"${escaped}\\""' -e 'tell application "Terminal" to activate'`;
+    } else {
+      cmd = `"${editor}" -n +"${line}" "${absPath}"`;
+    }
+  } else {
+    cmd = `"${editor}" "${absPath}"`;
+  }
 
   const extraPaths = [
     `${process.env['HOME'] ?? ''}/.antigravity/antigravity/bin`,
@@ -54,6 +69,7 @@ function startSidecar(port: number, root: string, editorCmd: string): void {
     const qs = req.url?.split('?')[1] ?? '';
     const params = new URLSearchParams(qs);
     const file = params.get('file');
+    const editorParam = params.get('editor');
     const line = parseInt(params.get('line') ?? '1', 10) || 1;
 
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -65,7 +81,9 @@ function startSidecar(port: number, root: string, editorCmd: string): void {
       return;
     }
 
-    openInEditor(resolve(root, file), line, editorCmd);
+    const resolvedEditor = editorParam ?? editorCmd;
+    console.log(`[react-flowmap] open: ${file} (editor: ${resolvedEditor})`);
+    openInEditor(resolve(root, file), line, resolvedEditor);
     res.end(JSON.stringify({ ok: true }));
   });
 

@@ -1,20 +1,68 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type React from 'react';
-import { SquareMousePointer, X, Search, ChevronLeft, ChevronRight, ExternalLink, Maximize2 } from 'lucide-react';
+import { SquareMousePointer, X, Search, ChevronLeft, ExternalLink, Maximize2, Clipboard, Check } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
-import type { DockPosition, FoundComp, RfmNextRoute } from './types';
-import { sidebarStyle, openInEditor, findAllMountedRfmComponents, deriveDisplayName } from './utils';
-import { buildFolderTree, flattenTreeEntries } from './tree-utils';
+import type { DockPosition, FoundComp, RfmNextRoute, RfmNextServerComponent } from './types';
+import { sidebarStyle, openInEditor, findAllMountedRfmComponents, deriveDisplayName, findAllInstanceRectsBySymbolId } from './utils';
+import { buildUnifiedTree, flattenUnifiedEntries, UnifiedTreeView } from './UnifiedTreeView';
+import type { UnifiedFolder, UnifiedFile } from './UnifiedTreeView';
 import { DockDropdown } from './DockDropdown';
-import { TreeNodeView } from './TreeView';
 import { EntryDetail } from './EntryDetail';
+import { ServerComponentDetail } from './ServerComponentDetail';
+
+// ─── 트리 텍스트 직렬화 (복사 버튼용) ────────────────────────────────────────
+
+function serializeImportNode(node: RfmNextServerComponent, prefix: string, isLast: boolean): string {
+  const connector = isLast ? '└── ' : '├── ';
+  const badge = node.isServer ? '(S)' : '(C)';
+  const line = `${prefix}${connector}${node.componentName} ${badge}`;
+  if (!node.children?.length) return line;
+  const childPrefix = prefix + (isLast ? '    ' : '│   ');
+  return [line, ...node.children.map((c, i) =>
+    serializeImportNode(c, childPrefix, i === node.children!.length - 1),
+  )].join('\n');
+}
+
+function serializeUnifiedNode(
+  node: UnifiedFolder | UnifiedFile,
+  prefix: string,
+  isLast: boolean,
+): string {
+  const connector = isLast ? '└── ' : '├── ';
+  const childPrefix = prefix + (isLast ? '    ' : '│   ');
+
+  if (node.kind === 'folder') {
+    const line = `${prefix}${connector}${node.name}/`;
+    const childLines = node.children.map((c, i) =>
+      serializeUnifiedNode(c, childPrefix, i === node.children.length - 1),
+    );
+    return [line, ...childLines].join('\n');
+  }
+
+  const lines: string[] = [];
+  const { route, entries } = node;
+
+  if (route) {
+    const badge = route.isServer ? '(S)' : '(C)';
+    lines.push(`${prefix}${connector}${node.name}  ${route.componentName} ${badge}`);
+    if (route.children?.length) {
+      route.children.forEach((child, ci) => {
+        lines.push(serializeImportNode(child, childPrefix, ci === route.children!.length - 1));
+      });
+    }
+  } else if (entries.length > 0) {
+    lines.push(`${prefix}${connector}${node.name}  ${entries.map(e => e.name).join(', ')}`);
+  }
+
+  return lines.filter(Boolean).join('\n');
+}
 
 // ─── FloatingSidebar ──────────────────────────────────────────────────────────
 
 export function FloatingSidebar({
   stack, selectedId, selectedLoc, selectedEl, allEntries, onSelect, onClose,
   dockPosition, floatPos, onDockChange, onFloatMove,
-  onHighlight, onHighlightEnd,
+  onHighlight, onHighlightEnd, onRouteRect, onRouteHoverRect,
   picking, onPickToggle,
   onOpenGraphWindow,
   nextRoutes,
@@ -32,15 +80,60 @@ export function FloatingSidebar({
   onFloatMove: (pos: { x: number; y: number }) => void;
   onHighlight: (symbolId: string) => void;
   onHighlightEnd: () => void;
+  onRouteRect: (rect: DOMRect | null, label: string) => void;
+  onRouteHoverRect: (rect: DOMRect | null, label: string) => void;
   picking: boolean;
   onPickToggle: () => void;
   onOpenGraphWindow: () => void;
   nextRoutes: RfmNextRoute[] | null;
 }) {
-  const [view, setView] = useState<'tree' | 'detail'>('tree');
+  const [view, setView] = useState<'tree' | 'detail' | 'server-detail'>('tree');
+  const [selectedRoute, setSelectedRoute] = useState<RfmNextRoute | null>(null);
+
+  function computeRouteRect(route: RfmNextRoute): DOMRect {
+    // layout → 항상 전체 뷰포트
+    if (route.type === 'layout') {
+      return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+    // 라우트 컴포넌트 자체가 displayEntries에 있으면 실제 DOM rect 사용
+    const ownEntry = displayEntries.find(e => e.filePath === route.filePath && e.name === route.componentName)
+      ?? displayEntries.find(e => e.filePath === route.filePath);
+
+    if (ownEntry) {
+      const rects = findAllInstanceRectsBySymbolId(ownEntry.symbolId);
+      if (rects.length > 0) {
+        const t = Math.min(...rects.map(r => r.top));
+        const l = Math.min(...rects.map(r => r.left));
+        const r = Math.max(...rects.map(r => r.right));
+        const b = Math.max(...rects.map(r => r.bottom));
+        return new DOMRect(l, t, r - l, b - t);
+      }
+    }
+    // 서버 컴포넌트 등 DOM에 없으면 전체 뷰포트 fallback
+    return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+
+  function activateRoute(route: RfmNextRoute) {
+    const fullRoute = nextRoutes?.find(r => r.filePath === route.filePath) ?? route;
+    setSelectedRoute(fullRoute);
+    onRouteRect(computeRouteRect(fullRoute), fullRoute.componentName);
+  }
+
+  function selectRoute(route: RfmNextRoute) {
+    const fullRoute = nextRoutes?.find(r => r.filePath === route.filePath) ?? route;
+    setSelectedRoute(fullRoute);
+    setView('server-detail');
+    onRouteRect(computeRouteRect(fullRoute), fullRoute.componentName);
+  }
+
+  function hoverRoute(route: RfmNextRoute | null) {
+    if (!route) { onRouteHoverRect(null, ''); return; }
+    onRouteHoverRect(computeRouteRect(route), route.componentName);
+  }
+
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [searchQuery, setSearchQuery] = useState('');
-  const [pagesExpanded, setPagesExpanded] = useState(true);
+  const [copied, setCopied] = useState(false);
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 플로팅 드래그
@@ -51,9 +144,10 @@ export function FloatingSidebar({
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: floatPos.x, origY: floatPos.y };
     function onMouseMove(ev: MouseEvent) {
       if (!dragRef.current) return;
-      const nx = dragRef.current.origX + (ev.clientX - dragRef.current.startX);
-      const ny = dragRef.current.origY + (ev.clientY - dragRef.current.startY);
-      onFloatMove({ x: Math.max(0, nx), y: Math.max(0, ny) });
+      onFloatMove({
+        x: Math.max(0, dragRef.current.origX + (ev.clientX - dragRef.current.startX)),
+        y: Math.max(0, dragRef.current.origY + (ev.clientY - dragRef.current.startY)),
+      });
     }
     function onMouseUp() {
       dragRef.current = null;
@@ -86,24 +180,51 @@ export function FloatingSidebar({
     }).filter((e): e is DocEntry => e !== null);
   }, [allEntries]);
 
+  // CSR 컴포넌트의 서버 부모 라우트 — 어떤 경로로 진입해도 자동 계산
+  const serverParent = useMemo<RfmNextRoute | null>(() => {
+    if (view !== 'detail' || !selectedId || !nextRoutes) return null;
+    const entry = displayEntries.find(e => e.symbolId === selectedId);
+    if (!entry?.filePath) return null;
+    // nextRoutes에서 이 파일을 import하는 라우트 탐색
+    const found = nextRoutes.find(route =>
+      route.children?.some(c => c.filePath === entry.filePath),
+    );
+    return found ?? null;
+  }, [view, selectedId, displayEntries, nextRoutes]);
+
   const filteredEntries = useMemo(() => {
     if (!searchQuery) return displayEntries;
     const q = searchQuery.toLowerCase();
     return displayEntries.filter(e => e.name.toLowerCase().includes(q));
   }, [displayEntries, searchQuery]);
 
-  const tree = useMemo(() => buildFolderTree(filteredEntries), [filteredEntries]);
-  // 트리 시각 순서 기준 플랫 리스트 (키보드 nav 용)
-  const treeOrderedEntries = useMemo(() => flattenTreeEntries(tree), [tree]);
+  // 통합 폴더 트리: 라우트 파일 + 런타임 컴포넌트
+  const unifiedTree = useMemo(
+    () => buildUnifiedTree(nextRoutes, filteredEntries),
+    [nextRoutes, filteredEntries],
+  );
+
+  // 키보드 네비게이션용 플랫 리스트 (런타임 컴포넌트만)
+  const treeOrderedEntries = useMemo(() => flattenUnifiedEntries(unifiedTree), [unifiedTree]);
+
   const selectedEntry = allEntries.find(e => e.symbolId === selectedId)
     ?? displayEntries.find(e => e.symbolId === selectedId)
     ?? null;
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
-  // selectedId가 초기화되면(라우터 전환 등) 트리뷰로 복귀
-  useEffect(() => {
-    if (!selectedId) setView('tree');
-  }, [selectedId]);
+  function copyTree() {
+    const text = unifiedTree.children
+      .map((c, i) => serializeUnifiedNode(c, '', i === unifiedTree.children.length - 1))
+      .filter(Boolean)
+      .join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  // selectedId 초기화 시 트리뷰로 복귀
+  useEffect(() => { if (!selectedId && view === 'detail') setView('tree'); }, [selectedId]);
 
   useEffect(() => {
     if (view === 'tree') selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -120,12 +241,10 @@ export function FloatingSidebar({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).closest('input, textarea, select')) return;
-
       if (view === 'detail') {
         if (e.key === 'Escape') { e.stopPropagation(); setView('tree'); }
         return;
       }
-
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         e.stopPropagation();
@@ -138,21 +257,16 @@ export function FloatingSidebar({
           return next;
         });
       }
-
       if (e.key === 'Enter' && focusedIdx >= 0) {
         e.preventDefault();
         e.stopPropagation();
         const entry = treeOrderedEntries[focusedIdx];
         if (entry) {
-          if (entry.symbolId === selectedId) {
-            setView('detail');
-          } else {
-            onSelect(entry.symbolId);
-          }
+          if (entry.symbolId === selectedId) setView('detail');
+          else onSelect(entry.symbolId);
         }
       }
     }
-
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
   }, [view, treeOrderedEntries, focusedIdx, onSelect]);
@@ -166,30 +280,37 @@ export function FloatingSidebar({
       {/* 헤더 */}
       <div
         onMouseDown={onHeaderMouseDown}
-        className={`h-9 min-h-9 flex items-center justify-between px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0 select-none ${dockPosition === 'float'
-          ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
-          : 'bg-[rgba(249,250,251,0.6)] cursor-default'
-          }`}
+        className={`h-9 min-h-9 flex items-center justify-between px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0 select-none ${
+          dockPosition === 'float'
+            ? 'bg-[rgba(249,250,251,0.5)] cursor-grab'
+            : 'bg-[rgba(249,250,251,0.6)] cursor-default'
+        }`}
       >
         <div className="flex items-center gap-1">
-          {/* 요소 선택 픽 버튼 */}
           <button
             type="button"
             onClick={onPickToggle}
             title={picking ? 'Cancel (Escape)' : 'Pick element'}
-            className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${picking
-              ? 'bg-rfm-bg-100 text-rfm-text-700'
-              : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
-              }`}
+            className={`w-6 h-6 rounded-[4px] border-none flex items-center justify-center cursor-pointer transition-all duration-100 ${
+              picking
+                ? 'bg-rfm-bg-100 text-rfm-text-700'
+                : 'bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-700'
+            }`}
           >
             <SquareMousePointer size={14} />
           </button>
           <div className="w-px h-3.5 bg-rfm-border-light" />
-          {/* 포지션 버튼 */}
           <DockDropdown current={dockPosition} onChange={onDockChange} />
         </div>
         <div className="flex items-center gap-1">
-          {/* 새 창으로 전체 그래프 열기 */}
+          <button
+            type="button"
+            onClick={copyTree}
+            title="Copy tree as text"
+            className="w-6 h-6 rounded-[4px] border-none bg-transparent text-rfm-text-400 cursor-pointer flex items-center justify-center transition-all duration-100 hover:bg-rfm-bg-100 hover:text-rfm-text-700"
+          >
+            {copied ? <Check size={12} className="text-green-500" /> : <Clipboard size={12} />}
+          </button>
           <button
             type="button"
             onClick={onOpenGraphWindow}
@@ -208,10 +329,8 @@ export function FloatingSidebar({
         </div>
       </div>
 
-
       {view === 'tree' ? (
         <>
-
           {/* 검색 */}
           <div className="px-2 py-1.5 border-b border-rfm-border shrink-0">
             <div className="relative">
@@ -228,88 +347,32 @@ export function FloatingSidebar({
                   type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-none bg-rfm-text-300 text-white cursor-pointer flex items-center justify-center p-0"
-                ><X size={10} /></button>
+                >
+                  <X size={10} />
+                </button>
               )}
             </div>
           </div>
 
-          {/* Next.js Pages 섹션 */}
-          {nextRoutes && nextRoutes.length > 0 && (
-            <div className="border-b border-rfm-border shrink-0">
-              <button
-                type="button"
-                onClick={() => setPagesExpanded(p => !p)}
-                className="w-full flex items-center gap-1 px-2 py-1.5 border-none bg-transparent cursor-pointer text-left"
-              >
-                <ChevronRight
-                  size={10}
-                  className={`text-rfm-text-400 transition-transform duration-100 ${pagesExpanded ? 'rotate-90' : ''}`}
-                />
-                <span className="text-[10px] font-semibold text-rfm-text-400 uppercase tracking-wide">
-                  Pages
-                </span>
-                <span className="ml-auto text-[10px] text-rfm-text-300">
-                  {nextRoutes.filter(r => r.type === 'layout' || r.type === 'page').length}
-                </span>
-              </button>
-              {pagesExpanded && (
-                <div className="pb-1">
-                  {nextRoutes
-                    .filter(r => r.type === 'layout' || r.type === 'page')
-                    .map(route => (
-                      <button
-                        key={route.filePath}
-                        type="button"
-                        onClick={() => openInEditor(route.filePath, '', '1')}
-                        title={route.filePath}
-                        className="w-full flex items-center gap-1.5 px-3 py-[3px] border-none bg-transparent cursor-pointer text-left hover:bg-rfm-bg-100 group"
-                      >
-                        <span
-                          title={route.isServer ? 'Server Component' : 'Client Component'}
-                          className={`text-[9px] font-semibold px-[3px] rounded ${
-                            route.isServer
-                              ? 'text-rfm-text-400 bg-[rgba(0,0,0,0.05)]'
-                              : 'text-rfm-blue bg-rfm-blue-xlight'
-                          }`}
-                        >
-                          {route.isServer ? 'S' : 'C'}
-                        </span>
-                        <span className="text-[11px] text-rfm-text-700 truncate flex-1">
-                          {route.componentName}
-                        </span>
-                        <span className="text-[10px] text-rfm-text-300 group-hover:text-rfm-text-400 shrink-0">
-                          {route.urlPath}
-                        </span>
-                      </button>
-                    ))
-                  }
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 폴더 트리 */}
-          <div ref={treeScrollRef} className="flex-1 overflow-y-auto pt-2 pb-4">
-            {filteredEntries.length === 0 ? (
-              <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400 leading-relaxed">
-                {searchQuery ? `No results for "${searchQuery}"` : 'No components rendered on screen'}
-              </p>
-            ) : (
-              <TreeNodeView
-                node={tree}
-                depth={0}
-                hoveredIds={hoveredIds}
-                treeHoveredId={treeHoveredId}
-                selectedId={selectedId}
-                focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
-                onSelect={onSelect}
-                onDetail={() => setView('detail')}
-                selectedRef={selectedRef}
-                onHover={(id) => { setTreeHoveredId(id); onHighlight(id); }}
-                onHoverEnd={() => { setTreeHoveredId(''); onHighlightEnd(); }}
-                forceExpanded={searchQuery.length > 0}
-              />
-            )}
+          {/* 통합 폴더 트리 */}
+          <div ref={treeScrollRef} className="flex-1 overflow-y-auto pt-1 pb-4">
+            <UnifiedTreeView
+              tree={unifiedTree}
+              selectedId={selectedId}
+              focusedSymbolId={focusedIdx >= 0 ? (treeOrderedEntries[focusedIdx]?.symbolId ?? '') : ''}
+              hoveredIds={hoveredIds}
+              treeHoveredId={treeHoveredId}
+              selectedRouteFilePath={selectedRoute?.filePath ?? ''}
+              onSelect={onSelect}
+              onDetail={() => setView('detail')}
+              onActivateRoute={(route) => activateRoute(route)}
+              onSelectRoute={(route) => selectRoute(route)}
+              selectedRef={selectedRef}
+              onHover={(id) => { setTreeHoveredId(id); onHighlight(id); }}
+              onHoverEnd={() => { setTreeHoveredId(''); onHighlightEnd(); }}
+              onHoverRoute={(route) => hoverRoute(route)}
+              onHoverRouteEnd={() => hoverRoute(null)}
+            />
           </div>
         </>
       ) : (
@@ -318,16 +381,29 @@ export function FloatingSidebar({
           <div className="h-9 min-h-9 grid grid-cols-[32px_1fr_32px] items-center px-2 border-b border-[rgba(229,231,235,0.5)] shrink-0">
             <button
               type="button"
-              onClick={() => setView('tree')}
+              onClick={() => {
+                if (view === 'detail' && serverParent) {
+                  // CSR 상세에서 뒤로 → 서버 부모로 복귀
+                  setView('server-detail');
+                  onRouteRect(computeRouteRect(serverParent), serverParent.componentName);
+                } else {
+                  setView('tree');
+                  setSelectedRoute(null);
+                  onRouteRect(null, '');
+                }
+              }}
               className="w-6 h-6 rounded-[4px] border-none bg-transparent cursor-pointer text-rfm-text-400 flex items-center justify-center transition-all duration-100 hover:bg-rfm-bg-100 hover:text-rfm-text-700"
             >
               <ChevronLeft size={14} />
             </button>
             <span className="text-[12px] font-semibold text-rfm-text-900 truncate text-center">
-              {selectedEntry?.name ?? selectedId.split('#').at(-1)}
+              {view === 'server-detail'
+                ? selectedRoute?.componentName
+                : (selectedEntry?.name ?? selectedId.split('#').at(-1))
+              }
             </span>
             <div className="flex justify-end">
-              {selectedEntry?.filePath && (
+              {view === 'detail' && selectedEntry?.filePath && (
                 <button
                   type="button"
                   onClick={() => openInEditor(selectedEntry.filePath!, selectedEntry.symbolId, selectedLoc)}
@@ -337,22 +413,57 @@ export function FloatingSidebar({
                   <ExternalLink size={12} />
                 </button>
               )}
+              {view === 'server-detail' && selectedRoute?.filePath && (
+                <button
+                  type="button"
+                  onClick={() => openInEditor(selectedRoute.filePath, '', '1')}
+                  title="Open in editor"
+                  className="w-6 h-6 rounded-[4px] border-none bg-transparent cursor-pointer text-rfm-text-400 flex items-center justify-center transition-all duration-100 hover:bg-rfm-bg-100 hover:text-rfm-text-700"
+                >
+                  <ExternalLink size={12} />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* 상세 — 전체 높이 사용 */}
+          {/* 상세 */}
           <div className="flex-1 overflow-y-auto">
-            {selectedEntry
-              ? <EntryDetail
-                entry={selectedEntry}
-                selectedEl={selectedEl}
-                onNavigate={(symbolId) => {
-                  onSelect(symbolId);
-                }}
-                onHover={(symbolId) => onHighlight(symbolId)}
-                onHoverEnd={onHighlightEnd}
-              />
-              : <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400">No data</p>
+            {view === 'server-detail' && selectedRoute
+              ? <ServerComponentDetail
+                  route={selectedRoute}
+                  allRoutes={nextRoutes ?? []}
+                  onSelectRoute={(r) => selectRoute(r)}
+                  onHoverRoute={(r) => hoverRoute(r)}
+                  onHoverRouteEnd={() => hoverRoute(null)}
+                  onHoverImportChild={(child) => {
+                    const entry = displayEntries.find(
+                      e => e.filePath === child.filePath && e.name === child.componentName,
+                    ) ?? displayEntries.find(e => e.filePath === child.filePath);
+                    if (entry) onHighlight(entry.symbolId);
+                  }}
+                  onHoverImportChildEnd={onHighlightEnd}
+                  onSelectImportChild={(child) => {
+                    const entry = displayEntries.find(
+                      e => e.filePath === child.filePath && e.name === child.componentName,
+                    ) ?? displayEntries.find(e => e.filePath === child.filePath);
+                    if (entry) { onSelect(entry.symbolId); setView('detail'); }
+                  }}
+                />
+              : selectedEntry
+                ? <EntryDetail
+                    entry={selectedEntry}
+                    selectedEl={selectedEl}
+                    onNavigate={(symbolId) => { onSelect(symbolId); }}
+                    onHover={(symbolId) => onHighlight(symbolId)}
+                    onHoverEnd={onHighlightEnd}
+                    serverParent={serverParent ? {
+                      name: serverParent.componentName,
+                      onSelect: () => { setView('server-detail'); onRouteRect(computeRouteRect(serverParent), serverParent.componentName); },
+                      onHover: () => hoverRoute(serverParent),
+                      onHoverEnd: () => hoverRoute(null),
+                    } : undefined}
+                  />
+                : <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400">No data</p>
             }
           </div>
         </>

@@ -3,5 +3,5 @@
 import { ReactFlowMap } from 'react-flowmap';
 
 export function FlowmapProvider() {
-  return <ReactFlowMap />;
+  return <ReactFlowMap config={{ editor: 'antigravity' }} />;
 }

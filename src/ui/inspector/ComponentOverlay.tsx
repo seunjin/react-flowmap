@@ -139,6 +139,8 @@ export function ComponentOverlay({
   const [stack,           setStack]           = useState<FoundComp[]>([]);
   const [selectedId,      setSelectedId]      = useState<string>('');
   const [highlightId,     setHighlightId]     = useState<string>('');
+  const [routeRect,       setRouteRect]       = useState<{ rect: DOMRect; label: string } | null>(null);
+  const [routeHoverRect,  setRouteHoverRect]  = useState<{ rect: DOMRect; label: string } | null>(null);
   const [graphWindowOpen, setGraphWindowOpen] = useState(false);
   const graphWinRef   = useRef<Window | null>(null);
   const channelRef    = useRef<BroadcastChannel | null>(null);
@@ -570,6 +572,11 @@ export function ComponentOverlay({
 
   return createPortal(
     <>
+      {/* SSR route hover 프리뷰 */}
+      {routeHoverRect && (
+        <HoverPreviewBox rect={routeHoverRect.rect} label={routeHoverRect.label} />
+      )}
+
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightId && (() => {
         const rects = findAllInstanceRectsBySymbolId(highlightId);
@@ -587,6 +594,11 @@ export function ComponentOverlay({
       {/* 액티브 선택: 실선 */}
       {selectedRect && (
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
+      )}
+
+      {/* SSR route 선택: 실선 (CSR 선택이 없을 때만) */}
+      {!selectedRect && routeRect && (
+        <ActiveSelectBox rect={routeRect.rect} label={routeRect.label} />
       )}
 
       {/* 플로팅 사이드바 — 그래프 창 열려있을 때는 숨김 */}
@@ -644,6 +656,8 @@ export function ComponentOverlay({
         }}
         onHighlight={setHighlightId}
         onHighlightEnd={() => setHighlightId('')}
+        onRouteRect={(rect, label) => setRouteRect(rect ? { rect, label } : null)}
+        onRouteHoverRect={(rect, label) => setRouteHoverRect(rect ? { rect, label } : null)}
       />}
     </>,
     shadowContainer,

@@ -3,7 +3,7 @@ import { findDomParent, findDomChildren } from './utils';
 
 // ─── GraphNode ────────────────────────────────────────────────────────────────
 
-function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
+export function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
   name: string;
   isCenter?: boolean;
   onClick?: (() => void) | undefined;
@@ -32,7 +32,7 @@ function GraphNode({ name, isCenter, onClick, onHover, onHoverEnd }: {
 
 // ─── GraphConnector ───────────────────────────────────────────────────────────
 
-function GraphConnector() {
+export function GraphConnector() {
   return (
     <div className="flex flex-col items-center shrink-0 my-1.5">
       <div className="w-px h-4 bg-rfm-text-300" />

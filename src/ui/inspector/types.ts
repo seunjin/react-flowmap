@@ -26,6 +26,14 @@ export type DomRelNode = { name: string; symbolId: string };
 
 export type RfmNextRouteType = 'layout' | 'page' | 'loading' | 'error' | 'not-found' | 'template';
 
+/** import 정적 분석으로 추출한 서버/클라이언트 컴포넌트 트리 노드 */
+export type RfmNextServerComponent = {
+  filePath: string;
+  componentName: string;
+  isServer: boolean;
+  children?: RfmNextServerComponent[];
+};
+
 export type RfmNextRoute = {
   /** URL 경로 (예: "/", "/dashboard", "/dashboard/[id]") */
   urlPath: string;
@@ -37,4 +45,8 @@ export type RfmNextRoute = {
   componentName: string;
   /** true = 서버 컴포넌트, false = 'use client' */
   isServer: boolean;
+  /** ts-morph 정적 분석으로 추출한 props 타입 */
+  propTypes?: Record<string, PropTypeEntry>;
+  /** 정적 import 분석으로 구성한 하위 컴포넌트 트리 */
+  children?: RfmNextServerComponent[];
 };

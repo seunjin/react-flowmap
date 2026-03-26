@@ -4,7 +4,7 @@ import type { DocEntry } from '../doc/build-doc-index';
 import type { ComponentPropTypes } from './types';
 import { getComponentPropsFromEl } from './utils';
 import { PropRow } from './PropRow';
-import { MiniRelationGraph } from './MiniRelationGraph';
+import { MiniRelationGraph, GraphNode, GraphConnector } from './MiniRelationGraph';
 
 // ─── DetailSection ────────────────────────────────────────────────────────────
 
@@ -19,12 +19,13 @@ export function DetailSection({ label, children }: { label: string; children: Re
 
 // ─── EntryDetail ──────────────────────────────────────────────────────────────
 
-export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd }: {
+export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd, serverParent }: {
   entry: DocEntry;
   selectedEl?: HTMLElement | null;
   onNavigate?: ((symbolId: string) => void) | undefined;
   onHover?: ((symbolId: string) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
+  serverParent?: { name: string; onSelect: () => void; onHover: () => void; onHoverEnd: () => void } | undefined;
 }) {
   return (
     <div className="flex flex-col">
@@ -34,6 +35,17 @@ export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd
         <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase block mb-3">
           Relations
         </span>
+        {serverParent && (
+          <div className="flex flex-col items-center mb-0">
+            <GraphNode
+              name={serverParent.name}
+              onClick={serverParent.onSelect}
+              onHover={serverParent.onHover}
+              onHoverEnd={serverParent.onHoverEnd}
+            />
+            <GraphConnector />
+          </div>
+        )}
         <MiniRelationGraph
           entry={entry}
           selectedEl={selectedEl ?? null}

@@ -8,6 +8,7 @@ import { attachFetchInterceptor } from '../../runtime/collector/index.js';
 import { ComponentOverlay } from './ComponentOverlay.js';
 import { GraphWindow } from '../graph-window/GraphWindow.js';
 import type { FlowmapConfig } from './InspectButton.js';
+import { setEditorOverride } from './utils.js';
 
 // ─── ReactFlowMap ──────────────────────────────────────────────────────────────
 
@@ -29,6 +30,8 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
     disableFetchInterceptor = false,
     ...overlayConfig
   } = config;
+
+  useEffect(() => { setEditorOverride(config.editor); }, [config.editor]);
 
   // ?__rfm=graph 감지 — window.open()으로 열린 그래프 창 팝업인 경우
   // SSR hydration mismatch 방지를 위해 useEffect에서 감지
