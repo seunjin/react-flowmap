@@ -9,6 +9,7 @@ import {
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
   findUnionRectBySymbolId, findAllInstanceRectsBySymbolId, deriveDisplayName,
+  findComponentRectByEl,
   buildFiberRelationships, invalidateMountedRfmSnapshot,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
@@ -145,7 +146,7 @@ export function ComponentOverlay({
 }) {
   const [stack,           setStack]           = useState<FoundComp[]>([]);
   const [selectedId,      setSelectedId]      = useState<string>('');
-  const [highlightId,     setHighlightId]     = useState<string>('');
+  const [highlightTarget, setHighlightTarget] = useState<{ symbolId: string; el?: HTMLElement | null } | null>(null);
   const [routeRect,       setRouteRect]       = useState<{ rect: DOMRect; label: string } | null>(null);
   const [routeHoverRect,  setRouteHoverRect]  = useState<{ rect: DOMRect; label: string } | null>(null);
   const [graphWindowOpen, setGraphWindowOpen] = useState(false);
@@ -290,10 +291,10 @@ export function ComponentOverlay({
             setRouteHoverRect({ rect, label: route.componentName });
           }
         } else {
-          setHighlightId(msg.symbolId);
+          setHighlightTarget({ symbolId: msg.symbolId });
         }
       } else if (msg.type === 'hover-end') {
-        setHighlightId('');
+        setHighlightTarget(null);
         setRouteHoverRect(null);
       } else if (msg.type === 'pick-start') {
         setPicking(true);
@@ -570,6 +571,9 @@ export function ComponentOverlay({
     c => c.symbolId === selectedId && (!selectedElRef.current || c.el === selectedElRef.current)
   ) ?? null;
   let selectedRect: DOMRect | null = selectedComp?.rect ?? null;
+  if (!selectedRect && selectedId && selectedElRef.current?.isConnected) {
+    selectedRect = findComponentRectByEl(selectedElRef.current, selectedId);
+  }
   if (!selectedRect && selectedId) {
     selectedRect = findUnionRectBySymbolId(selectedId);
   }
@@ -615,9 +619,17 @@ export function ComponentOverlay({
       )}
 
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
-      {highlightId && (() => {
-        const rects = findAllInstanceRectsBySymbolId(highlightId);
-        const label = highlightId.split('#').at(-1) ?? '';
+      {highlightTarget && (() => {
+        const label = highlightTarget.symbolId.split('#').at(-1) ?? '';
+        const exactRect = highlightTarget.el
+          ? findComponentRectByEl(highlightTarget.el, highlightTarget.symbolId)
+          : null;
+
+        if (exactRect && isVisible(exactRect)) {
+          return <HoverPreviewBox rect={exactRect} label={label} />;
+        }
+
+        const rects = findAllInstanceRectsBySymbolId(highlightTarget.symbolId);
         return rects.map((rect, i) => (
           isVisible(rect) ? <HoverPreviewBox key={i} rect={rect} label={label} /> : null
         ));
@@ -691,8 +703,8 @@ export function ComponentOverlay({
           }
           onDeactivate();
         }}
-        onHighlight={setHighlightId}
-        onHighlightEnd={() => setHighlightId('')}
+        onHighlight={(symbolId, el) => setHighlightTarget({ symbolId, ...(el !== undefined ? { el } : {}) })}
+        onHighlightEnd={() => setHighlightTarget(null)}
         onRouteRect={(rect, label) => setRouteRect(rect ? { rect, label } : null)}
         onRouteHoverRect={(rect, label) => setRouteHoverRect(rect ? { rect, label } : null)}
       />}

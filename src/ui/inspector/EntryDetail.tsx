@@ -22,8 +22,8 @@ export function DetailSection({ label, children }: { label: string; children: Re
 export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd, serverParent }: {
   entry: DocEntry;
   selectedEl?: HTMLElement | null;
-  onNavigate?: ((symbolId: string) => void) | undefined;
-  onHover?: ((symbolId: string) => void) | undefined;
+  onNavigate?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
+  onHover?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
   serverParent?: { name: string; onSelect: () => void; onHover: () => void; onHoverEnd: () => void } | undefined;
 }) {

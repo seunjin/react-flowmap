@@ -78,7 +78,7 @@ export function FloatingSidebar({
   floatPos: { x: number; y: number };
   onDockChange: (pos: DockPosition) => void;
   onFloatMove: (pos: { x: number; y: number }) => void;
-  onHighlight: (symbolId: string) => void;
+  onHighlight: (symbolId: string, el?: HTMLElement | null) => void;
   onHighlightEnd: () => void;
   onRouteRect: (rect: DOMRect | null, label: string) => void;
   onRouteHoverRect: (rect: DOMRect | null, label: string) => void;
@@ -453,8 +453,8 @@ export function FloatingSidebar({
                 ? <EntryDetail
                     entry={selectedEntry}
                     selectedEl={selectedEl}
-                    onNavigate={(symbolId) => { onSelect(symbolId); }}
-                    onHover={(symbolId) => onHighlight(symbolId)}
+                    onNavigate={(symbolId, el) => { onSelect(symbolId, el ?? undefined); }}
+                    onHover={(symbolId, el) => onHighlight(symbolId, el)}
                     onHoverEnd={onHighlightEnd}
                     serverParent={serverParent ? {
                       name: serverParent.componentName,

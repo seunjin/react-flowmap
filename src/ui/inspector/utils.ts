@@ -1,4 +1,4 @@
-import type { DockPosition, FoundComp } from './types';
+import type { DockPosition, DomRelNode, FoundComp } from './types';
 import { SIDEBAR_W, BOTTOM_H } from './tokens';
 
 // ─── Dock persistence ─────────────────────────────────────────────────────────
@@ -389,6 +389,25 @@ export function invalidateMountedRfmSnapshot(): void {
   mountedRfmSnapshotCache = null;
 }
 
+export function findComponentRectByEl(el: HTMLElement, selfSymbolId?: string): DOMRect | null {
+  const selfComp = resolveSelfFiber(el, selfSymbolId);
+  if (!selfComp) {
+    return null;
+  }
+
+  const rootEls = getRootHostEls(selfComp.child).filter((rootEl) => rootEl.isConnected);
+  if (rootEls.length > 0) {
+    return unionRects(rootEls);
+  }
+
+  const fallbackHostEl = getFirstHostEl(selfComp.child);
+  if (fallbackHostEl?.isConnected) {
+    return fallbackHostEl.getBoundingClientRect();
+  }
+
+  return el.isConnected ? el.getBoundingClientRect() : null;
+}
+
 export function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | null {
   let fiber = getFiberFromEl(el);
   while (fiber) {
@@ -469,7 +488,7 @@ function resolveSelfFiber(el: HTMLElement, selfSymbolId?: string): FiberNode | n
 function collectDirectRfmChildren(
   fiber: FiberNode | null,
   selfId: string,
-  results: { name: string; symbolId: string }[],
+  results: DomRelNode[],
   seen: Set<string>,
 ) {
   let cur = fiber;
@@ -479,7 +498,11 @@ function collectDirectRfmChildren(
       const id = fn.__rfm_symbolId!;
       if (!seen.has(id)) {
         seen.add(id);
-        results.push({ symbolId: id, name: id.split('#').at(-1) ?? '' });
+        results.push({
+          symbolId: id,
+          name: id.split('#').at(-1) ?? '',
+          el: getFirstHostEl(cur.child) ?? getFirstHostEl(cur) ?? null,
+        });
       }
       // Don't recurse — its children are its own responsibility
     } else {
@@ -490,7 +513,7 @@ function collectDirectRfmChildren(
   }
 }
 
-export function findDomParent(el: HTMLElement, selfSymbolId?: string): { name: string; symbolId: string } | null {
+export function findDomParent(el: HTMLElement, selfSymbolId?: string): DomRelNode | null {
   const selfComp = resolveSelfFiber(el, selfSymbolId);
   if (!selfComp) return null;
   // Walk above selfComp to find first parent component
@@ -498,14 +521,18 @@ export function findDomParent(el: HTMLElement, selfSymbolId?: string): { name: s
   while (f) {
     const fn = getRfmFn(f.type);
     if (fn) {
-      return { symbolId: fn.__rfm_symbolId!, name: fn.__rfm_symbolId!.split('#').at(-1) ?? '' };
+      return {
+        symbolId: fn.__rfm_symbolId!,
+        name: fn.__rfm_symbolId!.split('#').at(-1) ?? '',
+        el: getFirstHostEl(f.child) ?? null,
+      };
     }
     f = f.return;
   }
   return null;
 }
 
-export function findDomChildren(el: HTMLElement, selfSymbolId?: string): { name: string; symbolId: string }[] {
+export function findDomChildren(el: HTMLElement, selfSymbolId?: string): DomRelNode[] {
   const selfComp = resolveSelfFiber(el, selfSymbolId);
   if (!selfComp) return [];
   const selfId = selfSymbolId ?? getRfmFn(selfComp.type)?.__rfm_symbolId;
@@ -513,14 +540,14 @@ export function findDomChildren(el: HTMLElement, selfSymbolId?: string): { name:
 
   if (selfSymbolId) {
     // Fiber-based: walk the component's fiber subtree directly (avoids DOM position issues)
-    const results: { name: string; symbolId: string }[] = [];
+    const results: DomRelNode[] = [];
     const seen = new Set<string>();
     collectDirectRfmChildren(selfComp.child, selfId, results, seen);
     return results;
   }
 
   // Original DOM-based approach for pick-mode (el is directly the component's root element)
-  const results: { name: string; symbolId: string }[] = [];
+  const results: DomRelNode[] = [];
   const seen = new Set<string>();
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
   let node: Node | null = el;
@@ -536,7 +563,11 @@ export function findDomChildren(el: HTMLElement, selfSymbolId?: string): { name:
           if (fn) {
             if (fn.__rfm_symbolId === selfId) {
               seen.add(symbolId);
-              results.push({ symbolId, name: symbolId.split('#').at(-1) ?? '' });
+              results.push({
+                symbolId,
+                name: symbolId.split('#').at(-1) ?? '',
+                el: getFirstHostEl(compFiber.child) ?? domEl,
+              });
             }
             break;
           }

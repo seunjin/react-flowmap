@@ -1,4 +1,5 @@
 import type { DocEntry } from '../doc/build-doc-index';
+import type { DomRelNode } from './types';
 import { findDomParent, findDomChildren } from './utils';
 
 // ─── GraphNode ────────────────────────────────────────────────────────────────
@@ -44,18 +45,18 @@ export function GraphConnector() {
 // ─── NodeRow ──────────────────────────────────────────────────────────────────
 
 function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
-  items: { name: string; symbolId: string }[];
-  onNavigate?: ((symbolId: string) => void) | undefined;
-  onHover?: ((symbolId: string) => void) | undefined;
+  items: DomRelNode[];
+  onNavigate?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
+  onHover?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   return (
     <div className="flex flex-wrap gap-[5px] justify-center">
-      {items.map(({ name, symbolId }) => (
+      {items.map(({ name, symbolId, el }) => (
         <GraphNode
           key={symbolId} name={name}
-          onClick={() => onNavigate?.(symbolId)}
-          onHover={() => onHover?.(symbolId)}
+          onClick={() => onNavigate?.(symbolId, el)}
+          onHover={() => onHover?.(symbolId, el)}
           onHoverEnd={onHoverEnd}
         />
       ))}
@@ -68,8 +69,8 @@ function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
 export function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHoverEnd }: {
   entry: DocEntry;
   selectedEl: HTMLElement | null;
-  onNavigate?: ((symbolId: string) => void) | undefined;
-  onHover?: ((symbolId: string) => void) | undefined;
+  onNavigate?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
+  onHover?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   const connectedEl = selectedEl?.isConnected ? selectedEl : null;
