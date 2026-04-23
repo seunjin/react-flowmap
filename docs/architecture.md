@@ -205,8 +205,8 @@ react-flowmap/
 |---|---|
 | `react-flowmap/vite` | Vite 플러그인 (`flowmapInspect()`) |
 | `react-flowmap/next` | Next.js 플러그인 (`withFlowmap()`) |
-| `react-flowmap/next/api-handler` | App Router / Pages Router API 핸들러 |
-| `react-flowmap/context` | Runtime Context (내부 사용) |
+| `react-flowmap/rfm-context` | Runtime Context (내부 export) |
+| `react-flowmap/graph-window` | 그래프 전용 창 UI |
 
 #### 빌드 타임 변환 (`@react-flowmap/babel-plugin`)
 
@@ -230,7 +230,7 @@ react-flowmap/
 **Next.js App Router** (`react-flowmap/next`):
 - `withFlowmap(nextConfig)` — `next.config.ts`에서 사용
 - webpack 로더가 dev 빌드 시 클라이언트 사이드 JSX 파일에 변환 주입
-- `app/api/__rfm-open/route.ts`에서 `export { GET } from 'react-flowmap/next/api-handler'`로 에디터 열기 지원
+- 로컬 sidecar 서버를 통해 에디터 열기 지원
 
 #### Runtime Context (`src/runtime/rfm-context.ts`)
 

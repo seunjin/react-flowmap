@@ -1,10 +1,14 @@
-import { useParams } from '@tanstack/react-router';
+import { useParams } from 'react-router-dom';
 import { useAppContext } from '../app';
 import { ProductDetail } from '../widgets/product-detail';
 
 export function ProductPage() {
-  const { productId } = useParams({ from: '/product/$productId' });
+  const { productId } = useParams();
   const { onCartUpdated } = useAppContext();
+
+  if (!productId) {
+    return null;
+  }
 
   return (
     <div>

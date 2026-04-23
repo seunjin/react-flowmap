@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate } from 'react-router-dom';
 import type { Product } from '../shared/types';
 import { fetchProduct } from '../shared/api/products-api';
 import { Spinner } from '../shared/ui/spinner';
@@ -30,7 +30,7 @@ export function ProductDetail({ productId, onCartUpdated }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/' })}>
+      <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
         ← 목록으로
       </Button>
 

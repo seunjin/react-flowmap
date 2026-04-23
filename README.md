@@ -13,12 +13,9 @@ An in-app runtime component inspector and visual graph explorer for React.
 
 ## Framework support
 
-| Framework | Status | What's tracked |
+| Target | Status | What's tracked |
 |---|---|---|
-| Vite + React | ✅ Full | All components |
-| Vite + TanStack Router | ✅ Full | All components including route pages |
-| Vite + React Router | ✅ Full | All components |
-| TanStack Start | ✅ Full | All components including route pages |
+| Vite + React apps | ✅ Full | All components, including route pages in common client-side routers such as TanStack Router and React Router |
 | Next.js App Router | ⚠️ Partial | `'use client'` components only — server components are not tracked |
 
 ## Install
@@ -31,7 +28,7 @@ pnpm add -D react-flowmap
 
 ## Setup
 
-### Vite (React / TanStack Router / React Router)
+### Vite + React
 
 **1. Add the Vite plugin** (`vite.config.ts`):
 
@@ -60,41 +57,7 @@ function App() {
 }
 ```
 
-Works the same way with TanStack Router or React Router — just place `<ReactFlowMap />` in the root component that wraps your router.
-
-### TanStack Start
-
-**1. Add the Vite plugin** (`vite.config.ts`):
-
-```ts
-import { defineConfig } from 'vite';
-import viteReact from '@vitejs/plugin-react';
-import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import { flowmapInspect } from 'react-flowmap/vite';
-
-export default defineConfig({
-  plugins: [tanstackStart(), viteReact(), flowmapInspect()],
-});
-```
-
-**2. Add `<ReactFlowMap />` to your root route** (`app/routes/__root.tsx`):
-
-```tsx
-import { ReactFlowMap } from 'react-flowmap';
-
-function RootDocument({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <head><HeadContent /></head>
-      <body>
-        {children}
-        <ReactFlowMap />
-        <Scripts />
-      </body>
-    </html>
-  );
-}
-```
+Works the same way with common client-side routers such as TanStack Router or React Router — just place `<ReactFlowMap />` in the root component that wraps your router.
 
 ### Next.js App Router
 
@@ -145,7 +108,7 @@ Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
 Set the `editor` option to jump directly to source from the inspector:
 
-**Vite / TanStack Start** (`vite.config.ts`):
+**Vite** (`vite.config.ts`):
 ```ts
 flowmapInspect({
   editor: 'cursor',       // Cursor
@@ -165,7 +128,7 @@ withFlowmap({}, { editor: 'cursor' })
 Override per-machine without touching config files (`.env.local`):
 
 ```bash
-VITE_EDITOR=cursor   # Vite / TanStack Start
+VITE_EDITOR=cursor   # Vite
 NEXT_EDITOR=cursor   # Next.js
 ```
 
@@ -173,7 +136,7 @@ Each editor name is fully autocompleted in TypeScript. You can also pass any cus
 
 ## Options
 
-**Vite / TanStack Start plugin:**
+**Vite plugin:**
 
 ```ts
 flowmapInspect({
@@ -235,6 +198,6 @@ The plugin instruments your React components at dev-time with a lightweight Babe
 - Performs static JSX analysis so the component graph is accurate even for conditionally-rendered components (e.g. auth-gated layouts)
 - The inspector UI renders inside a Shadow DOM to prevent any style conflicts with your app
 
-For **Vite and TanStack Start**, all components are instrumented. For **Next.js**, only `'use client'` files are instrumented — server components are never touched.
+For **Vite apps**, all components are instrumented. For **Next.js App Router**, only `'use client'` files are instrumented — server components are never touched.
 
 All instrumentation is removed in production builds.

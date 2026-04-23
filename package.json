@@ -2,7 +2,7 @@
   "name": "react-flowmap",
   "version": "0.3.1",
   "type": "module",
-  "description": "Runtime component inspector and visual graph explorer for React + Vite.",
+  "description": "Runtime component inspector for Vite React apps and Next.js App Router.",
   "license": "MIT",
   "keywords": [
     "react",
@@ -49,8 +49,6 @@
     "demo:dev": "vite --mode demo",
     "demo:react": "pnpm --filter react-flowmap-demo-react dev",
     "demo:tanstack": "pnpm --filter react-flowmap-demo-tanstack dev",
-    "demo:start": "cd demos/start && npm run dev",
-    "demo:start:install": "cd demos/start && npm install",
     "demo:next": "cd demos/next && npm run dev",
     "demo:next:install": "cd demos/next && npm install --legacy-peer-deps",
     "build:css": "node scripts/build-inspector-css.mjs",

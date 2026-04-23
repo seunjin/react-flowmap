@@ -79,7 +79,7 @@ Babel 변환 로직을 번들러 독립 패키지로 분리:
 - `packages/next-plugin/` — `@react-flowmap/next-plugin`
   - `withFlowmap(nextConfig)` — Next.js config 래퍼
   - webpack 로더로 dev 빌드에 변환 주입
-  - App Router / Pages Router 에디터 열기 API 핸들러 포함
+- App Router용 에디터 열기 흐름 포함
 - `react-flowmap/vite`, `react-flowmap/next` 서브패스 exports 추가
 - 프로젝트명 **gori → react-flowmap** 전면 리네이밍 완료
 - 브랜드 심볼 SVG 아이콘 (컴포넌트 트리 형태) 적용

@@ -2,7 +2,7 @@
 
 ## 한 줄 소개
 
-**React Flowmap(고리)**는 React 애플리케이션의 실행 흐름을 추적해 컴포넌트, 훅, 함수, API 요청 사이의 관계를 문서화하고 시각화하는 런타임 분석 라이브러리입니다.
+**React Flowmap**는 React 애플리케이션의 실행 흐름을 추적해 컴포넌트, 훅, 함수, API 요청 사이의 관계를 문서화하고 시각화하는 런타임 분석 라이브러리입니다.
 
 > **The Missing Link of Your React Runtime**
 
@@ -103,13 +103,12 @@ React Flowmap은 다음과 같은 질문에 답하는 도구입니다.
 
 ### 현재 지원
 
-React Flowmap은 **Vite + React** 환경에서 완전히 동작하며, **Next.js App Router** 지원을 검증 중입니다.
+React Flowmap은 **Vite + React 앱**과 **Next.js App Router**를 현재 제품 범위로 둡니다.
 
-| 환경 | 상태 |
-|------|------|
-| Vite + React | ✅ 지원 |
-| Next.js App Router | 🔄 검증 중 |
-| Next.js Pages Router | 🔄 검증 중 |
+| 환경               | 상태                              |
+| ------------------ | --------------------------------- |
+| Vite + React       | ✅ 지원                           |
+| Next.js App Router | ⚠️ `'use client'` 컴포넌트만 추적 |
 
 ### 변환 방식
 
@@ -120,9 +119,9 @@ React Flowmap은 **Vite + React** 환경에서 완전히 동작하며, **Next.js
 
 ### 향후 방향
 
-- Next.js App Router 정식 지원 확정
+- Vite React / Next.js App Router 안정화
 - npm 배포
-- 라우터 환경(TanStack Router, react-router-dom) 검증
+- 일반적인 라우터 환경(TanStack Router, react-router-dom) 검증
 - Vue 등 다른 프레임워크 확장은 장기 고려 사항
 
 ---

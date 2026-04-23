@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 // ─── App Context (root → children) ───────────────────────────────────────────
 type AppContextValue = { onCartUpdated: () => void };
@@ -39,8 +39,8 @@ export function App() {
   const [toast, setToast] = useState<string>('');
 
   const navigate = useNavigate();
-  const routerState = useRouterState();
-  const activePath = routerState.location.pathname;
+  const location = useLocation();
+  const activePath = location.pathname;
 
   const styleRef = useRef<HTMLStyleElement | null>(null);
   useEffect(() => {
@@ -180,7 +180,7 @@ export function App() {
               <button
                 key={path}
                 type="button"
-                onClick={() => navigate({ to: path })}
+                onClick={() => navigate(path)}
                 style={{
                   padding: '5px 12px', borderRadius: 6, border: '1px solid',
                   borderColor: isActive ? '#3b82f6' : 'transparent',

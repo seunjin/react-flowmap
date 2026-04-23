@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate } from 'react-router-dom';
 import type { Product } from '../shared/types';
 import { fetchProducts } from '../shared/api/products-api';
 import { Spinner } from '../shared/ui/spinner';
@@ -22,7 +22,7 @@ export function ProductCatalog() {
   const filtered = category === 'All' ? products : products.filter(p => p.category === category);
 
   function handleSelectProduct(id: string) {
-    navigate({ to: '/product/$productId', params: { productId: id } });
+    navigate(`/product/${id}`);
   }
 
   if (loading) {

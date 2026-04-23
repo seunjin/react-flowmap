@@ -32,4 +32,16 @@ test.describe('demos/react', () => {
     const hasSidebar = await shadowQuerySelector(page, '[data-rfm-sidebar]');
     expect(hasSidebar).toBe(true);
   });
+
+  test('react-router-dom 라우팅으로 상품 상세와 목록 사이를 이동한다', async ({ page }) => {
+    await page.goto(BASE);
+
+    await page.getByRole('button', { name: /무선 노이즈캔슬링 헤드폰/i }).click();
+    await expect(page).toHaveURL(/\/product\/1$/);
+    await expect(page.getByRole('button', { name: /목록으로/i })).toBeVisible();
+
+    await page.getByRole('button', { name: /목록으로/i }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText('오늘의 추천 상품')).toBeVisible();
+  });
 });
