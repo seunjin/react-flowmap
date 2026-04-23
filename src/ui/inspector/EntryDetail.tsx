@@ -56,6 +56,46 @@ export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd
       </div>
 
       {/* Props */}
+      {entry.apiCalls.length > 0 && (
+        <div className="px-3 py-3 border-rfm-border">
+          <DetailSection label="Requests">
+            <div className="flex flex-col gap-2">
+              {entry.apiCalls.map((api) => (
+                <div
+                  key={api.apiId}
+                  className="rounded-[8px] border border-[rgba(229,231,235,0.8)] bg-[rgba(249,250,251,0.7)] px-2.5 py-2"
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-rfm-text-900">
+                    <span className="text-rfm-blue">{api.method}</span>
+                    <span className="truncate">{api.path}</span>
+                  </div>
+                  <div className="mt-1 text-[10px] text-rfm-text-400">
+                    {[
+                      api.requestCount !== undefined ? `${api.requestCount}x` : null,
+                      api.lastStatus !== undefined ? `status ${api.lastStatus}` : null,
+                      api.lastDurationMs !== undefined ? `${api.lastDurationMs}ms` : null,
+                      api.lastOutcome ?? null,
+                    ].filter(Boolean).join(' • ')}
+                  </div>
+                  {api.viaChain.length > 0 && (
+                    <div className="mt-1 text-[10px] text-rfm-text-400 truncate">
+                      via {api.viaChain.map((ref) => ref.name).join(' -> ')}
+                    </div>
+                  )}
+                  {api.lastErrorMessage && (
+                    <div className="mt-1 text-[10px] text-[#b91c1c] leading-relaxed">
+                      {api.lastErrorName ? `${api.lastErrorName}: ` : ''}
+                      {api.lastErrorMessage}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </DetailSection>
+        </div>
+      )}
+
+      {/* Props */}
       {selectedEl && selectedEl.isConnected && (() => {
         const props = getComponentPropsFromEl(selectedEl);
         const entries = props

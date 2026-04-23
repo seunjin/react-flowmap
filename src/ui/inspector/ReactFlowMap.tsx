@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { buildGraph } from '../../core/graph/index.js';
+import {
+  applyRuntimeEvents,
+  buildGraphFromState,
+  createGraphBuilderState,
+} from '../../core/graph/index.js';
 import type { FlowmapGraph } from '../../core/types/graph.js';
-import type { RuntimeEvent } from '../../core/types/runtime-events.js';
-import { __rfmCollector, __rfmSession } from '../../runtime/rfm-context.js';
-import { attachFetchInterceptor } from '../../runtime/collector/index.js';
+import { __rfmRuntimeManager } from '../../runtime/rfm-context.js';
 import { ComponentOverlay } from './ComponentOverlay.js';
 import { GraphWindow } from '../graph-window/GraphWindow.js';
 import type { FlowmapConfig } from './InspectButton.js';
@@ -52,30 +54,35 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
     }
   };
 
-  // 컴포넌트 트래킹 — 그래프 모드에서는 불필요하므로 건너뜀
-  const detachRef = useRef<(() => void) | null>(null);
+  const graphStateRef = useRef(createGraphBuilderState());
   useEffect(() => {
     if (isGraphMode) return;
 
-    const unsub = __rfmCollector.subscribe((events: RuntimeEvent[]) => {
-      setGraph(buildGraph(events));
+    graphStateRef.current = createGraphBuilderState();
+    const runtime = __rfmRuntimeManager.acquire({
+      enableFetchInterceptor: !disableFetchInterceptor,
     });
 
-    if (!disableFetchInterceptor) {
-      detachRef.current = attachFetchInterceptor({
-        collector: __rfmCollector,
-        getContext: () => __rfmSession.getContext(),
-      });
+    const initialEvents = runtime.collector.getEvents();
+    if (initialEvents.length > 0 && applyRuntimeEvents(graphStateRef.current, initialEvents)) {
+      setGraph(buildGraphFromState(graphStateRef.current));
     }
+
+    const unsub = runtime.collector.subscribeToBatches((events) => {
+      if (!applyRuntimeEvents(graphStateRef.current, events)) {
+        return;
+      }
+
+      setGraph(buildGraphFromState(graphStateRef.current));
+    });
 
     return () => {
       unsub();
-      detachRef.current?.();
-      detachRef.current = null;
-      __rfmCollector.reset();
+      runtime.release();
+      graphStateRef.current = createGraphBuilderState();
+      setGraph(emptyGraph);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGraphMode]);
+  }, [disableFetchInterceptor, isGraphMode]);
 
   // 그래프 창 팝업 모드: 전체화면 오버레이로 GraphWindow 렌더
   // 기존 라우트(/rfm-graph) 없이도 모든 프레임워크에서 동작

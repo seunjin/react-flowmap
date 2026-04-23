@@ -1,4 +1,4 @@
-import type { FlowmapGraph, SymbolNode } from '../../core/types/graph.js';
+import type { FlowmapGraph, RequestOutcome, SymbolNode } from '../../core/types/graph.js';
 
 export type DocRef = {
   symbolId: string;
@@ -11,6 +11,12 @@ export type ApiRef = {
   method: string;
   path: string;
   viaChain: DocRef[]; // 중간 경로 (비어있으면 직접 호출)
+  requestCount?: number;
+  lastStatus?: number;
+  lastDurationMs?: number;
+  lastOutcome?: RequestOutcome;
+  lastErrorName?: string;
+  lastErrorMessage?: string;
 };
 
 export type DocEntry = {
@@ -30,6 +36,12 @@ export type ApiDocEntry = {
   method: string;
   path: string;
   callerChains: DocRef[][]; // 각 체인 = root → 직접 호출자
+  requestCount?: number;
+  lastStatus?: number;
+  lastDurationMs?: number;
+  lastOutcome?: RequestOutcome;
+  lastErrorName?: string;
+  lastErrorMessage?: string;
 };
 
 export type DocIndex = {
@@ -72,7 +84,18 @@ export function buildDocIndex(graph: FlowmapGraph): DocIndex {
       if (edge.kind === 'request') {
         const api = nodeById.get(edge.target);
         if (api?.kind === 'api') {
-          results.push({ apiId: api.id, method: api.method, path: api.path, viaChain: chain });
+          results.push({
+            apiId: api.id,
+            method: api.method,
+            path: api.path,
+            viaChain: chain,
+            ...(api.requestCount !== undefined ? { requestCount: api.requestCount } : {}),
+            ...(api.lastStatus !== undefined ? { lastStatus: api.lastStatus } : {}),
+            ...(api.lastDurationMs !== undefined ? { lastDurationMs: api.lastDurationMs } : {}),
+            ...(api.lastOutcome !== undefined ? { lastOutcome: api.lastOutcome } : {}),
+            ...(api.lastErrorName !== undefined ? { lastErrorName: api.lastErrorName } : {}),
+            ...(api.lastErrorMessage !== undefined ? { lastErrorMessage: api.lastErrorMessage } : {}),
+          });
         }
       } else {
         const ref = toRef(edge.target);
@@ -160,7 +183,18 @@ export function buildDocIndex(graph: FlowmapGraph): DocIndex {
           if (!seen.has(key)) { seen.add(key); chains.push(chain); }
         }
       }
-      return { apiId: n.id, method: n.method, path: n.path, callerChains: chains };
+      return {
+        apiId: n.id,
+        method: n.method,
+        path: n.path,
+        callerChains: chains,
+        ...(n.requestCount !== undefined ? { requestCount: n.requestCount } : {}),
+        ...(n.lastStatus !== undefined ? { lastStatus: n.lastStatus } : {}),
+        ...(n.lastDurationMs !== undefined ? { lastDurationMs: n.lastDurationMs } : {}),
+        ...(n.lastOutcome !== undefined ? { lastOutcome: n.lastOutcome } : {}),
+        ...(n.lastErrorName !== undefined ? { lastErrorName: n.lastErrorName } : {}),
+        ...(n.lastErrorMessage !== undefined ? { lastErrorMessage: n.lastErrorMessage } : {}),
+      };
     })
     .filter(Boolean) as ApiDocEntry[];
 

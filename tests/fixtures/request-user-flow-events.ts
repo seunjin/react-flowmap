@@ -37,5 +37,8 @@ export const requestUserFlowEvents: RuntimeEvent[] = [
     sourceSymbolId: 'symbol:src/api/user.ts#fetchUser',
     method: 'GET',
     path: '/api/user',
+    outcome: 'success',
+    status: 200,
+    durationMs: 42,
   },
 ];

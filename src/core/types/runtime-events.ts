@@ -1,4 +1,4 @@
-import type { ApiMethod } from './graph.js';
+import type { ApiMethod, RequestOutcome } from './graph.js';
 
 export type RuntimeEventBase = {
   id: string;
@@ -32,7 +32,11 @@ export type RequestEvent = RuntimeEventBase & {
   sourceSymbolId: string;
   method: ApiMethod;
   path: string;
+  outcome: RequestOutcome;
   status?: number;
+  durationMs?: number;
+  errorName?: string;
+  errorMessage?: string;
 };
 
 export type RuntimeEvent =

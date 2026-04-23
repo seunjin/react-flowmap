@@ -74,6 +74,11 @@ export const requestUserFlow: FlowmapGraph = {
       method: 'GET',
       path: '/api/user',
       label: 'GET /api/user',
+      requestCount: 1,
+      lastSeenAt: 5,
+      lastStatus: 200,
+      lastDurationMs: 42,
+      lastOutcome: 'success',
     },
   ],
   edges: [
@@ -112,6 +117,11 @@ export const requestUserFlow: FlowmapGraph = {
       kind: 'request',
       source: 'symbol:src/api/user.ts#fetchUser',
       target: 'api:GET:/api/user',
+      count: 1,
+      lastSeenAt: 5,
+      lastStatus: 200,
+      lastDurationMs: 42,
+      lastOutcome: 'success',
     },
   ],
 };

@@ -18,6 +18,38 @@ type FetchInterceptorOptions = {
 
 type FetchLike = typeof fetch;
 
+function getRequestOutcomeFromResponse(response: Response) {
+  return response.ok ? 'success' as const : 'failure' as const;
+}
+
+function getRequestOutcomeFromError(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return 'aborted' as const;
+  }
+
+  return 'error' as const;
+}
+
+function getErrorName(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return undefined;
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return undefined;
+}
+
 function resolveUrl(input: RequestInfo | URL): URL {
   if (typeof input === 'string') {
     return new URL(input, 'http://localhost');
@@ -59,24 +91,54 @@ export function attachFetchInterceptor({
 
   const interceptedFetch: FetchLike = async (input, init) => {
     const context = getContext();
-    const response = await originalFetch(input, init);
+    const requestId = createEventId();
+    const startedAt = getTimestamp();
 
-    if (context.sourceSymbolId) {
-      collector.record(
-        createRequestEvent({
-          id: createEventId(),
-          timestamp: getTimestamp(),
-          sourceSymbolId: context.sourceSymbolId,
-          method: resolveMethod(input, init),
-          path: resolvePath(input),
-          ...(response.status !== undefined ? { status: response.status } : {}),
-          ...(context.traceId !== undefined ? { traceId: context.traceId } : {}),
-          ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
-        })
-      );
+    try {
+      const response = await originalFetch(input, init);
+
+      if (context.sourceSymbolId) {
+        collector.record(
+          createRequestEvent({
+            id: requestId,
+            timestamp: startedAt,
+            sourceSymbolId: context.sourceSymbolId,
+            method: resolveMethod(input, init),
+            path: resolvePath(input),
+            outcome: getRequestOutcomeFromResponse(response),
+            ...(response.status !== undefined ? { status: response.status } : {}),
+            durationMs: Math.max(0, getTimestamp() - startedAt),
+            ...(context.traceId !== undefined ? { traceId: context.traceId } : {}),
+            ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
+          })
+        );
+      }
+
+      return response;
+    } catch (error) {
+      if (context.sourceSymbolId) {
+        const errorName = getErrorName(error);
+        const errorMessage = getErrorMessage(error);
+
+        collector.record(
+          createRequestEvent({
+            id: requestId,
+            timestamp: startedAt,
+            sourceSymbolId: context.sourceSymbolId,
+            method: resolveMethod(input, init),
+            path: resolvePath(input),
+            outcome: getRequestOutcomeFromError(error),
+            durationMs: Math.max(0, getTimestamp() - startedAt),
+            ...(errorName !== undefined ? { errorName } : {}),
+            ...(errorMessage !== undefined ? { errorMessage } : {}),
+            ...(context.traceId !== undefined ? { traceId: context.traceId } : {}),
+            ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
+          })
+        );
+      }
+
+      throw error;
     }
-
-    return response;
   };
 
   globalThis.fetch = interceptedFetch;

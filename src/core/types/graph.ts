@@ -18,6 +18,7 @@ export type SymbolNode = {
 };
 
 export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export type RequestOutcome = 'success' | 'failure' | 'error' | 'aborted';
 
 export type ApiNode = {
   id: string;
@@ -25,6 +26,13 @@ export type ApiNode = {
   method: ApiMethod;
   path: string;
   label: string;
+  requestCount?: number;
+  lastSeenAt?: number;
+  lastStatus?: number;
+  lastDurationMs?: number;
+  lastOutcome?: RequestOutcome;
+  lastErrorName?: string;
+  lastErrorMessage?: string;
 };
 
 export type FlowmapNode = FileNode | SymbolNode | ApiNode;
@@ -62,6 +70,13 @@ export type RequestEdge = {
   kind: 'request';
   source: string;
   target: string;
+  count?: number;
+  lastSeenAt?: number;
+  lastStatus?: number;
+  lastDurationMs?: number;
+  lastOutcome?: RequestOutcome;
+  lastErrorName?: string;
+  lastErrorMessage?: string;
 };
 
 export type FlowmapEdge =

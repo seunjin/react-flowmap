@@ -1,12 +1,14 @@
 import { createContext, useEffect, useRef } from 'react';
 import { RuntimeCollector } from './collector/collector';
 import { RuntimeSession } from './tracing/runtime-session';
+import { FlowmapRuntimeManager } from './runtime-manager';
 
 export const __rfmCollector = new RuntimeCollector();
 
 export const __rfmSession = new RuntimeSession(__rfmCollector, {
   createEventId: (kind: string) => `evt-${kind}:${Date.now()}`,
 });
+export const __rfmRuntimeManager = new FlowmapRuntimeManager(__rfmCollector, __rfmSession);
 
 export const __RfmCtx = createContext<string>('__root__');
 
