@@ -9,7 +9,7 @@ import {
   findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
   findUnionRectBySymbolId, findAllInstanceRectsBySymbolId, deriveDisplayName,
-  buildFiberRelationships,
+  buildFiberRelationships, invalidateMountedRfmSnapshot,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
 import { FloatingSidebar } from './FloatingSidebar';
@@ -327,10 +327,12 @@ export function ComponentOverlay({
   const [domVersion, setDomVersion] = useState(0);
   useEffect(() => {
     // 첫 마운트 후 즉시 실행 (domReady 역할 포함)
+    invalidateMountedRfmSnapshot();
     setDomVersion(v => v + 1);
     if (!active) return;
     let debounceId: ReturnType<typeof setTimeout> | null = null;
     const obs = new MutationObserver(() => {
+      invalidateMountedRfmSnapshot();
       if (debounceId) clearTimeout(debounceId);
       debounceId = setTimeout(() => setDomVersion(v => v + 1), 200);
     });
@@ -378,6 +380,7 @@ export function ComponentOverlay({
     if (!graphWindowOpen) return;
     let debounceId: ReturnType<typeof setTimeout> | null = null;
     const obs = new MutationObserver(() => {
+      invalidateMountedRfmSnapshot();
       if (debounceId) clearTimeout(debounceId);
       debounceId = setTimeout(() => {
         if (channelRef.current) broadcastToGraph(channelRef.current, allEntries, selectedIdRef.current, nextRoutes);
@@ -482,6 +485,7 @@ export function ComponentOverlay({
   useEffect(() => {
     if (!active) return;
     const observer = new MutationObserver(() => {
+      invalidateMountedRfmSnapshot();
       if (!selectedElRef.current || selectedElRef.current.isConnected) return;
       const id = selectedIdRef.current;
       const fallback = id ? findElBySymbolId(id) : null;

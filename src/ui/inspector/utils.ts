@@ -112,6 +112,24 @@ type FiberNode = {
   memoizedProps: Record<string, unknown> | null;
 };
 
+type MountedRfmComponent = {
+  symbolId: string;
+  loc: string | null;
+};
+
+type MountedRfmInstance = MountedRfmComponent & {
+  probeEl: HTMLElement;
+  fallbackHostEl: HTMLElement;
+};
+
+type MountedRfmSnapshot = {
+  mountedComponents: MountedRfmComponent[];
+  instancesBySymbolId: Map<string, MountedRfmInstance[]>;
+  fiberRelationships: Record<string, string[]>;
+};
+
+let mountedRfmSnapshotCache: MountedRfmSnapshot | null = null;
+
 /** Unwrap React.memo / React.forwardRef to get the underlying RFM-instrumented function. */
 function getRfmFn(type: unknown): RfmFn | null {
   if (typeof type === 'function') {
@@ -225,6 +243,152 @@ function getCompFiber(fiber: FiberNode | null): FiberNode | null {
   return null;
 }
 
+function createMountedRfmWalker(): TreeWalker {
+  return document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node) {
+      return (node as HTMLElement).hasAttribute('data-rfm-overlay')
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT;
+    },
+  });
+}
+
+function buildMountedRfmSnapshot(): MountedRfmSnapshot {
+  if (!document.body) {
+    return {
+      mountedComponents: [],
+      instancesBySymbolId: new Map<string, MountedRfmInstance[]>(),
+      fiberRelationships: {},
+    };
+  }
+
+  const mountedComponents: MountedRfmComponent[] = [];
+  const instancesBySymbolId = new Map<string, MountedRfmInstance[]>();
+  const fiberRelationships = new Map<string, Set<string>>();
+  const seenSymbols = new Set<string>();
+  const seenFibers = new Set<FiberNode>();
+  const walker = createMountedRfmWalker();
+
+  let node: Node | null = document.body;
+  while (node) {
+    const el = node as HTMLElement;
+    const fiber = getFiberFromEl(el);
+
+    if (fiber) {
+      let f: FiberNode | null = fiber;
+
+      while (f) {
+        const fn = getRfmFn(f.type);
+        const symbolId = fn?.__rfm_symbolId;
+
+        if (symbolId && !seenFibers.has(f)) {
+          seenFibers.add(f);
+
+          const instance: MountedRfmInstance = {
+            symbolId,
+            loc: fn.__rfm_loc ?? null,
+            probeEl: el,
+            fallbackHostEl: getFirstHostEl(f.child) ?? el,
+          };
+
+          const instances = instancesBySymbolId.get(symbolId);
+          if (instances) {
+            instances.push(instance);
+          } else {
+            instancesBySymbolId.set(symbolId, [instance]);
+          }
+
+          if (!seenSymbols.has(symbolId)) {
+            seenSymbols.add(symbolId);
+            mountedComponents.push({ symbolId, loc: fn.__rfm_loc ?? null });
+          }
+
+          let parent: FiberNode | null = f.return;
+          while (parent) {
+            const parentId = getRfmFn(parent.type)?.__rfm_symbolId;
+
+            if (parentId && parentId !== symbolId) {
+              if (!fiberRelationships.has(parentId)) {
+                fiberRelationships.set(parentId, new Set<string>());
+              }
+              fiberRelationships.get(parentId)!.add(symbolId);
+              break;
+            }
+
+            parent = parent.return;
+          }
+        }
+
+        f = f.return;
+      }
+    }
+
+    node = walker.nextNode();
+  }
+
+  return {
+    mountedComponents,
+    instancesBySymbolId,
+    fiberRelationships: Object.fromEntries(
+      [...fiberRelationships.entries()].map(([symbolId, childIds]) => [symbolId, [...childIds]])
+    ),
+  };
+}
+
+function getMountedRfmSnapshot(): MountedRfmSnapshot {
+  if (!mountedRfmSnapshotCache) {
+    mountedRfmSnapshotCache = buildMountedRfmSnapshot();
+  }
+
+  return mountedRfmSnapshotCache;
+}
+
+type LiveMountedRfmInstance = MountedRfmInstance & {
+  fiber: FiberNode;
+};
+
+function getLiveMountedInstances(symbolId: string, retry = true): LiveMountedRfmInstance[] {
+  const snapshot = getMountedRfmSnapshot();
+  const instances = snapshot.instancesBySymbolId.get(symbolId) ?? [];
+  const liveInstances: LiveMountedRfmInstance[] = [];
+
+  for (const instance of instances) {
+    const probeEl = instance.probeEl.isConnected ? instance.probeEl : instance.fallbackHostEl;
+    if (!probeEl.isConnected) {
+      continue;
+    }
+
+    const fiber = resolveSelfFiber(probeEl, symbolId);
+    if (!fiber) {
+      continue;
+    }
+
+    liveInstances.push({ ...instance, fiber });
+  }
+
+  if (liveInstances.length > 0 || instances.length === 0 || !retry) {
+    return liveInstances;
+  }
+
+  invalidateMountedRfmSnapshot();
+  return getLiveMountedInstances(symbolId, false);
+}
+
+function getLiveRootEls(instance: LiveMountedRfmInstance): HTMLElement[] {
+  const rootEls = getRootHostEls(instance.fiber.child).filter((el) => el.isConnected);
+
+  if (rootEls.length > 0) {
+    return rootEls;
+  }
+
+  const fallbackHostEl = getFirstHostEl(instance.fiber.child) ?? instance.fallbackHostEl;
+  return fallbackHostEl.isConnected ? [fallbackHostEl] : [];
+}
+
+export function invalidateMountedRfmSnapshot(): void {
+  mountedRfmSnapshotCache = null;
+}
+
 export function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown> | null {
   let fiber = getFiberFromEl(el);
   while (fiber) {
@@ -239,25 +403,12 @@ export function getComponentPropsFromEl(el: HTMLElement): Record<string, unknown
 /** Walk the entire DOM to find the fiber for a specific rfm symbolId and return its props.
  *  Returns `{}` if mounted but has no props, `null` if not currently mounted. */
 export function getPropsForSymbolId(symbolId: string): Record<string, unknown> | null {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = document.body;
-  const seen = new Set<FiberNode>();
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        if (seen.has(f)) break;
-        seen.add(f);
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId === symbolId) {
-          return f.memoizedProps ?? {};
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
+  const instances = getLiveMountedInstances(symbolId);
+
+  for (const instance of instances) {
+    return instance.fiber.memoizedProps ?? {};
   }
+
   return null;
 }
 
@@ -402,77 +553,27 @@ export function findDomChildren(el: HTMLElement, selfSymbolId?: string): { name:
 
 /** Find the first mounted DOM element for a component by symbolId. */
 export function findElBySymbolId(symbolId: string): HTMLElement | null {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId === symbolId) {
-          return getFirstHostEl(f.child) ?? (node as HTMLElement);
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
+  const instance = getLiveMountedInstances(symbolId)[0];
+
+  if (!instance) {
+    return null;
   }
-  return null;
+
+  return getFirstHostEl(instance.fiber.child) ?? instance.fallbackHostEl;
 }
 
 /** Find all mounted DOM elements for a component by symbolId (multiple instances). */
 export function findAllElsBySymbolId(symbolId: string): HTMLElement[] {
-  const results: HTMLElement[] = [];
-  const seenFibers = new Set<FiberNode>();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        if (seenFibers.has(f)) break;
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId === symbolId) {
-          seenFibers.add(f);
-          results.push(getFirstHostEl(f.child) ?? (node as HTMLElement));
-          break;
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
-  }
-  return results;
+  return getLiveMountedInstances(symbolId).map((instance) =>
+    getFirstHostEl(instance.fiber.child) ?? instance.fallbackHostEl
+  );
 }
 
 /** Union rects for each mounted instance of a component (for highlight overlay). */
 export function findAllInstanceRectsBySymbolId(symbolId: string): DOMRect[] {
-  const rects: DOMRect[] = [];
-  const seenFibers = new Set<FiberNode>();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        if (seenFibers.has(f)) break;
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId === symbolId) {
-          seenFibers.add(f);
-          const rootEls = getRootHostEls(f.child);
-          const rect = unionRects(rootEls);
-          if (rect) rects.push(rect);
-          break;
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
-  }
-  return rects;
+  return getLiveMountedInstances(symbolId)
+    .map((instance) => unionRects(getLiveRootEls(instance)))
+    .filter((rect): rect is DOMRect => rect !== null);
 }
 
 /** Find a component's DOM element within a fiber subtree rooted at `root`. */
@@ -509,24 +610,25 @@ export function findAncestorElBySymbolId(el: HTMLElement, symbolId: string): HTM
 
 /** Union rect for all root-level host elements of a component by symbolId. */
 export function findUnionRectBySymbolId(symbolId: string): DOMRect | null {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId === symbolId) {
-          const rootEls = getRootHostEls(f.child);
-          return unionRects(rootEls) ?? (rootEls[0]?.getBoundingClientRect() ?? null);
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
+  const rects = findAllInstanceRectsBySymbolId(symbolId);
+
+  if (rects.length === 0) {
+    return null;
   }
-  return null;
+
+  let top = Infinity;
+  let left = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+
+  for (const rect of rects) {
+    top = Math.min(top, rect.top);
+    left = Math.min(left, rect.left);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+
+  return new DOMRect(left, top, right - left, bottom - top);
 }
 
 /** Get loc (line number string) for a symbolId from its fiber. */
@@ -545,78 +647,13 @@ export function getLocForSymbolId(el: HTMLElement, symbolId: string): string | n
  *  This is used to supplement (or replace) staticJsx edges in the graph layout,
  *  covering alias imports and Outlet-mediated route rendering that staticJsx misses. */
 export function buildFiberRelationships(): Record<string, string[]> {
-  const result: Record<string, string[]> = {};
-  const seenIds = new Set<string>(); // dedup by symbolId (one relationship per symbol is enough)
-
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
-    acceptNode(node) {
-      return (node as HTMLElement).hasAttribute('data-rfm-overlay')
-        ? NodeFilter.FILTER_REJECT
-        : NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        const fn = getRfmFn(f.type);
-        if (fn && fn.__rfm_symbolId) {
-          const childId = fn.__rfm_symbolId;
-          if (!seenIds.has(childId)) {
-            seenIds.add(childId);
-            // Walk further up to find the nearest RFM ancestor
-            let parent: FiberNode | null = f.return;
-            while (parent) {
-              const pfn = getRfmFn(parent.type);
-              if (pfn && pfn.__rfm_symbolId && pfn.__rfm_symbolId !== childId) {
-                const parentId = pfn.__rfm_symbolId;
-                if (!result[parentId]) result[parentId] = [];
-                if (!result[parentId].includes(childId)) result[parentId].push(childId);
-                break;
-              }
-              parent = parent.return;
-            }
-          }
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
-  }
-
-  return result;
+  return Object.fromEntries(
+    Object.entries(getMountedRfmSnapshot().fiberRelationships).map(([parentId, childIds]) => [parentId, [...childIds]])
+  );
 }
 
 /** Walk all DOM nodes to collect all mounted RFM components.
  *  Skips [data-rfm-overlay] subtrees (inspector UI itself). */
 export function findAllMountedRfmComponents(): { symbolId: string; loc: string | null }[] {
-  const seen = new Set<string>();
-  const results: { symbolId: string; loc: string | null }[] = [];
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
-    acceptNode(node) {
-      return (node as HTMLElement).hasAttribute('data-rfm-overlay')
-        ? NodeFilter.FILTER_REJECT   // skip entire inspector subtree
-        : NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  let node: Node | null = document.body;
-  while (node) {
-    const fiber = getFiberFromEl(node as Element);
-    if (fiber) {
-      let f: FiberNode | null = fiber;
-      while (f) {
-        const fn = getRfmFn(f.type);
-        if (fn && !seen.has(fn.__rfm_symbolId!)) {
-          seen.add(fn.__rfm_symbolId!);
-          results.push({ symbolId: fn.__rfm_symbolId!, loc: fn.__rfm_loc ?? null });
-        }
-        f = f.return;
-      }
-    }
-    node = walker.nextNode();
-  }
-  return results;
+  return [...getMountedRfmSnapshot().mountedComponents];
 }
