@@ -47,16 +47,16 @@ export function GraphConnector() {
 function NodeRow({ items, onNavigate, onHover, onHoverEnd }: {
   items: DomRelNode[];
   onNavigate?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
-  onHover?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
+  onHover?: ((symbolId: string, el?: HTMLElement | null, els?: HTMLElement[]) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   return (
     <div className="flex flex-wrap gap-[5px] justify-center">
-      {items.map(({ name, symbolId, el }) => (
+      {items.map(({ name, symbolId, el, els, count }) => (
         <GraphNode
-          key={symbolId} name={name}
+          key={symbolId} name={count && count > 1 ? `${name} ×${count}` : name}
           onClick={() => onNavigate?.(symbolId, el)}
-          onHover={() => onHover?.(symbolId, el)}
+          onHover={() => onHover?.(symbolId, el, els)}
           onHoverEnd={onHoverEnd}
         />
       ))}
@@ -70,7 +70,7 @@ export function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHo
   entry: DocEntry;
   selectedEl: HTMLElement | null;
   onNavigate?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
-  onHover?: ((symbolId: string, el?: HTMLElement | null) => void) | undefined;
+  onHover?: ((symbolId: string, el?: HTMLElement | null, els?: HTMLElement[]) => void) | undefined;
   onHoverEnd?: (() => void) | undefined;
 }) {
   const connectedEl = selectedEl?.isConnected ? selectedEl : null;
@@ -83,7 +83,7 @@ export function MiniRelationGraph({ entry, selectedEl, onNavigate, onHover, onHo
   if (noRelations) {
     return (
       <p className="m-0 text-[11px] text-rfm-text-400 leading-relaxed">
-        No relations.
+        No component relations.
       </p>
     );
   }

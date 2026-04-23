@@ -226,6 +226,74 @@ describe('inspector mounted snapshot helpers', () => {
         symbolId: metaSymbolId,
         name: 'UserMeta',
         el: secondMetaEl,
+        els: [secondMetaEl],
+        count: 1,
+      },
+    ]);
+  });
+
+  it('collapses repeated direct child components into one relation node with a count', () => {
+    const fiberKey = '__reactFiber$repeat';
+    const ratingSymbolId = 'symbol:src/entities/product/product-rating.tsx#ProductRating';
+    const starSymbolId = 'symbol:src/entities/product/star-icon.tsx#StarIcon';
+    const ratingEl = document.createElement('div');
+    const firstStarEl = document.createElement('svg');
+    const secondStarEl = document.createElement('svg');
+
+    ratingEl.append(firstStarEl, secondStarEl);
+    document.body.appendChild(ratingEl);
+
+    setRect(ratingEl, new DOMRect(0, 0, 80, 20));
+    setRect(firstStarEl, new DOMRect(0, 0, 10, 10));
+    setRect(secondStarEl, new DOMRect(12, 0, 10, 10));
+
+    const ratingComp = makeRfmComponent(ratingSymbolId, '40', null);
+    const firstStarComp = makeRfmComponent(starSymbolId, '41', { filled: true });
+    const secondStarComp = makeRfmComponent(starSymbolId, '41', { filled: false });
+
+    const ratingHost: TestFiberNode = {
+      type: 'div',
+      return: ratingComp,
+      child: firstStarComp,
+      sibling: null,
+      stateNode: ratingEl,
+      memoizedProps: null,
+    };
+    const firstStarHost: TestFiberNode = {
+      type: 'svg',
+      return: firstStarComp,
+      child: null,
+      sibling: null,
+      stateNode: firstStarEl,
+      memoizedProps: null,
+    };
+    const secondStarHost: TestFiberNode = {
+      type: 'svg',
+      return: secondStarComp,
+      child: null,
+      sibling: null,
+      stateNode: secondStarEl,
+      memoizedProps: null,
+    };
+
+    ratingComp.child = ratingHost;
+    firstStarComp.return = ratingHost;
+    firstStarComp.child = firstStarHost;
+    firstStarComp.sibling = secondStarComp;
+    secondStarComp.return = ratingHost;
+    secondStarComp.child = secondStarHost;
+
+    Object.assign(ratingEl, { [fiberKey]: ratingHost });
+    Object.assign(firstStarEl, { [fiberKey]: firstStarHost });
+    Object.assign(secondStarEl, { [fiberKey]: secondStarHost });
+
+    expect(findDomChildren(ratingEl, ratingSymbolId)).toEqual([
+      {
+        symbolId: starSymbolId,
+        name: 'StarIcon',
+        el: firstStarEl,
+        els: [firstStarEl, secondStarEl],
+        count: 2,
       },
     ]);
   });

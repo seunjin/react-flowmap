@@ -20,7 +20,13 @@ export type FoundComp = {
   loc: string | null;
 };
 
-export type DomRelNode = { name: string; symbolId: string; el?: HTMLElement | null };
+export type DomRelNode = {
+  name: string;
+  symbolId: string;
+  el?: HTMLElement | null;
+  els?: HTMLElement[];
+  count?: number;
+};
 
 // ─── Next.js App Router 정적 라우트 ──────────────────────────────────────────
 

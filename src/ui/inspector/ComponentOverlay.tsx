@@ -146,7 +146,11 @@ export function ComponentOverlay({
 }) {
   const [stack,           setStack]           = useState<FoundComp[]>([]);
   const [selectedId,      setSelectedId]      = useState<string>('');
-  const [highlightTarget, setHighlightTarget] = useState<{ symbolId: string; el?: HTMLElement | null } | null>(null);
+  const [highlightTarget, setHighlightTarget] = useState<{
+    symbolId: string;
+    el?: HTMLElement | null;
+    els?: HTMLElement[];
+  } | null>(null);
   const [routeRect,       setRouteRect]       = useState<{ rect: DOMRect; label: string } | null>(null);
   const [routeHoverRect,  setRouteHoverRect]  = useState<{ rect: DOMRect; label: string } | null>(null);
   const [graphWindowOpen, setGraphWindowOpen] = useState(false);
@@ -621,9 +625,18 @@ export function ComponentOverlay({
       {/* 사이드바 Relations 노드 hover → DOM 하이라이트 */}
       {highlightTarget && (() => {
         const label = highlightTarget.symbolId.split('#').at(-1) ?? '';
+        const exactRects = (highlightTarget.els ?? [])
+          .map((el) => findComponentRectByEl(el, highlightTarget.symbolId))
+          .filter((rect): rect is DOMRect => rect !== null && isVisible(rect));
         const exactRect = highlightTarget.el
           ? findComponentRectByEl(highlightTarget.el, highlightTarget.symbolId)
           : null;
+
+        if (exactRects.length > 0) {
+          return exactRects.map((rect, i) => (
+            <HoverPreviewBox key={`${highlightTarget.symbolId}-${i}`} rect={rect} label={label} />
+          ));
+        }
 
         if (exactRect && isVisible(exactRect)) {
           return <HoverPreviewBox rect={exactRect} label={label} />;
@@ -703,7 +716,11 @@ export function ComponentOverlay({
           }
           onDeactivate();
         }}
-        onHighlight={(symbolId, el) => setHighlightTarget({ symbolId, ...(el !== undefined ? { el } : {}) })}
+        onHighlight={(symbolId, el, els) => setHighlightTarget({
+          symbolId,
+          ...(el !== undefined ? { el } : {}),
+          ...(els !== undefined ? { els } : {}),
+        })}
         onHighlightEnd={() => setHighlightTarget(null)}
         onRouteRect={(rect, label) => setRouteRect(rect ? { rect, label } : null)}
         onRouteHoverRect={(rect, label) => setRouteHoverRect(rect ? { rect, label } : null)}

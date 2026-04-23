@@ -489,28 +489,57 @@ function collectDirectRfmChildren(
   fiber: FiberNode | null,
   selfId: string,
   results: DomRelNode[],
-  seen: Set<string>,
 ) {
   let cur = fiber;
   while (cur) {
     const fn = getRfmFn(cur.type);
     if (fn && fn.__rfm_symbolId !== selfId) {
       const id = fn.__rfm_symbolId!;
-      if (!seen.has(id)) {
-        seen.add(id);
-        results.push({
-          symbolId: id,
-          name: id.split('#').at(-1) ?? '',
-          el: getFirstHostEl(cur.child) ?? getFirstHostEl(cur) ?? null,
-        });
-      }
+      results.push({
+        symbolId: id,
+        name: id.split('#').at(-1) ?? '',
+        el: getFirstHostEl(cur.child) ?? getFirstHostEl(cur) ?? null,
+      });
       // Don't recurse — its children are its own responsibility
     } else {
       // Transparent wrapper or same component — recurse into children
-      collectDirectRfmChildren(cur.child, selfId, results, seen);
+      collectDirectRfmChildren(cur.child, selfId, results);
     }
     cur = cur.sibling;
   }
+}
+
+function appendDomRelNode(
+  nodes: DomRelNode[],
+  symbolId: string,
+  el?: HTMLElement | null,
+): void {
+  const existing = nodes.find((node) => node.symbolId === symbolId);
+  const nextEl = el ?? null;
+
+  if (existing) {
+    existing.count = (existing.count ?? 1) + 1;
+
+    if (nextEl) {
+      const els = existing.els ?? (existing.el ? [existing.el] : []);
+      if (!els.includes(nextEl)) {
+        els.push(nextEl);
+      }
+      existing.els = els;
+      if (!existing.el) {
+        existing.el = nextEl;
+      }
+    }
+
+    return;
+  }
+
+  nodes.push({
+    symbolId,
+    name: symbolId.split('#').at(-1) ?? '',
+    ...(nextEl ? { el: nextEl, els: [nextEl] } : {}),
+    count: 1,
+  });
 }
 
 export function findDomParent(el: HTMLElement, selfSymbolId?: string): DomRelNode | null {
@@ -540,15 +569,17 @@ export function findDomChildren(el: HTMLElement, selfSymbolId?: string): DomRelN
 
   if (selfSymbolId) {
     // Fiber-based: walk the component's fiber subtree directly (avoids DOM position issues)
+    const rawResults: DomRelNode[] = [];
+    collectDirectRfmChildren(selfComp.child, selfId, rawResults);
     const results: DomRelNode[] = [];
-    const seen = new Set<string>();
-    collectDirectRfmChildren(selfComp.child, selfId, results, seen);
+    for (const node of rawResults) {
+      appendDomRelNode(results, node.symbolId, node.el);
+    }
     return results;
   }
 
   // Original DOM-based approach for pick-mode (el is directly the component's root element)
   const results: DomRelNode[] = [];
-  const seen = new Set<string>();
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
   let node: Node | null = el;
   while (node) {
@@ -556,18 +587,13 @@ export function findDomChildren(el: HTMLElement, selfSymbolId?: string): DomRelN
     const compFiber = getCompFiber(getFiberFromEl(domEl));
     if (compFiber) {
       const symbolId = getRfmFn(compFiber.type)?.__rfm_symbolId;
-      if (symbolId && symbolId !== selfId && !seen.has(symbolId)) {
+      if (symbolId && symbolId !== selfId) {
         let f: FiberNode | null = compFiber.return;
         while (f) {
           const fn = getRfmFn(f.type);
           if (fn) {
             if (fn.__rfm_symbolId === selfId) {
-              seen.add(symbolId);
-              results.push({
-                symbolId,
-                name: symbolId.split('#').at(-1) ?? '',
-                el: getFirstHostEl(compFiber.child) ?? domEl,
-              });
+              appendDomRelNode(results, symbolId, getFirstHostEl(compFiber.child) ?? domEl);
             }
             break;
           }
