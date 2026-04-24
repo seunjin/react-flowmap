@@ -1,6 +1,6 @@
 {
   "name": "react-flowmap",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "description": "Runtime component inspector for Vite React apps and Next.js App Router.",
   "license": "MIT",

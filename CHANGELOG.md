@@ -1,10 +1,21 @@
 # react-flowmap
 
+## 0.4.0
+
+### Minor Changes
+
+- 109e59c: 그래프 워크스페이스를 현재 화면의 컴포넌트 구조 중심으로 정리했습니다.
+
+  - react-router-dom과 TanStack Router route manifest를 현재 화면 scope 기준으로 반영합니다.
+  - 기본 graph canvas에서 route island를 제거하고 mounted component graph만 유지합니다.
+  - 상세 패널은 props 중심으로 단순화하고 screen context 섹션을 제거했습니다.
+
 ## 0.3.1
 
 ### Patch Changes
 
 - **그래프 뷰 Next.js 서버 컴포넌트 지원**
+
   - 캔버스에 서버 라우트(layout / page) 노드 표시 — amber 색상으로 구분
   - layout → page → CSR 컴포넌트 계층 연결선 렌더링
   - 서버 노드 hover / 클릭 시 실제 화면에 rect 오버레이 표시 (layout·page 모두 full-viewport)
