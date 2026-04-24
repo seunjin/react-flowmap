@@ -35,6 +35,8 @@ npm install -D react-flowmap
 pnpm add -D react-flowmap
 ```
 
+> **Peer dependency note**: The published package currently declares `vite` as a peer dependency because the shared package also ships the Vite integration. Next.js-only apps can still use `react-flowmap/next`, but some package managers may show a `vite` peer warning until the package surface is split further.
+
 ## Setup
 
 ### Vite + React
@@ -115,7 +117,7 @@ Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
 ## Product Direction
 
-The current product direction is documented in [docs/product-direction.md](./docs/product-direction.md).
+The current product direction is documented in [docs/product-direction.md](https://github.com/seunjin/react-flowmap/blob/main/docs/product-direction.md).
 In short:
 
 - the primary job is inspecting a selected UI fragment first
@@ -192,6 +194,22 @@ withFlowmap(nextConfig, {
   }}
 />
 ```
+
+## Advanced exports
+
+Most app integrations only need:
+
+- `ReactFlowMap` from `react-flowmap`
+- `flowmapInspect` from `react-flowmap/vite`
+- `withFlowmap` from `react-flowmap/next`
+
+The package also exports lower-level building blocks for custom tooling:
+
+- `react-flowmap/rfm-context`
+- `react-flowmap/graph-window`
+- root-level graph / runtime / doc helpers re-exported from `react-flowmap`
+
+These advanced exports are public, but they are not the primary setup surface described in this README. Prefer the main integration APIs unless you are building custom inspector workflows on top of Flowmap itself.
 
 ## Props display
 
