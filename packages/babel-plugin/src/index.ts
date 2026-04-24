@@ -115,7 +115,297 @@ export type TransformResult = {
   symbolLocs: Map<string, number>;
   /** symbolId → 이 컴포넌트가 JSX에서 직접 렌더하는 컴포넌트 이름 목록 (상대 경로 import 기준) */
   staticJsxMap: Map<string, string[]>;
+  /** 라우터별 정적 route manifest */
+  routeManifestEntries: RouteManifestEntry[];
 };
+
+type RouteManifestEntry = {
+  id: string;
+  router: 'react-router' | 'tanstack-router';
+  urlPath: string;
+  type: 'layout' | 'page';
+  componentName: string;
+  componentImportSource?: string;
+  line: number;
+};
+
+type RouteComponentRef = {
+  componentName: string;
+  componentImportSource?: string;
+};
+
+type TanStackRouteDef = {
+  localName: string;
+  parentLocalName?: string;
+  path?: string;
+  component?: RouteComponentRef;
+  line: number;
+};
+
+function normalizeRouteUrl(path: string): string {
+  if (!path || path === '/') return '/';
+  const normalized = path.replace(/\/+/g, '/');
+  if (normalized === '/') return '/';
+  return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+}
+
+function joinRouteUrl(parentPath: string, childPath?: string, isIndex = false): string {
+  const parent = normalizeRouteUrl(parentPath);
+
+  if (isIndex || !childPath || childPath === '/') {
+    return parent;
+  }
+
+  if (childPath.startsWith('/')) {
+    return normalizeRouteUrl(childPath);
+  }
+
+  return normalizeRouteUrl(parent === '/' ? `/${childPath}` : `${parent}/${childPath}`);
+}
+
+function resolveComponentRef(
+  localName: string,
+  importMap: Map<string, string>,
+): RouteComponentRef | null {
+  if (!/^[A-Z]/.test(localName)) return null;
+
+  const importSource = importMap.get(localName);
+  if (importSource && importSource.startsWith('.')) {
+    return { componentName: localName, componentImportSource: importSource };
+  }
+
+  return { componentName: localName };
+}
+
+function getJsxIdentifierName(name: unknown): string | null {
+  return t.isJSXIdentifier(name) ? (name as { name: string }).name : null;
+}
+
+function getObjectPropertyName(key: unknown): string | null {
+  if (t.isIdentifier(key)) return (key as { name: string }).name;
+  if (t.isStringLiteral(key)) return (key as { value: string }).value;
+  return null;
+}
+
+function getObjectExpressionProperty(node: unknown, propertyName: string): unknown {
+  if (!t.isObjectExpression(node)) return null;
+  const objectNode = node as { properties: unknown[] };
+
+  for (const prop of objectNode.properties) {
+    if (!t.isObjectProperty(prop) || (prop as { computed: boolean }).computed) continue;
+    const objectProp = prop as { key: unknown; value: unknown };
+    if (getObjectPropertyName(objectProp.key) === propertyName) return objectProp.value;
+  }
+
+  return null;
+}
+
+function getStringLiteralValue(node: unknown): string | undefined {
+  return t.isStringLiteral(node) ? (node as { value: string }).value : undefined;
+}
+
+function getBooleanAttributeValue(attr: unknown): boolean {
+  if (!t.isJSXAttribute(attr)) return false;
+  const jsxAttr = attr as {
+    value?: unknown;
+  };
+  if (!jsxAttr.value) return true;
+  if (
+    t.isJSXExpressionContainer(jsxAttr.value)
+    && t.isBooleanLiteral((jsxAttr.value as { expression: unknown }).expression)
+  ) {
+    return ((jsxAttr.value as { expression: { value: boolean } }).expression).value;
+  }
+  return false;
+}
+
+function getJsxAttribute(node: unknown, attrName: string): unknown {
+  if (!t.isJSXElement(node)) return null;
+  return (node as { openingElement: { attributes: unknown[] } }).openingElement.attributes.find((attr: unknown) => (
+    t.isJSXAttribute(attr)
+    && t.isJSXIdentifier((attr as { name: unknown }).name)
+    && ((attr as { name: { name: string } }).name).name === attrName
+  )) ?? null;
+}
+
+function readRouteComponentFromJsx(
+  routeEl: unknown,
+  importMap: Map<string, string>,
+): RouteComponentRef | null {
+  const componentAttr = getJsxAttribute(routeEl, 'Component');
+  if (
+    t.isJSXAttribute(componentAttr)
+    && (componentAttr as { value?: unknown }).value
+    && t.isJSXExpressionContainer((componentAttr as { value: unknown }).value)
+    && t.isIdentifier(((componentAttr as { value: { expression: unknown } }).value).expression)
+  ) {
+    return resolveComponentRef(
+      (((componentAttr as { value: { expression: { name: string } } }).value).expression).name,
+      importMap,
+    );
+  }
+
+  const elementAttr = getJsxAttribute(routeEl, 'element');
+  if (
+    t.isJSXAttribute(elementAttr)
+    && (elementAttr as { value?: unknown }).value
+    && t.isJSXExpressionContainer((elementAttr as { value: unknown }).value)
+    && t.isJSXElement(((elementAttr as { value: { expression: unknown } }).value).expression)
+  ) {
+    const childName = getJsxIdentifierName(
+      ((((elementAttr as { value: { expression: { openingElement: { name: unknown } } } }).value).expression).openingElement).name,
+    );
+    return childName ? resolveComponentRef(childName, importMap) : null;
+  }
+
+  return null;
+}
+
+function collectNestedRouteElements(children: unknown[]): unknown[] {
+  const routes: unknown[] = [];
+
+  for (const child of children) {
+    if (!t.isJSXElement(child)) continue;
+    const childName = getJsxIdentifierName((child as { openingElement: { name: unknown } }).openingElement.name);
+
+    if (childName === 'Route') {
+      routes.push(child);
+      continue;
+    }
+
+    routes.push(...collectNestedRouteElements((child as { children: unknown[] }).children));
+  }
+
+  return routes;
+}
+
+function extractReactRouterRoutes(
+  fnPath: unknown,
+  relPath: string,
+  importMap: Map<string, string>,
+): RouteManifestEntry[] {
+  const topLevelRoutes: Array<{
+    node: unknown;
+    line: number;
+  }> = [];
+
+  (fnPath as { traverse: (v: unknown) => void }).traverse({
+    JSXElement(jsxPath: {
+      node: { children: unknown[]; openingElement: { name: unknown; loc?: { start: { line: number } } } };
+      parentPath: { node: unknown };
+      skip: () => void;
+    }) {
+      const name = getJsxIdentifierName(jsxPath.node.openingElement.name);
+      if (name !== 'Route') return;
+
+      const parentNode = jsxPath.parentPath.node;
+      if (
+        t.isJSXElement(parentNode)
+        && getJsxIdentifierName((parentNode as { openingElement: { name: unknown } }).openingElement.name) === 'Route'
+      ) {
+        return;
+      }
+
+      topLevelRoutes.push({
+        node: jsxPath.node,
+        line: jsxPath.node.openingElement.loc?.start.line ?? 1,
+      });
+      jsxPath.skip();
+    },
+    FunctionDeclaration:     { enter(p: { skip: () => void }) { p.skip(); } },
+    FunctionExpression:      { enter(p: { skip: () => void }) { p.skip(); } },
+    ArrowFunctionExpression: { enter(p: { skip: () => void }) { p.skip(); } },
+  });
+
+  const entries: RouteManifestEntry[] = [];
+
+  function visitRoute(routeEl: unknown, parentUrl: string): void {
+    if (!t.isJSXElement(routeEl)) return;
+
+    const pathAttr = getJsxAttribute(routeEl, 'path');
+    const indexAttr = getJsxAttribute(routeEl, 'index');
+    const path = (
+      t.isJSXAttribute(pathAttr)
+      && (pathAttr as { value?: unknown }).value
+      && t.isStringLiteral((pathAttr as { value: unknown }).value)
+    ) ? ((pathAttr as { value: { value: string } }).value).value : undefined;
+    const isIndex = getBooleanAttributeValue(indexAttr);
+    const component = readRouteComponentFromJsx(routeEl, importMap);
+    const nestedRoutes = collectNestedRouteElements((routeEl as { children: unknown[] }).children);
+    const urlPath = joinRouteUrl(parentUrl, path, isIndex);
+    const line = (routeEl as { openingElement: { loc?: { start: { line: number } } } }).openingElement.loc?.start.line ?? 1;
+
+    if (component) {
+      entries.push({
+        id: `route:${relPath}:${line}:${component.componentName}`,
+        router: 'react-router',
+        urlPath,
+        type: nestedRoutes.length > 0 ? 'layout' : 'page',
+        componentName: component.componentName,
+        ...(component.componentImportSource ? { componentImportSource: component.componentImportSource } : {}),
+        line,
+      });
+    }
+
+    for (const childRoute of nestedRoutes) {
+      visitRoute(childRoute, urlPath);
+    }
+  }
+
+  for (const route of topLevelRoutes) {
+    visitRoute(route.node, '/');
+  }
+
+  return entries;
+}
+
+function extractTanStackRoutes(
+  routeDefs: Map<string, TanStackRouteDef>,
+  relPath: string,
+): RouteManifestEntry[] {
+  if (routeDefs.size === 0) return [];
+
+  const childCounts = new Map<string, number>();
+  for (const route of routeDefs.values()) {
+    if (!route.parentLocalName) continue;
+    childCounts.set(route.parentLocalName, (childCounts.get(route.parentLocalName) ?? 0) + 1);
+  }
+
+  const urlCache = new Map<string, string>();
+  const resolveUrl = (localName: string): string => {
+    const cached = urlCache.get(localName);
+    if (cached) return cached;
+
+    const route = routeDefs.get(localName);
+    if (!route) return '/';
+
+    const parentUrl = route.parentLocalName ? resolveUrl(route.parentLocalName) : '/';
+    let urlPath = parentUrl;
+
+    if (route.path !== undefined) {
+      urlPath = joinRouteUrl(parentUrl, route.path, route.path === '/');
+    } else if (!route.parentLocalName) {
+      urlPath = '/';
+    }
+
+    urlCache.set(localName, urlPath);
+    return urlPath;
+  };
+
+  return [...routeDefs.values()]
+    .filter((route) => route.component)
+    .map((route) => ({
+      id: `route:${relPath}#${route.localName}`,
+      router: 'tanstack-router' as const,
+      urlPath: resolveUrl(route.localName),
+      type: (childCounts.get(route.localName) ?? 0) > 0 || !route.parentLocalName ? 'layout' : 'page',
+      componentName: route.component!.componentName,
+      ...(route.component?.componentImportSource
+        ? { componentImportSource: route.component.componentImportSource }
+        : {}),
+      line: route.line,
+    }));
+}
 
 // ─── 핵심 변환 함수 ───────────────────────────────────────────────────────────
 /**
@@ -143,6 +433,8 @@ export function transformFlowmap(
   const importMap = new Map<string, string>();
   // fromSymbolId → [child component names] (JSX 정적 관계)
   const staticJsxMap = new Map<string, string[]>();
+  const tanStackRouteDefs = new Map<string, TanStackRouteDef>();
+  const reactRouterRouteEntries: RouteManifestEntry[] = [];
 
   function scanJsxComponents(fnPath: unknown, fromSymbolId: string): void {
     const childNames: string[] = [];
@@ -231,6 +523,7 @@ export function transformFlowmap(
       symbolLocs.set(symbolId, line);
       componentDefs.push({ name, symbolId, line });
       scanJsxComponents(path, symbolId);
+      reactRouterRouteEntries.push(...extractReactRouterRoutes(path, relPath, importMap));
       injectIntoFn(path, symbolId, line, `file:${relPath}`);
       modified = true;
     },
@@ -257,8 +550,52 @@ export function transformFlowmap(
       componentDefs.push({ name, symbolId, line });
       const initPath = (path as unknown as { get: (k: string) => unknown }).get('init');
       scanJsxComponents(initPath, symbolId);
+      reactRouterRouteEntries.push(...extractReactRouterRoutes(initPath, relPath, importMap));
       injectIntoFn(initPath, symbolId, line, `file:${relPath}`);
       modified = true;
+    },
+
+    CallExpression(path: {
+      node: {
+        callee: unknown;
+        arguments: unknown[];
+      };
+      parent: unknown;
+    }) {
+      if (!t.isIdentifier(path.node.callee)) return;
+      const calleeName = (path.node.callee as { name: string }).name;
+      if (!['createRootRoute', 'createRoute'].includes(calleeName)) return;
+      if (!t.isVariableDeclarator(path.parent) || !t.isIdentifier((path.parent as { id: unknown }).id)) return;
+
+      const [config] = path.node.arguments;
+      if (!t.isObjectExpression(config)) return;
+
+      const parent = path.parent as { id: { name: string }; loc?: { start: { line: number } } };
+      const localName = parent.id.name;
+      const line = parent.loc?.start.line ?? 1;
+      const pathValue = getStringLiteralValue(getObjectExpressionProperty(config, 'path'));
+      const parentGetter = getObjectExpressionProperty(config, 'getParentRoute');
+      let parentLocalName: string | undefined;
+      if (
+        t.isArrowFunctionExpression(parentGetter)
+        && t.isIdentifier((parentGetter as { body: unknown }).body)
+      ) {
+        parentLocalName = ((parentGetter as { body: { name: string } }).body).name;
+      }
+
+      const componentProp = getObjectExpressionProperty(config, 'component');
+      let component: RouteComponentRef | undefined;
+      if (t.isIdentifier(componentProp)) {
+        component = resolveComponentRef((componentProp as { name: string }).name, importMap) ?? undefined;
+      }
+
+      tanStackRouteDefs.set(localName, {
+        localName,
+        ...(parentLocalName ? { parentLocalName } : {}),
+        ...(pathValue !== undefined ? { path: pathValue } : {}),
+        ...(component ? { component } : {}),
+        line,
+      });
     },
 
     // router/library 패턴: { component: () => <JSX /> }
@@ -318,7 +655,16 @@ export function transformFlowmap(
     },
   });
 
-  if (!modified) return null;
+  const routeManifestEntries = [
+    ...reactRouterRouteEntries,
+    ...extractTanStackRoutes(tanStackRouteDefs, relPath),
+  ];
+
+  if (!modified && routeManifestEntries.length === 0) return null;
+
+  if (!modified) {
+    return { code, map: null, symbolLocs, staticJsxMap, routeManifestEntries };
+  }
 
   const { code: newCode, map } = generate(
     ast,
@@ -326,5 +672,5 @@ export function transformFlowmap(
     code,
   ) as { code: string; map: unknown };
 
-  return { code: newCode, map, symbolLocs, staticJsxMap };
+  return { code: newCode, map, symbolLocs, staticJsxMap, routeManifestEntries };
 }

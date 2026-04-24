@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type React from 'react';
 import { Folder, FileCode, Component, ChevronRight } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
-import type { RfmNextRoute, RfmNextServerComponent } from './types';
+import type { RfmRoute, RfmServerComponent } from './types';
 import { openInEditor } from './utils';
 
 // ─── Data types ───────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ export type UnifiedFile = {
   kind: 'file';
   name: string;
   fullPath: string;
-  route?: RfmNextRoute;
+  route?: RfmRoute;
   entries: DocEntry[];
 };
 
@@ -64,7 +64,7 @@ function sortTree(node: UnifiedFolder): void {
 }
 
 export function buildUnifiedTree(
-  nextRoutes: RfmNextRoute[] | null,
+  routes: RfmRoute[] | null,
   displayEntries: DocEntry[],
 ): UnifiedFolder {
   const root: UnifiedFolder = { kind: 'folder', name: '', fullPath: '', children: [] };
@@ -74,20 +74,14 @@ export function buildUnifiedTree(
     displayEntries.map(e => e.filePath).filter((p): p is string => Boolean(p)),
   );
 
-  if (nextRoutes) {
-    for (const route of nextRoutes) {
+  if (routes) {
+    for (const route of routes) {
       const file = ensureFile(root, route.filePath);
       const filteredChildren = route.children?.filter(child => !runtimePaths.has(child.filePath));
-      const routeWithFiltered: RfmNextRoute = {
-        urlPath: route.urlPath,
-        filePath: route.filePath,
-        type: route.type,
-        componentName: route.componentName,
-        isServer: route.isServer,
+      const routeWithFiltered: RfmRoute = {
+        ...route,
+        ...(filteredChildren && filteredChildren.length > 0 ? { children: filteredChildren } : {}),
       };
-      if (filteredChildren && filteredChildren.length > 0) {
-        routeWithFiltered.children = filteredChildren;
-      }
       file.route = routeWithFiltered;
     }
   }
@@ -118,7 +112,7 @@ function ImportNode({
   node,
   depth,
 }: {
-  node: RfmNextServerComponent;
+  node: RfmServerComponent;
   depth: number;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -166,6 +160,7 @@ function FileNode({
   hoveredIds,
   treeHoveredId,
   selectedRouteFilePath,
+  showDetailButton,
   onSelect,
   onDetail,
   onActivateRoute,
@@ -264,7 +259,7 @@ function FileNode({
                 {entry.name}
               </span>
             </button>
-            {isSelected && (
+            {isSelected && showDetailButton && (
               <button
                 type="button"
                 onClick={onDetail}
@@ -289,11 +284,12 @@ type TreeNodeProps = {
   hoveredIds: Set<string>;
   treeHoveredId: string;
   selectedRouteFilePath: string;
+  showDetailButton: boolean;
   onSelect: (symbolId: string, el?: HTMLElement) => void;
   onDetail: () => void;
-  onActivateRoute: (route: RfmNextRoute) => void;
-  onSelectRoute: (route: RfmNextRoute) => void;
-  onHoverRoute: (route: RfmNextRoute) => void;
+  onActivateRoute: (route: RfmRoute) => void;
+  onSelectRoute: (route: RfmRoute) => void;
+  onHoverRoute: (route: RfmRoute) => void;
   onHoverRouteEnd: () => void;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
@@ -357,6 +353,7 @@ export function UnifiedTreeView({
   hoveredIds,
   treeHoveredId,
   selectedRouteFilePath,
+  showDetailButton = true,
   onSelect,
   onDetail,
   onActivateRoute,
@@ -368,7 +365,7 @@ export function UnifiedTreeView({
   selectedRef,
 }: {
   tree: UnifiedFolder;
-} & TreeNodeProps) {
+} & Omit<TreeNodeProps, 'showDetailButton'> & { showDetailButton?: boolean }) {
   if (tree.children.length === 0) {
     return (
       <p className="m-0 px-2 py-4 text-[11px] text-rfm-text-400 leading-relaxed">
@@ -389,6 +386,7 @@ export function UnifiedTreeView({
           hoveredIds={hoveredIds}
           treeHoveredId={treeHoveredId}
           selectedRouteFilePath={selectedRouteFilePath}
+          showDetailButton={showDetailButton}
           onSelect={onSelect}
           onDetail={onDetail}
           onActivateRoute={onActivateRoute}

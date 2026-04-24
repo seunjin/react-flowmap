@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { exec } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
@@ -23,6 +24,39 @@ const _resolvePkg = (distName: string, srcRelative: string) =>
 export type PropTypeEntry      = { type: string; optional: boolean };
 export type ComponentPropTypes = { propsDefLoc?: { file: string; line: number }; props: Record<string, PropTypeEntry> };
 export type PropTypesMap       = Record<string, ComponentPropTypes>;
+export type RouteManifestEntry = {
+  id: string;
+  router: 'react-router' | 'tanstack-router';
+  urlPath: string;
+  filePath: string;
+  type: 'layout' | 'page';
+  componentName: string;
+  isServer: false;
+  propTypes?: Record<string, PropTypeEntry>;
+};
+
+function resolveImportedComponentPath(
+  root: string,
+  importerAbsPath: string,
+  importSource: string,
+): string | null {
+  const basePath = resolve(dirname(importerAbsPath), importSource);
+  const candidates = [
+    basePath,
+    `${basePath}.tsx`,
+    `${basePath}.ts`,
+    `${basePath}.jsx`,
+    `${basePath}.js`,
+    resolve(basePath, 'index.tsx'),
+    resolve(basePath, 'index.ts'),
+    resolve(basePath, 'index.jsx'),
+    resolve(basePath, 'index.js'),
+  ];
+
+  const resolved = candidates.find((candidate) => existsSync(candidate));
+  if (!resolved) return null;
+  return relative(root, resolved).replace(/\\/g, '/');
+}
 
 /** 타입의 선언 위치(파일, 라인)를 반환. node_modules / lib 타입은 null */
 function getTypeDefLoc(type: import('ts-morph').Type): { file: string; line: number } | null {
@@ -232,6 +266,37 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
           jsxLines.push(`(globalThis.__rfmStaticJsx[${JSON.stringify(fromId)}]??=[]).push(...${JSON.stringify(names)});`);
         }
         finalCode += jsxLines.join('\n');
+      }
+
+      const routeManifestEntries: RouteManifestEntry[] = result.routeManifestEntries.map((route) => {
+        const componentFilePath = route.componentImportSource
+          ? resolveImportedComponentPath(root, id, route.componentImportSource)
+          : relPath;
+
+        const propTypes = tsProject && componentFilePath
+          ? extractPropsViaTsMorph(tsProject, resolve(root, componentFilePath), route.componentName)?.props
+          : null;
+
+        return {
+          id: route.id,
+          router: route.router,
+          urlPath: route.urlPath,
+          filePath: componentFilePath ?? relPath,
+          type: route.type,
+          componentName: route.componentName,
+          isServer: false,
+          ...(propTypes ? { propTypes } : {}),
+        };
+      });
+
+      if (routeManifestEntries.length > 0) {
+        const routeLines = [
+          '\n// __rfm route manifest',
+          '(globalThis.__rfmViteRouteFiles??={});',
+          `globalThis.__rfmViteRouteFiles[${JSON.stringify(relPath)}]=${JSON.stringify(routeManifestEntries)};`,
+          'globalThis.__rfmViteRoutes=Object.values(globalThis.__rfmViteRouteFiles).flat();',
+        ];
+        finalCode += routeLines.join('\n');
       }
 
       // ts-morph prop types 주입

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { DocEntry } from '../../src/ui/doc/build-doc-index';
 import type { RfmNextRoute } from '../../src/ui/inspector/types';
-import { getEntryScreenContext, getRouteScreenContext } from '../../src/ui/graph-window/workspace-detail-model';
+import {
+  getActiveRoutesForPath,
+  getEntryScreenContext,
+  getRouteScreenContext,
+} from '../../src/ui/graph-window/workspace-detail-model';
 
 function makeEntry(overrides: Partial<DocEntry> & { symbolId: string; name: string }): DocEntry {
   return {
@@ -85,6 +89,98 @@ describe('workspace detail model', () => {
     ).toEqual({
       route: dynamicPageRoute,
       parentLayout: layoutRoute,
+    });
+  });
+
+  it('matches react-router style params and falls back to the active page route', () => {
+    const appLayoutRoute = makeRoute({
+      filePath: 'src/app.tsx',
+      componentName: 'App',
+      type: 'layout',
+      urlPath: '/',
+      router: 'react-router',
+    });
+    const productRoute = makeRoute({
+      filePath: 'src/pages/product-page.tsx',
+      componentName: 'ProductPage',
+      urlPath: '/product/:productId',
+      router: 'react-router',
+    });
+    const selectedEntry = makeEntry({
+      symbolId: 'symbol:src/widgets/product-detail.tsx#ProductDetail',
+      name: 'ProductDetail',
+      filePath: 'src/widgets/product-detail.tsx',
+    });
+
+    expect(
+      getEntryScreenContext(selectedEntry, [appLayoutRoute, productRoute], '/product/42'),
+    ).toEqual({
+      route: productRoute,
+      parentLayout: appLayoutRoute,
+    });
+  });
+
+  it('returns only the active route chain for the current path', () => {
+    const appLayoutRoute = makeRoute({
+      filePath: 'src/app.tsx',
+      componentName: 'App',
+      type: 'layout',
+      urlPath: '/',
+      router: 'react-router',
+    });
+    const homeRoute = makeRoute({
+      filePath: 'src/pages/home-page.tsx',
+      componentName: 'HomePage',
+      urlPath: '/',
+      router: 'react-router',
+    });
+    const productRoute = makeRoute({
+      filePath: 'src/pages/product-page.tsx',
+      componentName: 'ProductPage',
+      urlPath: '/product/:productId',
+      router: 'react-router',
+    });
+    const cartRoute = makeRoute({
+      filePath: 'src/pages/cart-page.tsx',
+      componentName: 'CartPage',
+      urlPath: '/cart',
+      router: 'react-router',
+    });
+
+    expect(
+      getActiveRoutesForPath([appLayoutRoute, homeRoute, productRoute, cartRoute], '/'),
+    ).toEqual([homeRoute, appLayoutRoute]);
+
+    expect(
+      getActiveRoutesForPath([appLayoutRoute, homeRoute, productRoute, cartRoute], '/product/42'),
+    ).toEqual([productRoute, appLayoutRoute]);
+  });
+
+  it('matches tanstack style params when deriving the current screen context', () => {
+    const rootRoute = makeRoute({
+      filePath: 'src/app.tsx',
+      componentName: 'App',
+      type: 'layout',
+      urlPath: '/',
+      router: 'tanstack-router',
+    });
+    const detailRoute = makeRoute({
+      filePath: 'src/pages/posts/post-page.tsx',
+      componentName: 'PostPage',
+      urlPath: '/posts/$postId',
+      router: 'tanstack-router',
+    });
+    const selectedEntry = makeEntry({
+      symbolId: 'symbol:src/widgets/post-body.tsx#PostBody',
+      name: 'PostBody',
+      filePath: 'src/widgets/post-body.tsx',
+    });
+
+    expect(
+      getEntryScreenContext(selectedEntry, [rootRoute, detailRoute], '/posts/hello-world'),
+    ).toEqual({
+      route: detailRoute,
+      parentLayout: rootRoute,
     });
   });
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
-import type { FoundComp, RfmNextRoute } from './types';
+import type { FoundComp, RfmRoute } from './types';
 import {
   findComponentsAt, findElBySymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
@@ -55,12 +55,35 @@ function serializeProps(rawProps: Record<string, unknown> | null): Record<string
   );
 }
 
-function applyStaticEdges(
+function buildOwnershipChildIds(
+  entries: DocEntry[],
+  fiberRelations: Record<string, string[]>,
+): Set<string> {
+  const ownedChildIds = new Set<string>();
+
+  for (const entry of entries) {
+    for (const child of entry.renders) {
+      ownedChildIds.add(child.symbolId);
+    }
+  }
+
+  for (const childIds of Object.values(fiberRelations)) {
+    for (const childId of childIds) {
+      ownedChildIds.add(childId);
+    }
+  }
+
+  return ownedChildIds;
+}
+
+export function applyStaticEdges(
   entries: DocEntry[],
   staticJsx: Record<string, string[]>,
+  fiberRelations: Record<string, string[]>,
 ): DocEntry[] {
   const byId = new Map(entries.map(e => [e.symbolId, e]));
   const byName = new Map(entries.map(e => [e.name, e]));
+  const ownedChildIds = buildOwnershipChildIds(entries, fiberRelations);
 
   // child name → [parentSymbolId] 역방향
   const staticParents = new Map<string, string[]>();
@@ -74,8 +97,8 @@ function applyStaticEdges(
   return entries.map(entry => {
     let { renderedBy, renders } = entry;
 
-    // renderedBy 보완: 런타임 부모가 없으면 static 부모 추가
-    if (renderedBy.length === 0) {
+    // renderedBy 보완: ownership parent가 전혀 없을 때만 static 부모를 fallback으로 추가
+    if (renderedBy.length === 0 && !ownedChildIds.has(entry.symbolId)) {
       const extra = (staticParents.get(entry.name) ?? [])
         .map(id => byId.get(id))
         .filter(Boolean)
@@ -83,13 +106,14 @@ function applyStaticEdges(
       if (extra.length > 0) renderedBy = extra;
     }
 
-    // renders 보완: staticJsx에 있지만 런타임 renders에 없는 자식 추가
+    // renders 보완: ownership child가 전혀 없을 때만 static child를 fallback으로 추가
     const staticChildren = staticJsx[entry.symbolId] ?? [];
     const runtimeChildIds = new Set(renders.map(r => r.symbolId));
     const extraRenders = staticChildren
       .map(name => byName.get(name))
       .filter(Boolean)
       .filter(ce => !runtimeChildIds.has(ce!.symbolId))
+      .filter(ce => !ownedChildIds.has(ce!.symbolId))
       .map(ce => ({ symbolId: ce!.symbolId, name: ce!.name, filePath: ce!.filePath }));
     if (extraRenders.length > 0) renders = [...renders, ...extraRenders];
 
@@ -103,19 +127,28 @@ function computeRouteRect(): DOMRect {
   return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
 }
 
+function getRouteManifest(): RfmRoute[] | null {
+  const globalRoutes = globalThis as typeof globalThis & {
+    __rfmNextRouteTree?: RfmRoute[];
+    __rfmViteRoutes?: RfmRoute[];
+  };
+
+  return globalRoutes.__rfmNextRouteTree ?? globalRoutes.__rfmViteRoutes ?? null;
+}
+
 function broadcastToGraph(
   ch: BroadcastChannel,
   allEntries: DocEntry[],
   selectedId: string,
-  nextRoutes?: RfmNextRoute[] | null,
+  routes?: RfmRoute[] | null,
 ) {
   // 항상 fresh하게 계산 (unmount 반영)
   const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
   let mountedEntries = allEntries.filter(e => mountedIds.has(e.symbolId));
   const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
-  const staticJsx = (globalThis as unknown as { __rfmStaticJsx?: Record<string, string[]> }).__rfmStaticJsx;
-  if (staticJsx) mountedEntries = applyStaticEdges(mountedEntries, staticJsx);
   const fiberRelations = buildFiberRelationships();
+  const staticJsx = (globalThis as unknown as { __rfmStaticJsx?: Record<string, string[]> }).__rfmStaticJsx;
+  if (staticJsx) mountedEntries = applyStaticEdges(mountedEntries, staticJsx, fiberRelations);
   ch.postMessage({
     type: 'graph-update',
     allEntries: mountedEntries,
@@ -123,7 +156,8 @@ function broadcastToGraph(
     propTypesMap,
     ...(staticJsx ? { staticJsx } : {}),
     fiberRelations,
-    nextRoutes: nextRoutes ?? null,
+    routes: routes ?? null,
+    currentPath: window.location.pathname,
   } satisfies MainToGraph);
   if (selectedId) {
     const props = serializeProps(getPropsForSymbolId(selectedId));
@@ -154,9 +188,7 @@ export function ComponentOverlay({
   const channelRef    = useRef<BroadcastChannel | null>(null);
   const [shadowContainer, setShadowContainer] = useState<HTMLElement | null>(null);
 
-  // Next.js App Router 라우트 트리 — withFlowmap의 DefinePlugin이 주입, Vite에서는 undefined
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nextRoutes: RfmNextRoute[] | null = (globalThis as any).__rfmNextRouteTree ?? null;
+  const routes = getRouteManifest();
   const [picking,    setPicking]    = useState(false);
   // ref 교체 후 re-render 강제용 (setSelectedId가 동일값이면 React가 스킵하므로)
   const [, forceRender] = useState(0);
@@ -173,7 +205,8 @@ export function ComponentOverlay({
   const currentDataRef = useRef<{
     mountedEntries: DocEntry[]; // allEntries 저장 (broadcastToGraph 내부에서 fresh mount 계산)
     selectedId: string;
-  }>({ mountedEntries: [], selectedId: '' });
+    routes: RfmRoute[] | null;
+  }>({ mountedEntries: [], selectedId: '', routes: null });
 
   // shadow root ref — CSS 동기화에 재사용
   const shadowRootRef = useRef<ShadowRoot | null>(null);
@@ -244,14 +277,14 @@ export function ComponentOverlay({
       const msg = ev.data;
       if (msg.type === 'ready') {
         // 그래프 창 준비 완료 → 현재 상태 즉시 전송
-        const { mountedEntries, selectedId: sid } = currentDataRef.current;
-        broadcastToGraph(ch, mountedEntries, sid, nextRoutes);
+        const { mountedEntries, selectedId: sid, routes: currentRoutes } = currentDataRef.current;
+        broadcastToGraph(ch, mountedEntries, sid, currentRoutes);
       } else if (msg.type === 'select') {
         if (msg.symbolId.startsWith('ssr:')) {
           // 그래프 창에서 서버 라우트 노드 선택 → routeRect 표시
           const fp = msg.symbolId.slice('ssr:'.length);
-          const routes: RfmNextRoute[] = (globalThis as unknown as { __rfmNextRouteTree?: RfmNextRoute[] }).__rfmNextRouteTree ?? [];
-          const route = routes.find(r => r.filePath === fp) ?? null;
+          const currentRoutes = getRouteManifest() ?? [];
+          const route = currentRoutes.find(r => r.filePath === fp) ?? null;
           if (route) {
             const rect = computeRouteRect();
             setSelectedId('');
@@ -274,8 +307,8 @@ export function ComponentOverlay({
         if (msg.symbolId.startsWith('ssr:')) {
           // 그래프 창에서 서버 라우트 노드 호버 → routeHoverRect 표시
           const fp = msg.symbolId.slice('ssr:'.length);
-          const routes: RfmNextRoute[] = (globalThis as unknown as { __rfmNextRouteTree?: RfmNextRoute[] }).__rfmNextRouteTree ?? [];
-          const route = routes.find(r => r.filePath === fp) ?? null;
+          const currentRoutes = getRouteManifest() ?? [];
+          const route = currentRoutes.find(r => r.filePath === fp) ?? null;
           if (route) {
             const rect = computeRouteRect();
             setRouteHoverRect({ rect, label: route.componentName });
@@ -335,7 +368,7 @@ export function ComponentOverlay({
         symbolId,
         name,
         filePath,
-        category: name.endsWith('Page') || name.endsWith('Layout') ? 'page' : 'component',
+        category: 'component',
         renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
       });
       graphIds.add(symbolId);
@@ -345,14 +378,14 @@ export function ComponentOverlay({
 
   // 채널 핸들러에서 최신 값 참조용 ref 동기화
   useEffect(() => {
-    currentDataRef.current = { mountedEntries: allEntries, selectedId };
-  }, [allEntries, selectedId]);
+    currentDataRef.current = { mountedEntries: allEntries, selectedId, routes };
+  }, [allEntries, selectedId, routes]);
 
   // allEntries / selectedId 변경 시 그래프 창에 브로드캐스트
   useEffect(() => {
     if (!graphWindowOpen || !channelRef.current) return;
-    broadcastToGraph(channelRef.current, allEntries, selectedId, nextRoutes);
-  }, [allEntries, selectedId, graphWindowOpen, nextRoutes]);
+    broadcastToGraph(channelRef.current, allEntries, selectedId, routes);
+  }, [allEntries, selectedId, graphWindowOpen, routes]);
 
   // popup refresh는 유지하고, 실제 close일 때만 inspector를 정리한다.
   useEffect(() => {
@@ -381,7 +414,14 @@ export function ComponentOverlay({
       invalidateMountedRfmSnapshot();
       if (debounceId) clearTimeout(debounceId);
       debounceId = setTimeout(() => {
-        if (channelRef.current) broadcastToGraph(channelRef.current, allEntries, selectedIdRef.current, nextRoutes);
+        if (channelRef.current) {
+          broadcastToGraph(
+            channelRef.current,
+            allEntries,
+            selectedIdRef.current,
+            currentDataRef.current.routes,
+          );
+        }
       }, 100);
     });
     obs.observe(document.body, { childList: true, subtree: true });
@@ -412,11 +452,14 @@ export function ComponentOverlay({
     onGraphWindowOpen?.();
     setTimeout(() => {
       const propTypesMap = (globalThis as unknown as { __rfmPropTypes?: PropTypesMap }).__rfmPropTypes ?? {};
+      const { mountedEntries, selectedId: currentSelectedId, routes: currentRoutes } = currentDataRef.current;
       channelRef.current?.postMessage({
         type: 'graph-update',
-        allEntries,
-        selectedId,
+        allEntries: mountedEntries,
+        selectedId: currentSelectedId,
         propTypesMap,
+        routes: currentRoutes,
+        currentPath: window.location.pathname,
       } satisfies MainToGraph);
     }, 600);
     return true;

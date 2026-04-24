@@ -1,13 +1,13 @@
 import type { DocEntry } from '../doc/build-doc-index';
-import type { RfmNextRoute, RfmNextServerComponent } from '../inspector/types';
+import type { RfmRoute, RfmServerComponent } from '../inspector/types';
 
 export type WorkspaceEntryScreenContext = {
-  route: RfmNextRoute | null;
-  parentLayout: RfmNextRoute | null;
+  route: RfmRoute | null;
+  parentLayout: RfmRoute | null;
 };
 
 export type WorkspaceRouteScreenContext = {
-  parentLayout: RfmNextRoute | null;
+  parentLayout: RfmRoute | null;
 };
 
 function normalizePath(path: string): string {
@@ -31,13 +31,17 @@ function isUrlAncestor(ancestor: string, descendant: string): boolean {
 }
 
 function isDynamicSegment(segment: string): boolean {
-  return /^\[[^\]]+\]$/.test(segment)
+  return (
+    /^\[[^\]]+\]$/.test(segment)
+    || /^:[^/]+$/.test(segment)
+    || (/^\$[^/]+$/.test(segment) && segment !== '$')
+  )
     && !segment.startsWith('[...')
     && !segment.startsWith('[[...');
 }
 
 function isCatchAllSegment(segment: string): boolean {
-  return /^\[\.\.\.[^\]]+\]$/.test(segment);
+  return /^\[\.\.\.[^\]]+\]$/.test(segment) || segment === '*' || segment === '$';
 }
 
 function isOptionalCatchAllSegment(segment: string): boolean {
@@ -64,7 +68,7 @@ function matchesRouteSegments(routeSegments: string[], pathSegments: string[], a
   return false;
 }
 
-function isActiveRouteForPath(route: RfmNextRoute, currentPath: string): boolean {
+function isActiveRouteForPath(route: RfmRoute, currentPath: string): boolean {
   const routeSegments = splitPath(route.urlPath);
   const pathSegments = splitPath(currentPath);
   return route.type === 'layout'
@@ -72,7 +76,7 @@ function isActiveRouteForPath(route: RfmNextRoute, currentPath: string): boolean
     : matchesRouteSegments(routeSegments, pathSegments, false);
 }
 
-function findParentLayout(route: RfmNextRoute, allRoutes: RfmNextRoute[]): RfmNextRoute | null {
+function findParentLayout(route: RfmRoute, allRoutes: RfmRoute[]): RfmRoute | null {
   const candidates = allRoutes.filter((candidate) =>
     candidate.type === 'layout'
     && candidate.filePath !== route.filePath
@@ -83,7 +87,7 @@ function findParentLayout(route: RfmNextRoute, allRoutes: RfmNextRoute[]): RfmNe
   return candidates[0] ?? null;
 }
 
-function importTreeContainsEntry(children: RfmNextServerComponent[] | undefined, entry: DocEntry): boolean {
+function importTreeContainsEntry(children: RfmServerComponent[] | undefined, entry: DocEntry): boolean {
   for (const child of children ?? []) {
     if (child.filePath === entry.filePath && child.componentName === entry.name) {
       return true;
@@ -97,7 +101,7 @@ function importTreeContainsEntry(children: RfmNextServerComponent[] | undefined,
   return false;
 }
 
-function routeOwnsEntry(route: RfmNextRoute, entry: DocEntry): boolean {
+function routeOwnsEntry(route: RfmRoute, entry: DocEntry): boolean {
   if (route.filePath === entry.filePath && route.componentName === entry.name) {
     return true;
   }
@@ -105,7 +109,7 @@ function routeOwnsEntry(route: RfmNextRoute, entry: DocEntry): boolean {
   return importTreeContainsEntry(route.children, entry);
 }
 
-function routeSpecificityScore(route: RfmNextRoute): [number, number] {
+function routeSpecificityScore(route: RfmRoute): [number, number] {
   const typeRank = route.type === 'page'
     ? 0
     : route.type === 'template'
@@ -117,23 +121,33 @@ function routeSpecificityScore(route: RfmNextRoute): [number, number] {
   return [getUrlDepth(route.urlPath), -typeRank];
 }
 
-function sortRoutesBySpecificity(a: RfmNextRoute, b: RfmNextRoute): number {
+function sortRoutesBySpecificity(a: RfmRoute, b: RfmRoute): number {
   const [aDepth, aType] = routeSpecificityScore(a);
   const [bDepth, bType] = routeSpecificityScore(b);
   if (aDepth !== bDepth) return bDepth - aDepth;
   return bType - aType;
 }
 
-export function getEntryScreenContext(
-  entry: DocEntry,
-  allRoutes: RfmNextRoute[],
+export function getActiveRoutesForPath(
+  allRoutes: RfmRoute[],
   currentPath: string,
-): WorkspaceEntryScreenContext {
-  const activeRoutes = allRoutes
+): RfmRoute[] {
+  return allRoutes
     .filter((route) => isActiveRouteForPath(route, currentPath))
     .sort(sortRoutesBySpecificity);
+}
 
-  const route = activeRoutes.find((candidate) => routeOwnsEntry(candidate, entry)) ?? null;
+export function getEntryScreenContext(
+  entry: DocEntry,
+  allRoutes: RfmRoute[],
+  currentPath: string,
+): WorkspaceEntryScreenContext {
+  const activeRoutes = getActiveRoutesForPath(allRoutes, currentPath);
+
+  const route = activeRoutes.find((candidate) => routeOwnsEntry(candidate, entry))
+    ?? activeRoutes.find((candidate) => candidate.type !== 'layout')
+    ?? activeRoutes[0]
+    ?? null;
   return {
     route,
     parentLayout: route ? findParentLayout(route, activeRoutes) : null,
@@ -141,8 +155,8 @@ export function getEntryScreenContext(
 }
 
 export function getRouteScreenContext(
-  route: RfmNextRoute,
-  allRoutes: RfmNextRoute[],
+  route: RfmRoute,
+  allRoutes: RfmRoute[],
 ): WorkspaceRouteScreenContext {
   return {
     parentLayout: findParentLayout(route, allRoutes),

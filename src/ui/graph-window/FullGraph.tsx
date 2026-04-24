@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { DocEntry } from '../doc/build-doc-index';
-import type { RfmNextRoute } from '../inspector/types';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -20,7 +19,6 @@ interface LayoutNode {
   entry: DocEntry;
   x: number;
   y: number;
-  isServer?: boolean;
 }
 
 interface LayoutEdge {
@@ -38,39 +36,42 @@ interface Layout {
 
 // ─── Layout builder ───────────────────────────────────────────────────────────
 
-// URL 유틸 (서버 라우트 계층 계산용)
-function urlDepth(p: string) { return p === '/' ? 0 : p.split('/').filter(Boolean).length; }
-function isUrlAncestor(a: string, d: string) {
-  if (a === d) return false;
-  if (a === '/') return true;
-  return d.startsWith(a + '/');
+function buildOwnershipChildIds(
+  entries: DocEntry[],
+  fiberRelations: Record<string, string[]>,
+): Set<string> {
+  const ownershipChildIds = new Set<string>();
+
+  for (const entry of entries) {
+    for (const child of entry.renders) {
+      ownershipChildIds.add(child.symbolId);
+    }
+  }
+
+  for (const childIds of Object.values(fiberRelations)) {
+    for (const childId of childIds) {
+      ownershipChildIds.add(childId);
+    }
+  }
+
+  return ownershipChildIds;
 }
 
-function buildLayout(
+export function buildLayout(
   entries: DocEntry[],
   staticJsx: Record<string, string[]>,
   fiberRelations: Record<string, string[]>,
-  nextRoutes: RfmNextRoute[] | null,
 ): Layout {
-  // 서버 라우트 → 합성 DocEntry
-  const serverEntries: DocEntry[] = (nextRoutes ?? []).map(route => ({
-    symbolId: SSR_PREFIX + route.filePath,
-    name: route.componentName,
-    filePath: route.filePath,
-    category: 'page' as const,
-    renders: [], renderedBy: [], uses: [], usedBy: [], apiCalls: [],
-  }));
-  const serverIds = new Set(serverEntries.map(e => e.symbolId));
-
-  const allEntries = [...serverEntries, ...entries];
+  const allEntries = [...entries];
   if (allEntries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
 
   const byId  = new Map(allEntries.map(e => [e.symbolId, e]));
   const byName = new Map(entries.map(e => [e.name, e]));
+  const ownershipChildIds = buildOwnershipChildIds(entries, fiberRelations);
 
-  // ── Build combined adjacency: runtime renders/uses + staticJsx + fiberRelations ──
-  // fiberRelations is the live fiber tree — covers alias imports and Outlet-mediated
-  // route rendering that staticJsx (relative-import-only) misses.
+  // ── Build combined adjacency: runtime renders/uses + fiberRelations ──
+  // staticJsx is declaration metadata and should only act as a fallback when a child
+  // has no ownership parent in the current screen.
   const childEdges  = new Map<string, string[]>(); // parentId → [childId]
   const parentEdges = new Map<string, string[]>(); // childId  → [parentId]
   const edgeDedup   = new Set<string>();
@@ -91,33 +92,11 @@ function buildLayout(
   for (const [fromId, names] of Object.entries(staticJsx)) {
     for (const name of names) {
       const child = byName.get(name);
-      if (child) addEdge(fromId, child.symbolId);
+      if (child && !ownershipChildIds.has(child.symbolId)) addEdge(fromId, child.symbolId);
     }
   }
   for (const [fromId, childIds] of Object.entries(fiberRelations)) {
     for (const childId of childIds) addEdge(fromId, childId);
-  }
-  // 서버 라우트 엣지: 레이아웃→하위 라우트, 페이지→CSR import 자식
-  for (const route of nextRoutes ?? []) {
-    const fromId = SSR_PREFIX + route.filePath;
-    if (route.type === 'layout') {
-      const layoutDepth = urlDepth(route.urlPath);
-      for (const child of nextRoutes ?? []) {
-        if (child.filePath === route.filePath) continue;
-        if (child.urlPath === route.urlPath || isUrlAncestor(route.urlPath, child.urlPath)) {
-          if (urlDepth(child.urlPath) === layoutDepth + 1 || child.urlPath === route.urlPath) {
-            addEdge(fromId, SSR_PREFIX + child.filePath);
-          }
-        }
-      }
-    }
-    // 모든 라우트: CSR import 자식 연결
-    for (const child of route.children ?? []) {
-      if (child.isServer) continue;
-      const csrEntry = entries.find(e => e.filePath === child.filePath && e.name === child.componentName)
-        ?? entries.find(e => e.filePath === child.filePath);
-      if (csrEntry) addEdge(fromId, csrEntry.symbolId);
-    }
   }
 
   // ── Topological longest-path depth assignment (Kahn's algorithm) ──────────
@@ -148,7 +127,7 @@ function buildLayout(
     if (!depthMap.has(entry.symbolId)) depthMap.set(entry.symbolId, ++maxDepth);
   }
 
-  // Group by depth, sort: pages first, then hooks last, then alphabetical
+  // Group by depth, sort hooks/functions after components.
   const colGroups = new Map<number, DocEntry[]>();
   for (const entry of allEntries) {
     const d = depthMap.get(entry.symbolId)!;
@@ -156,7 +135,7 @@ function buildLayout(
     colGroups.get(d)!.push(entry);
   }
   const sortGroup = (a: DocEntry, b: DocEntry) => {
-    const catOrder = (e: DocEntry) => e.category === 'page' ? 0 : e.category === 'hook' ? 2 : 1;
+    const catOrder = (e: DocEntry) => e.category === 'hook' ? 2 : e.category === 'function' ? 3 : 1;
     if (catOrder(a) !== catOrder(b)) return catOrder(a) - catOrder(b);
     return a.name.localeCompare(b.name);
   };
@@ -202,38 +181,19 @@ function buildLayout(
   for (const [fromId, names] of Object.entries(staticJsx)) {
     for (const name of names) {
       const child = byName.get(name);
-      if (child) addVisualEdge(fromId, child.symbolId, 'render');
+      if (child && !ownershipChildIds.has(child.symbolId)) {
+        addVisualEdge(fromId, child.symbolId, 'render');
+      }
     }
   }
   for (const [fromId, childIds] of Object.entries(fiberRelations)) {
     for (const childId of childIds) addVisualEdge(fromId, childId, 'render');
   }
-  // 서버 라우트 visual 엣지 (topology와 동일 로직)
-  for (const route of nextRoutes ?? []) {
-    const fromId = SSR_PREFIX + route.filePath;
-    if (route.type === 'layout') {
-      const layoutDepth = urlDepth(route.urlPath);
-      for (const child of nextRoutes ?? []) {
-        if (child.filePath === route.filePath) continue;
-        if (child.urlPath === route.urlPath || isUrlAncestor(route.urlPath, child.urlPath)) {
-          if (urlDepth(child.urlPath) === layoutDepth + 1 || child.urlPath === route.urlPath) {
-            addVisualEdge(fromId, SSR_PREFIX + child.filePath, 'render');
-          }
-        }
-      }
-    }
-    for (const child of route.children ?? []) {
-      if (child.isServer) continue;
-      const csrEntry = entries.find(e => e.filePath === child.filePath && e.name === child.componentName)
-        ?? entries.find(e => e.filePath === child.filePath);
-      if (csrEntry) addVisualEdge(fromId, csrEntry.symbolId, 'render');
-    }
-  }
 
   const nodes: LayoutNode[] = allEntries
     .map(entry => {
       const pos = posMap.get(entry.symbolId);
-      return pos ? { entry, ...pos, isServer: serverIds.has(entry.symbolId) } : null;
+      return pos ? { entry, ...pos } : null;
     })
     .filter(Boolean) as LayoutNode[];
 
@@ -266,7 +226,6 @@ export function FullGraph({
   selectedId,
   staticJsx,
   fiberRelations,
-  nextRoutes,
   onSelect,
   onHover,
   onHoverEnd,
@@ -275,14 +234,13 @@ export function FullGraph({
   selectedId: string;
   staticJsx: Record<string, string[]>;
   fiberRelations: Record<string, string[]>;
-  nextRoutes: RfmNextRoute[] | null;
   onSelect: (symbolId: string) => void;
   onHover: (symbolId: string) => void;
   onHoverEnd: () => void;
 }) {
   const layout = useMemo(
-    () => buildLayout(entries, staticJsx, fiberRelations, nextRoutes),
-    [entries, staticJsx, fiberRelations, nextRoutes],
+    () => buildLayout(entries, staticJsx, fiberRelations),
+    [entries, staticJsx, fiberRelations],
   );
 
   // Pan & zoom
@@ -392,14 +350,13 @@ export function FullGraph({
         </svg>
 
         {/* Nodes */}
-        {layout.nodes.map(({ entry, x, y, isServer }) => {
+        {layout.nodes.map(({ entry, x, y }) => {
           const isSelected = entry.symbolId === selectedId;
-          const catColor = isServer
-            ? { bg: '#fffbeb', border: '#fcd34d', text: '#92400e' }
-            : entry.category === 'page'      ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
-            : entry.category === 'hook'    ? { bg: '#f5f3ff', border: '#ddd6fe', text: '#7c3aed' }
-            : entry.category === 'function'? { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' }
-            :                                { bg: '#f9fafb', border: '#e5e7eb', text: '#374151' };
+          const catColor = entry.category === 'hook'
+            ? { bg: '#f5f3ff', border: '#ddd6fe', text: '#7c3aed' }
+            : entry.category === 'function'
+              ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' }
+              : { bg: '#f9fafb', border: '#e5e7eb', text: '#374151' };
 
           return (
             <button
@@ -437,15 +394,6 @@ export function FullGraph({
               }}>
                 {entry.name}
               </span>
-              {entry.category !== 'component' && (
-                <span style={{
-                  fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
-                  color: isSelected ? '#3b82f6' : catColor.border,
-                  textTransform: 'uppercase', flexShrink: 0,
-                }}>
-                  {entry.category}
-                </span>
-              )}
             </button>
           );
         })}

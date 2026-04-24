@@ -51,6 +51,25 @@ test.describe('demos/react', () => {
     await expect(mountedSymbols).toHaveText(/^[1-9]\d* mounted symbols$/);
   });
 
+  test('workspace 창이 react-router route context를 표시한다', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
+
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText(/^[1-9]\d* active routes$/)).toBeVisible();
+    await expect(popup.locator('button[title*=" - /"]')).toHaveCount(0);
+  });
+
+  test('컴포넌트를 선택해도 그래프는 route island 없이 component graph만 유지한다', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
+
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.locator('button[title="App"]').first()).not.toContainText('PAGE');
+    await popup.locator('button[title="HomePage"]').first().click();
+    await expect(popup.locator('button[title*=" - /"]')).toHaveCount(0);
+  });
+
   test('react-router-dom 라우팅으로 상품 상세와 목록 사이를 이동한다', async ({ page }) => {
     await page.goto(BASE);
 

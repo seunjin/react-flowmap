@@ -135,7 +135,6 @@ export function buildDocIndex(graph: FlowmapGraph): DocIndex {
   );
 
   function categorize(id: string): DocEntry['category'] {
-    if (!hasIncomingRender.has(id) && hasOutgoingRender.has(id)) return 'page';
     if (hasIncomingRender.has(id) || hasOutgoingRender.has(id)) return 'component';
     if (isHookTarget.has(id)) return 'hook';
     return 'function';

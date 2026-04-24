@@ -1,52 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-// applyStaticEdges is a module-internal function — test via its exported effect
-// by importing and calling it directly after extracting it
-// Since it's not exported, we duplicate a minimal version here tied to DocEntry shape.
-// If the implementation diverges, TypeScript will catch the type mismatch.
-
 import type { DocEntry } from '../../src/ui/doc/build-doc-index';
-
-// Replicated from ComponentOverlay.tsx — kept in sync by types
-function applyStaticEdges(
-  entries: DocEntry[],
-  staticJsx: Record<string, string[]>,
-): DocEntry[] {
-  const byId = new Map(entries.map(e => [e.symbolId, e]));
-  const byName = new Map(entries.map(e => [e.name, e]));
-
-  const staticParents = new Map<string, string[]>();
-  for (const [fromId, childNames] of Object.entries(staticJsx)) {
-    for (const name of childNames) {
-      if (!staticParents.has(name)) staticParents.set(name, []);
-      staticParents.get(name)!.push(fromId);
-    }
-  }
-
-  return entries.map(entry => {
-    let { renderedBy, renders } = entry;
-
-    if (renderedBy.length === 0) {
-      const extra = (staticParents.get(entry.name) ?? [])
-        .map(id => byId.get(id))
-        .filter(Boolean)
-        .map(pe => ({ symbolId: pe!.symbolId, name: pe!.name, filePath: pe!.filePath }));
-      if (extra.length > 0) renderedBy = extra;
-    }
-
-    const staticChildren = staticJsx[entry.symbolId] ?? [];
-    const runtimeChildIds = new Set(renders.map(r => r.symbolId));
-    const extraRenders = staticChildren
-      .map(name => byName.get(name))
-      .filter(Boolean)
-      .filter(ce => !runtimeChildIds.has(ce!.symbolId))
-      .map(ce => ({ symbolId: ce!.symbolId, name: ce!.name, filePath: ce!.filePath }));
-    if (extraRenders.length > 0) renders = [...renders, ...extraRenders];
-
-    if (renderedBy === entry.renderedBy && renders === entry.renders) return entry;
-    return { ...entry, renderedBy, renders };
-  });
-}
+import { applyStaticEdges } from '../../src/ui/inspector/ComponentOverlay';
 
 function makeEntry(overrides: Partial<DocEntry> & { symbolId: string; name: string }): DocEntry {
   return {
@@ -64,7 +19,7 @@ function makeEntry(overrides: Partial<DocEntry> & { symbolId: string; name: stri
 describe('applyStaticEdges', () => {
   it('returns entries unchanged when staticJsx is empty', () => {
     const entries = [makeEntry({ symbolId: 'symbol:src/app.tsx#App', name: 'App' })];
-    const result = applyStaticEdges(entries, {});
+    const result = applyStaticEdges(entries, {}, {});
     expect(result[0]).toBe(entries[0]); // same reference
   });
 
@@ -74,7 +29,7 @@ describe('applyStaticEdges', () => {
 
     const result = applyStaticEdges([app, menu], {
       'symbol:src/app.tsx#App': ['UserMenu'],
-    });
+    }, {});
 
     const menuResult = result.find(e => e.name === 'UserMenu')!;
     expect(menuResult.renderedBy).toEqual([
@@ -93,7 +48,7 @@ describe('applyStaticEdges', () => {
 
     const result = applyStaticEdges([app, menu], {
       'symbol:src/app.tsx#App': ['UserMenu'],
-    });
+    }, {});
 
     const menuResult = result.find(e => e.name === 'UserMenu')!;
     // Runtime parent preserved — static parent not added since renderedBy already has entries
@@ -106,7 +61,7 @@ describe('applyStaticEdges', () => {
 
     const result = applyStaticEdges([app, menu], {
       'symbol:src/app.tsx#App': ['UserMenu'],
-    });
+    }, {});
 
     const appResult = result.find(e => e.name === 'App')!;
     expect(appResult.renders).toEqual([
@@ -125,7 +80,7 @@ describe('applyStaticEdges', () => {
 
     const result = applyStaticEdges([app, menu], {
       'symbol:src/app.tsx#App': ['UserMenu'],
-    });
+    }, {});
 
     const appResult = result.find(e => e.name === 'App')!;
     expect(appResult.renders).toHaveLength(1);
@@ -137,10 +92,33 @@ describe('applyStaticEdges', () => {
     // 'Ghost' is not in entries
     const result = applyStaticEdges([app], {
       'symbol:src/app.tsx#App': ['Ghost'],
-    });
+    }, {});
 
     const appResult = result.find(e => e.name === 'App')!;
     expect(appResult.renders).toHaveLength(0);
     expect(appResult).toBe(app); // unchanged reference
+  });
+
+  it('does not add static edges when fiber ownership already exists', () => {
+    const appRouter = makeEntry({ symbolId: 'symbol:src/router.tsx#AppRouter', name: 'AppRouter' });
+    const app = makeEntry({ symbolId: 'symbol:src/app.tsx#App', name: 'App' });
+    const homePage = makeEntry({ symbolId: 'symbol:src/pages/home-page.tsx#HomePage', name: 'HomePage' });
+
+    const result = applyStaticEdges(
+      [appRouter, app, homePage],
+      {
+        'symbol:src/router.tsx#AppRouter': ['HomePage'],
+      },
+      {
+        'symbol:src/router.tsx#AppRouter': ['symbol:src/app.tsx#App'],
+        'symbol:src/app.tsx#App': ['symbol:src/pages/home-page.tsx#HomePage'],
+      },
+    );
+
+    const homePageResult = result.find((entry) => entry.name === 'HomePage')!;
+    const appRouterResult = result.find((entry) => entry.name === 'AppRouter')!;
+
+    expect(homePageResult.renderedBy).toEqual([]);
+    expect(appRouterResult.renders).toEqual([]);
   });
 });

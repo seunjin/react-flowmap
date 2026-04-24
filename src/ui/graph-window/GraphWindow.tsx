@@ -7,7 +7,7 @@ import type {
   PropTypesMap,
 } from "../inspector/channel";
 import { RFM_CHANNEL } from "../inspector/channel";
-import type { RfmNextRoute } from "../inspector/types";
+import type { RfmRoute } from "../inspector/types";
 import {
   buildUnifiedTree,
   flattenUnifiedEntries,
@@ -15,12 +15,13 @@ import {
 } from "../inspector/UnifiedTreeView";
 import { FullGraph, SSR_PREFIX } from "./FullGraph";
 import { WorkspaceDetail } from "./WorkspaceDetail";
+import { getActiveRoutesForPath } from "./workspace-detail-model";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
 
 function selectionExists(
   selectedId: string,
   entries: DocEntry[],
-  routes: RfmNextRoute[] | null,
+  routes: RfmRoute[] | null,
 ): boolean {
   if (!selectedId) return true;
   if (selectedId.startsWith(SSR_PREFIX)) {
@@ -38,7 +39,8 @@ export function GraphWindow() {
   const [fiberRelations, setFiberRelations] = useState<
     Record<string, string[]>
   >({});
-  const [nextRoutes, setNextRoutes] = useState<RfmNextRoute[] | null>(null);
+  const [routes, setRoutes] = useState<RfmRoute[] | null>(null);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [currentProps, setCurrentProps] = useState<Record<
     string,
     unknown
@@ -70,7 +72,8 @@ export function GraphWindow() {
         setPropTypesMap(msg.propTypesMap ?? {});
         setStaticJsx(msg.staticJsx ?? {});
         setFiberRelations(msg.fiberRelations ?? {});
-        setNextRoutes(msg.nextRoutes ?? null);
+        setRoutes(msg.routes ?? null);
+        setCurrentPath(msg.currentPath ?? window.location.pathname);
         if (msg.selectedId !== selectedIdRef.current) {
           setSelectedId(msg.selectedId);
           selectedIdRef.current = msg.selectedId;
@@ -92,13 +95,18 @@ export function GraphWindow() {
     return () => ch.close();
   }, []);
 
+  const activeRoutes = useMemo(
+    () => getActiveRoutesForPath(routes ?? [], currentPath),
+    [routes, currentPath],
+  );
+
   useEffect(() => {
-    if (!selectionExists(selectedId, allEntries, nextRoutes)) {
+    if (!selectionExists(selectedId, allEntries, activeRoutes)) {
       setSelectedId("");
       selectedIdRef.current = "";
       setCurrentProps(null);
     }
-  }, [allEntries, nextRoutes, selectedId]);
+  }, [activeRoutes, allEntries, selectedId]);
 
   useEffect(() => {
     selectedTreeRef.current?.scrollIntoView({
@@ -154,8 +162,8 @@ export function GraphWindow() {
   }, [allEntries, searchQuery]);
 
   const unifiedTree = useMemo(
-    () => buildUnifiedTree(nextRoutes, filteredEntries),
-    [nextRoutes, filteredEntries],
+    () => buildUnifiedTree(activeRoutes, filteredEntries),
+    [activeRoutes, filteredEntries],
   );
   const treeEntries = useMemo(
     () => flattenUnifiedEntries(unifiedTree),
@@ -168,11 +176,11 @@ export function GraphWindow() {
 
   const selectedEntry =
     allEntries.find((entry) => entry.symbolId === selectedId) ?? null;
-  const selectedRoute = useMemo<RfmNextRoute | null>(() => {
-    if (!selectedId.startsWith(SSR_PREFIX) || !nextRoutes) return null;
+  const selectedRoute = useMemo<RfmRoute | null>(() => {
+    if (!selectedId.startsWith(SSR_PREFIX)) return null;
     const filePath = selectedId.slice(SSR_PREFIX.length);
-    return nextRoutes.find((route) => route.filePath === filePath) ?? null;
-  }, [selectedId, nextRoutes]);
+    return activeRoutes.find((route) => route.filePath === filePath) ?? null;
+  }, [activeRoutes, selectedId]);
   const selectedLabel =
     selectedRoute?.componentName ?? selectedEntry?.name ?? "No selection";
 
@@ -241,9 +249,9 @@ export function GraphWindow() {
         <span className="text-[11px] text-rfm-text-400">
           {allEntries.length} mounted symbols
         </span>
-        {!!nextRoutes?.length && (
+        {!!activeRoutes.length && (
           <span className="text-[11px] text-rfm-text-400">
-            {nextRoutes.length} routes
+            {activeRoutes.length} active routes
           </span>
         )}
         <div className="flex-1" />
@@ -285,7 +293,8 @@ export function GraphWindow() {
                 placeholder="Search name or file..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full box-border p-6.5 rounded-md border border-rfm-border-light bg-[rgba(249,250,251,0.7)] text-[11px] text-rfm-text-900 outline-none font-[inherit] focus:border-rfm-text-400 focus:bg-white"
+                className="w-full box-border rounded-md border border-rfm-border-light bg-[rgba(249,250,251,0.7)] text-[11px] text-rfm-text-900 outline-none font-[inherit] focus:border-rfm-text-400 focus:bg-white"
+                style={{ height: 28, paddingLeft: 28, paddingRight: 24 }}
               />
               {searchQuery && (
                 <button
@@ -348,7 +357,6 @@ export function GraphWindow() {
               selectedId={selectedId}
               staticJsx={staticJsx}
               fiberRelations={fiberRelations}
-              nextRoutes={nextRoutes}
               onSelect={handleSelect}
               onHover={handleHover}
               onHoverEnd={handleHoverEnd}
@@ -370,10 +378,8 @@ export function GraphWindow() {
             <WorkspaceDetail
               entry={selectedEntry}
               route={selectedRoute}
-              allRoutes={nextRoutes ?? []}
               props={currentProps}
               propTypesMap={propTypesMap}
-              currentUrlPath={window.location.pathname}
             />
           </div>
         </aside>

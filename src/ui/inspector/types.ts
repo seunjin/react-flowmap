@@ -28,9 +28,11 @@ export type DomRelNode = {
   count?: number;
 };
 
-// ─── Next.js App Router 정적 라우트 ──────────────────────────────────────────
+// ─── Shared Route Metadata ───────────────────────────────────────────────────
 
 export type RfmNextRouteType = 'layout' | 'page' | 'loading' | 'error' | 'not-found' | 'template';
+export type RfmRouteSource = 'next' | 'react-router' | 'tanstack-router';
+export type RfmRouteType = RfmNextRouteType;
 
 /** import 정적 분석으로 추출한 서버/클라이언트 컴포넌트 트리 노드 */
 export type RfmNextServerComponent = {
@@ -39,8 +41,13 @@ export type RfmNextServerComponent = {
   isServer: boolean;
   children?: RfmNextServerComponent[];
 };
+export type RfmServerComponent = RfmNextServerComponent;
 
 export type RfmNextRoute = {
+  /** 라우트 고유 ID (있는 경우) */
+  id?: string;
+  /** 라우트 메타데이터를 제공한 라우터 */
+  router?: RfmRouteSource;
   /** URL 경로 (예: "/", "/dashboard", "/dashboard/[id]") */
   urlPath: string;
   /** 프로젝트 루트 기준 상대 경로 (예: "src/app/page.tsx") */
@@ -56,3 +63,4 @@ export type RfmNextRoute = {
   /** 정적 import 분석으로 구성한 하위 컴포넌트 트리 */
   children?: RfmNextServerComponent[];
 };
+export type RfmRoute = RfmNextRoute;

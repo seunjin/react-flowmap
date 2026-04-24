@@ -117,6 +117,92 @@ export const ProductList = () => {
     expect(children).toEqual(['Card']);
   });
 
+  it('extracts react-router route manifest entries from nested Route JSX', () => {
+    const code = `
+import { Route, Routes } from 'react-router-dom';
+import { App } from './app';
+import { HomePage } from './pages/home-page';
+
+export function AppRouter() {
+  return (
+    <Routes>
+      <Route path="/" element={<App />}>
+        <Route index element={<HomePage />} />
+      </Route>
+    </Routes>
+  );
+}
+`.trim();
+
+    const result = transformFlowmap(code, 'src/router.tsx', {
+      relPath: 'src/router.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.routeManifestEntries).toEqual([
+      {
+        id: 'route:src/router.tsx:8:App',
+        router: 'react-router',
+        urlPath: '/',
+        type: 'layout',
+        componentName: 'App',
+        componentImportSource: './app',
+        line: 8,
+      },
+      {
+        id: 'route:src/router.tsx:9:HomePage',
+        router: 'react-router',
+        urlPath: '/',
+        type: 'page',
+        componentName: 'HomePage',
+        componentImportSource: './pages/home-page',
+        line: 9,
+      },
+    ]);
+  });
+
+  it('extracts tanstack route manifest entries from createRoute calls', () => {
+    const code = `
+import { createRootRoute, createRoute } from '@tanstack/react-router';
+import { App } from './app';
+import { HomePage } from './pages/home-page';
+
+const rootRoute = createRootRoute({ component: App });
+
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  component: HomePage,
+});
+`.trim();
+
+    const result = transformFlowmap(code, 'src/router.tsx', {
+      relPath: 'src/router.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.routeManifestEntries).toEqual([
+      {
+        id: 'route:src/router.tsx#rootRoute',
+        router: 'tanstack-router',
+        urlPath: '/',
+        type: 'layout',
+        componentName: 'App',
+        componentImportSource: './app',
+        line: 5,
+      },
+      {
+        id: 'route:src/router.tsx#homeRoute',
+        router: 'tanstack-router',
+        urlPath: '/',
+        type: 'page',
+        componentName: 'HomePage',
+        componentImportSource: './pages/home-page',
+        line: 7,
+      },
+    ]);
+  });
+
   it('excludes library internal paths by default', () => {
     const code = 'export function Inspector() { return <div />; }';
     expect(transformFlowmap(code, '/project/src/ui/inspector/Inspector.tsx', OPTS)).toBeNull();

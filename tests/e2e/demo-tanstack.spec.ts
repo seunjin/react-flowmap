@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clickInspectorButton, shadowQuerySelector } from './inspector';
+import { openWorkspaceFromInspector, shadowQuerySelector } from './inspector';
 
 const BASE = 'http://localhost:3002';
 
@@ -24,11 +24,19 @@ test.describe('demos/tanstack', () => {
     expect(hasButton).toBe(true);
   });
 
-  test('Inspector 버튼 클릭 시 사이드바가 열린다', async ({ page }) => {
+  test('Inspector 버튼 클릭 시 workspace 창이 바로 열린다', async ({ page }) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
-    await clickInspectorButton(page);
-    const hasSidebar = await shadowQuerySelector(page, '[data-rfm-sidebar]');
-    expect(hasSidebar).toBe(true);
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup).toHaveURL(/__rfm=graph/);
+    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
+  });
+
+  test('workspace 창이 tanstack route context를 표시한다', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
+
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText(/^[1-9]\d* active routes$/)).toBeVisible();
   });
 });

@@ -88,6 +88,7 @@ route와 layout은 제품의 주인공이 아닙니다.
 - 현재 화면의 시작점 표시
 - 현재 subtree의 구조적 컨텍스트 제공
 - component graph를 읽을 때의 상위 문맥 제공
+- 기본 graph canvas에는 별도 route node를 만들지 않고, route 정보는 explorer / header context로 보여줌
 
 즉, route / layout은 핵심 분석 대상이라기보다 **screen context** 입니다.
 
@@ -131,3 +132,9 @@ v1에서 React Flowmap이 잘해야 하는 것은 다음입니다.
 - "바로 소스 코드로 이동해 수정할 수 있다"
 
 이 기준이 충족되면 React Flowmap은 좋은 구조 검사기입니다.
+
+---
+
+## Related Docs
+
+- [Router-Agnostic Graph Plan](./router-agnostic-graph-plan.md)

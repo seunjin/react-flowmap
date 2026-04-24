@@ -3,9 +3,8 @@ import { ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { PropTypesMap } from '../inspector/channel';
 import { PropRow } from '../inspector/PropRow';
-import type { RfmNextRoute } from '../inspector/types';
+import type { RfmRoute } from '../inspector/types';
 import { openInEditor } from '../inspector/utils';
-import { getEntryScreenContext, getRouteScreenContext } from './workspace-detail-model';
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -15,26 +14,6 @@ function Section({ label, children }: { label: string; children: React.ReactNode
       </span>
       {children}
     </section>
-  );
-}
-
-function MetaGrid({ items }: { items: Array<{ label: string; value: string }> }) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="rounded-[8px] border border-[rgba(229,231,235,0.8)] bg-[rgba(249,250,251,0.7)] px-2.5 py-2"
-        >
-          <div className="text-[9px] font-bold text-rfm-text-400 tracking-[0.06em] uppercase">
-            {item.label}
-          </div>
-          <div className="mt-1 text-[12px] font-medium text-rfm-text-900 break-words">
-            {item.value}
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -114,44 +93,15 @@ function PropsSection({
   );
 }
 
-function ScreenContextSection({
-  items,
-}: {
-  items: Array<{ label: string; value: string }>;
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <Section label="Screen context">
-      <MetaGrid items={items} />
-    </Section>
-  );
-}
-
 function ComponentDetail({
   entry,
   props,
   propTypesMap,
-  allRoutes,
-  currentUrlPath,
 }: {
   entry: DocEntry;
   props: Record<string, unknown> | null;
   propTypesMap: PropTypesMap;
-  allRoutes: RfmNextRoute[];
-  currentUrlPath: string;
 }) {
-  const screenContext = getEntryScreenContext(entry, allRoutes, currentUrlPath);
-  const contextItems = screenContext.route
-    ? [
-        { label: 'Route', value: screenContext.route.componentName },
-        { label: 'URL', value: screenContext.route.urlPath },
-        ...(screenContext.parentLayout
-          ? [{ label: 'Layout', value: screenContext.parentLayout.componentName }]
-          : []),
-      ]
-    : [];
-
   return (
     <>
       <SelectionHeader
@@ -160,28 +110,16 @@ function ComponentDetail({
         onOpen={() => openInEditor(entry.filePath, entry.symbolId)}
       />
       <PropsSection props={props} symbolId={entry.symbolId} propTypesMap={propTypesMap} />
-      <ScreenContextSection items={contextItems} />
     </>
   );
 }
 
 function RouteDetail({
   route,
-  allRoutes,
 }: {
-  route: RfmNextRoute;
-  allRoutes: RfmNextRoute[];
+  route: RfmRoute;
 }) {
   const propEntries = Object.entries(route.propTypes ?? {});
-  const screenContext = getRouteScreenContext(route, allRoutes);
-  const contextItems = [
-    { label: 'URL', value: route.urlPath },
-    { label: 'Type', value: route.type },
-    { label: 'Mode', value: route.isServer ? 'Server' : 'Client' },
-    ...(screenContext.parentLayout
-      ? [{ label: 'Parent layout', value: screenContext.parentLayout.componentName }]
-      : []),
-  ];
 
   return (
     <>
@@ -202,8 +140,6 @@ function RouteDetail({
           </div>
         )}
       </Section>
-
-      <ScreenContextSection items={contextItems} />
     </>
   );
 }
@@ -211,17 +147,13 @@ function RouteDetail({
 export function WorkspaceDetail({
   entry,
   route,
-  allRoutes,
   props,
   propTypesMap,
-  currentUrlPath,
 }: {
   entry: DocEntry | null;
-  route: RfmNextRoute | null;
-  allRoutes: RfmNextRoute[];
+  route: RfmRoute | null;
   props: Record<string, unknown> | null;
   propTypesMap: PropTypesMap;
-  currentUrlPath: string;
 }) {
   if (!entry && !route) {
     return (
@@ -229,7 +161,7 @@ export function WorkspaceDetail({
         <p className="m-0 text-[11px] text-rfm-text-400 text-center leading-relaxed">
           Pick a component or select a route
           <br />
-          to inspect its props and screen context.
+          to inspect its props.
         </p>
       </div>
     );
@@ -238,14 +170,12 @@ export function WorkspaceDetail({
   return (
     <div className="flex flex-col">
       {route ? (
-        <RouteDetail route={route} allRoutes={allRoutes} />
+        <RouteDetail route={route} />
       ) : entry ? (
         <ComponentDetail
           entry={entry}
           props={props}
           propTypesMap={propTypesMap}
-          allRoutes={allRoutes}
-          currentUrlPath={currentUrlPath}
         />
       ) : null}
     </div>
