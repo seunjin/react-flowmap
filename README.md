@@ -1,15 +1,24 @@
 # react-flowmap
 
-An in-app runtime component inspector and visual graph explorer for React.
+A dev-only visual component inspector for React that helps you see how the current screen is composed.
 
-- **Pick mode** — click any element on screen to inspect it (DevTools-style crosshair)
-- **Component tree** — browse all mounted components with search and folder grouping
-- **Props** — live prop values with TypeScript type hints and jump-to-source
-- **Relations** — visual parent / child / hook relationship graph per component
-- **Graph window** — full component map in a dedicated window, top-down flow layout
+- **Pick mode** — click any UI fragment on screen to inspect its owning component
+- **Workspace button** — open the full analysis workspace directly from the app window
+- **Component tree** — browse the mounted component / route structure with search and folder grouping
+- **Graph view** — explore the currently rendered screen structure from the active route root
+- **Props** — inspect live prop values with TypeScript type hints and jump-to-source
+- **Route context** — keep layout / page context visible without making routing the primary object
 - **Fragment support** — components rendering multiple root elements are highlighted across their full area
 
 > Dev-only. Instrumentation runs only in development mode — zero code injected in production builds.
+
+React Flowmap is built for questions like:
+
+- "What component owns this UI?"
+- "How is this screen assembled right now?"
+- "Which parts are already componentized, and which areas still look like parent-owned markup?"
+
+It is **not** trying to replace Chrome DevTools or become a general runtime analysis platform.
 
 ## Framework support
 
@@ -104,6 +113,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
+## Product Direction
+
+The current product direction is documented in [docs/product-direction.md](/Users/jin/Desktop/dev/react-flowmap/docs/product-direction.md).
+In short:
+
+- the primary job is inspecting a selected UI fragment
+- the graph is a broader context view of the current screen
+- requests / generic runtime metrics are not a primary user-facing goal
+
 ## Editor integration
 
 Set the `editor` option to jump directly to source from the inspector:
@@ -159,8 +177,9 @@ withFlowmap(nextConfig, {
 ```tsx
 <ReactFlowMap
   config={{
-    defaultFloatPos: { x: 900, y: 80 },        // initial panel position (px)
     buttonPosition: { bottom: 24, right: 24 }, // ⬡ button position (px)
+    persistActive: true,                       // remember whether the workspace is active
+    disableFetchInterceptor: false,            // optional internal graph enrichment
   }}
 />
 ```
@@ -175,27 +194,14 @@ withFlowmap(nextConfig, {
 
 TypeScript type names are shown next to each prop. Click the `↗` icon in the Props section header to jump to the type definition in your editor.
 
-## Panel positions
-
-The inspector panel can be docked or floated. Click the dock icon in the panel header:
-
-| Mode | Description |
-|---|---|
-| `right` | pinned to the right edge (default) |
-| `left` | pinned to the left edge |
-| `bottom` | pinned to the bottom edge |
-| `float` | draggable floating panel |
-
-Position is saved to `localStorage` automatically.
-
 ## How it works
 
 The plugin instruments your React components at dev-time with a lightweight Babel AST transform:
 
-- Injects `useContext` + `useEffect` hooks to track render parent–child relationships at runtime
+- Injects `useContext` + `useEffect` hooks to track parent-child render relationships at runtime
 - Sets static `__rfm_symbolId` properties on component functions for DOM-to-fiber lookups
 - Extracts TypeScript prop types via `ts-morph` at transform time for inline display
-- Performs static JSX analysis so the component graph is accurate even for conditionally-rendered components (e.g. auth-gated layouts)
+- Performs static JSX analysis so the graph remains useful even for conditionally-rendered structures
 - The inspector UI renders inside a Shadow DOM to prevent any style conflicts with your app
 
 For **Vite apps**, all components are instrumented. For **Next.js App Router**, only `'use client'` files are instrumented — server components are never touched.

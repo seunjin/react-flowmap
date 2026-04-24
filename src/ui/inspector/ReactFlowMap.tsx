@@ -50,7 +50,7 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
 
   const persist = (next: boolean) => {
     if (persistActive) {
-      try { localStorage.setItem(storageKey, String(next)); } catch {}
+      try { localStorage.setItem(storageKey, String(next)); } catch { /* noop */ }
     }
   };
 
@@ -100,7 +100,7 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
       graph={graph}
       active={active}
       onDeactivate={() => { setActive(false); persist(false); }}
-      onToggle={() => setActive(p => { const next = !p; persist(next); return next; })}
+      onOpenWorkspace={() => setActive(true)}
       onGraphWindowOpen={() => persist(false)}
       config={overlayConfig}
     />

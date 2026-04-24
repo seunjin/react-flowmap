@@ -1,310 +1,362 @@
 # React Flowmap UI Concept
 
-## 목적
+## Purpose
 
-이 문서는 React Flowmap의 초기 시각화 경험을 정의합니다.  
-핵심 목표는 React 애플리케이션의 런타임 관계를 단순히 그려내는 것이 아니라, **복잡한 연결 구조를 사용자가 탐색 가능한 형태로 드러내는 것**입니다.
+이 문서는 현재 React Flowmap UI의 기준 계약을 정의합니다.
 
-React Flowmap의 UI는 일반적인 자유 그래프 에디터가 아니라, 다음 세 가지를 결합한 탐색 도구를 지향합니다.
+핵심 목표는 다음 순서를 유지하는 것입니다.
 
-- ERD 같은 구조적 가독성
-- IDE 같은 정보 밀도
-- 런타임 그래프 같은 연결성
+- 화면에서 UI 조각을 집는다
+- 선택한 조각의 상세를 먼저 읽는다
+- 그 조각이 현재 화면 구조 안에서 어디에 놓여 있는지 본다
+- 필요할 때만 넓은 graph / file tree 문맥으로 확장한다
 
----
+이 문서는 구현 디테일보다 먼저 다음 질문에 답하도록 작성합니다.
 
-## 핵심 원칙
-
-### 1. 파일이 기본 단위다
-
-초기 화면에서 사용자가 보는 기본 노드는 함수나 훅이 아니라 **파일(File)** 입니다.
-
-이유:
-
-- 파일은 개발자가 가장 직관적으로 이해하는 단위다.
-- 그래프가 처음부터 함수 단위로 폭발하는 것을 막을 수 있다.
-- 런타임 관계를 상위 수준에서 먼저 파악한 뒤, 필요할 때만 상세로 내려갈 수 있다.
+- 각 화면은 무엇을 책임지는가
+- selection은 무엇을 의미하는가
+- 어떤 정보는 어디서 봐야 하는가
+- 어떤 정보는 일부러 보여주지 않는가
 
 ---
 
-### 2. 연결의 의미는 export가 만든다
+## Product Surfaces
 
-그래프에 보이는 기본 노드는 파일이지만, 실제 연결의 의미는 각 파일 내부의 **export된 심볼**이 결정합니다.
+React Flowmap의 UI는 두 개의 surface로 나뉩니다.
+
+### 1. In-app overlay
+
+앱 위에 겹쳐지는 overlay는 `workspace button + picker bridge` 입니다.
+
+책임:
+
+- floating workspace button
+- popup workspace 열기
+- popup과 app window 사이의 highlight / pick 동기화
+
+하지 않는 일:
+
+- 인앱 popover 패널 렌더링
+- 복잡한 관계 탐색
+- 좁은 패널 안에서 tree, graph, detail을 모두 설명하기
+
+overlay는 짧고 즉각적이어야 합니다.
+제품적으로는 DevTools의 element picker에 가깝고, IDE 전체 화면이 아닙니다.
+실제 pick action은 popup workspace에서 시작해 app window에 반영되는 흐름을 기본으로 둡니다.
+
+### 2. Popup workspace
+
+새 창은 `graph popup`이 아니라 `analysis workspace` 입니다.
+
+책임:
+
+- 현재 화면 구조 탐색 제공
+- route subtree 기준 graph 제공
+- 선택된 대상의 상태 inspector 제공
+- file / folder 관점의 구조 탐색 제공
+
+popup은 사용자가 실제로 오래 머물며 분석하는 공간입니다.
+
+---
+
+## Shared Selection Model
+
+UI 혼란을 줄이기 위해 selection 의미를 먼저 고정합니다.
+
+### Canonical selection: `symbolId`
+
+좌측 explorer, 중앙 graph, 우측 inspector가 공유하는 기본 선택 단위는 `symbolId` 입니다.
 
 예:
 
-- `user-page.tsx` 파일 노드 내부에 `UserPage`, `loadUserPageData`가 보인다.
-- 사용자가 `UserPage`를 선택하면, 그 export를 기준으로 다른 파일, 함수, 훅, API와의 연결이 강조된다.
+- `symbol:src/widgets/product-detail.tsx#ProductDetail`
+- `symbol:src/shared/ui/button.tsx#Button`
+
+이 선택은 "코드에 정의된 컴포넌트 심볼"을 가리킵니다.
+
+### Optional live instance
+
+화면에서 pick한 경우에는 같은 `symbolId`라도 실제 DOM instance가 존재합니다.
+
+현재 UI는 이 instance를 props 조회와 app-window highlight에 활용합니다.
+다만 workspace 전반의 canonical identity는 여전히 `symbolId` 입니다.
+
+즉 현재 버전은 다음처럼 동작합니다.
+
+- selection의 기준: `symbolId`
+- live lookup의 보조 기준: 현재 선택된 mounted instance
+
+향후 인스턴스 목록과 instance switching이 추가되면 `selectedInstance`가 별도 상태로 승격됩니다.
+
+### Server route selection
+
+Next.js App Router의 서버 라우트는 DOM instance가 없으므로 `ssr:<filePath>` 형태의 synthetic id를 사용합니다.
+
+예:
+
+- `ssr:src/app/products/page.tsx`
+
+이 id는 popup graph/explorer와 overlay route highlight 사이의 공통 키입니다.
+
+---
+
+## Core User Flow
+
+React Flowmap의 기본 흐름은 "나무를 보고 숲을 본다" 입니다.
+
+1. 사용자는 화면에서 특정 UI 조각을 pick한다.
+2. inspector는 그 조각의 owning component와 props를 먼저 보여준다.
+3. graph와 explorer는 그 조각이 현재 화면 구조 안에서 어디에 놓여 있는지 보여준다.
+4. 사용자는 그 구조를 보고 컴포넌트화 경계와 추출 가능성을 판단한다.
+
+즉, graph는 시작점이 아니라 **상세를 둘러싼 문맥 제공 장치**입니다.
+
+---
+
+## Workspace Layout
+
+popup workspace의 기본 레이아웃은 3패널입니다.
+
+### Left: Explorer
+
+역할:
+
+- 현재 렌더된 route subtree에 기여하는 component / route file을 파일 트리 형태로 보여준다
+- search와 folder grouping을 제공한다
+- graph와 같은 데이터를 코드 구조 관점으로 다시 읽게 만든다
+- 선택의 안정적인 진입점 역할을 한다
+
+이 패널은 "코드 구조상 어디에 있는가"에 답합니다.
+
+### Center: Graph canvas
+
+역할:
+
+- 현재 화면 구조를 넓게 보여준다
+- active route root에서 시작하는 component structure를 시각화한다
+- explorer보다 더 넓은 조립 문맥을 제공한다
+
+이 패널은 "무엇과 연결되는가"에 답합니다.
+
+기본 scope는 "현재 보고 있는 화면"입니다.
+즉 repo 전체 구조보다 **현재 렌더된 route subtree**를 먼저 보여줍니다.
+
+### Right: Inspector
+
+역할:
+
+- 현재 선택된 대상이 어떤 상태인지 보여준다
+- props와 type metadata를 우선적으로 보여준다
+- route / layout context를 보조 정보로 보여준다
+- source jump 같은 action을 제공한다
+
+이 패널은 "지금 이건 무엇이고 어떤 상태인가"에 답합니다.
+
+---
+
+## Panel Responsibilities
+
+### Explorer is not the graph
+
+Explorer는 tree 탐색을 위한 패널입니다.
+
+- 파일/폴더 구조를 유지한다
+- 그래프처럼 모든 관계를 풀어 설명하지 않는다
+- selection anchor 역할을 우선한다
+
+### Graph is not the detail panel
+
+graph는 관계 탐색기입니다.
+
+- 현재 화면 구조를 넓게 본다
+- 선택된 조각이 어느 상위 문맥 안에 있는지 보여준다
+- props를 상세히 읽는 용도가 아니다
+- 구조를 시각적으로 탐색하는 데 집중한다
+
+### Inspector is not a mini graph
+
+Inspector는 현재 선택한 항목의 상태를 읽는 패널입니다.
+
+기본 정보:
+
+- name
+- file path
+- props
+- TypeScript props type
+- route / layout context
+- actions
+
+여기서 관계 mini-graph를 기본 UI로 넣지 않습니다.
+관계 자체는 가운데 graph가 더 적절한 공간과 문맥을 갖습니다.
+
+---
+
+## Inspector Content Contract
+
+Inspector는 다음 순서로 정보를 보여줍니다.
+
+### 1. Identity
+
+- component / route name
+- file path
+- source location jump
+
+### 2. Props
+
+props는 inspector의 중심 정보입니다.
+
+- mounted component라면 live props 표시
+- props type metadata가 있으면 type 힌트 표시
+- 현재 props가 비어 있으면 `No props`
+
+### 3. Screen context
+
+- 현재 route / layout context를 짧게 표시한다
+- 선택한 컴포넌트가 현재 화면 안에서 읽히도록 돕는다
+- route는 주인공이 아니라 context로 다룬다
+
+### 4. Actions
+
+- source jump
+- 필요한 최소한의 보조 액션
+
+다음 정보는 inspector의 기본 계약에서 제외합니다.
+
+- request 목록
+- hook 수 / request 수 같은 숫자 요약
+- parent / child 관계 목록의 중복 노출
+- raw markup을 별도 node처럼 설명하는 세부 구조
+
+---
+
+## Interaction Rules
+
+### Pick from overlay
+
+1. 사용자가 앱 화면에서 컴포넌트를 pick한다
+2. overlay는 해당 symbol을 선택 상태로 만든다
+3. popup이 열려 있다면 explorer, graph, inspector도 같은 selection으로 동기화된다
+
+### Select from explorer
+
+1. tree에서 컴포넌트 또는 route를 클릭한다
+2. graph가 해당 노드로 focus를 맞춘다
+3. overlay는 해당 symbol 또는 route를 highlight한다
+4. inspector가 즉시 갱신된다
+
+### Select from graph
+
+1. graph node를 클릭한다
+2. explorer가 같은 항목을 선택 상태로 맞춘다
+3. inspector가 같은 selection을 보여준다
+
+### Detail visibility
+
+popup workspace에서는 detail이 항상 열려 있습니다.
 
 즉:
 
-- 시각적 단위 = 파일 노드
-- 의미적 단위 = 선택된 export
+- tree에서 선택 후 detail로 "한 번 더 들어가는" 모드 전환을 두지 않는다
+- selection 결과는 즉시 우측 inspector에서 읽는다
 
 ---
 
-### 3. 복잡성은 허용하지만 무질서는 허용하지 않는다
+## Graph Scope
 
-React Flowmap는 복잡한 애플리케이션 구조를 억지로 단순화하지 않습니다.  
-사용자는 여러 export를 동시에 선택할 수 있고, 그 결과 연결선이 많아질 수도 있습니다.
-
-하지만 React Flowmap는 다음을 보장해야 합니다.
-
-- 어떤 연결이 왜 생겼는지 식별 가능해야 한다.
-- 현재 무엇이 선택되었는지 항상 확인 가능해야 한다.
-- 연결이 많아져도 사용자가 다시 정리할 수 있어야 한다.
-
-복잡성 자체는 문제되지 않습니다.  
-문제는 읽을 수 없는 상태입니다.
-
----
-
-## 기본 화면 구조
-
-초기 화면은 세 영역으로 구성됩니다.
-
-### 1. Main Canvas
-
-파일 노드들이 배치되는 메인 시각화 영역입니다.
-
-- 각 노드는 하나의 파일을 나타낸다.
-- 노드 내부에는 파일 경로 또는 파일명과 export 목록이 표시된다.
-- 노드 간 선은 선택된 export 기준으로 동적으로 표시되거나 강조된다.
-
-### 2. Inspector Sidebar
-
-선택된 파일 또는 export의 상세 정보를 보여주는 영역입니다.
-
-- 파일 메타데이터
-- export 목록
-- 해당 export의 타입 (`component`, `hook`, `function`, `constant`)
-- 연결된 대상 목록
-- 호출 유형 (`render`, `use`, `call`, `request`)
-- 선택 상태 관리
-
-모달보다 사이드바가 적합합니다.  
-이유는 사용자가 캔버스를 계속 보면서 탐색을 이어가야 하기 때문입니다.
-
-### 3. Filter / Query Controls
-
-표시 범위를 제어하는 상단 또는 측면 컨트롤 영역입니다.
-
-- 파일 검색
-- export 검색
-- 연결 타입별 필터
-- API만 보기
-- 현재 선택 초기화
-- 특정 파일 또는 export isolate
-
----
-
-## 노드 디자인
-
-각 파일 노드는 ERD의 테이블 박스처럼 보이되, 데이터베이스 컬럼 대신 **export 목록**을 가집니다.
-
-예상 구조:
-
-```text
-+--------------------------------------------------+
-| user-page.tsx                                    |
-| src/pages/user-page.tsx                          |
-|--------------------------------------------------|
-| exports                                          |
-| [x] UserPage                                     |
-| [ ] UserPageHeader                               |
-| [x] loadUserPageData                             |
-+--------------------------------------------------+
-```
-
-구성 요소:
-
-- 파일명
-- 상대 경로
-- export 리스트
-- 각 export의 선택 상태
-- 필요시 타입 배지
-
-선택되지 않은 상태에서도 노드는 기본 정보를 제공해야 하며,  
-선택이 이루어지면 연결과 강조 상태가 반영됩니다.
-
----
-
-## Export 선택 모델
-
-### 다중 선택 허용
-
-한 파일 안에서 여러 export를 동시에 선택할 수 있습니다.
-
-예:
-
-- `UserPage`
-- `loadUserPageData`
-- `UserPageHeader`
-
-이 경우 선택된 export 각각이 만든 연결선이 동시에 표시될 수 있습니다.
-
-### 선택은 노드 내부에서 일어난다
-
-사용자는 파일 노드 내부의 export 항목을 클릭하거나 체크하여 선택합니다.
-
-중요한 점은, export를 선택하더라도 캔버스에서 별도 심볼 노드를 생성하는 것이 아니라,  
-**파일 노드 자체를 시각적 anchor로 유지한다는 점**입니다.
+graph의 기본 범위는 repo 전체가 아니라 **현재 렌더된 route의 최상단부터 시작하는 화면 구조**입니다.
 
 즉:
 
-- 선택 UI는 노드 내부에 존재한다.
-- 연결선은 파일 노드에서 바깥으로 뻗는다.
-- 선의 의미는 선택된 export 기준으로 해석한다.
+- 현재 active route subtree를 먼저 보여준다
+- 현재 화면과 무관한 구조는 기본 뷰에서 후순위로 둔다
+- file tree도 같은 scope를 다른 관점으로 보여준다
 
-이 방식은 그래프 복잡도를 억제하면서도 심볼 단위 의미를 유지할 수 있게 해줍니다.
-
----
-
-## 연결선 표현 규칙
-
-### 선은 파일에서 파일로 연결된다
-
-초기 버전에서 캔버스 선의 물리적 연결은 파일 노드 간 연결로 본다.
-
-예:
-
-- `user-page.tsx` -> `use-user.ts`
-- `use-user.ts` -> `user-api.ts`
-- `user-api.ts` -> `GET /api/user`
-
-### 선의 근거는 export 단위로 관리된다
-
-같은 파일 간 연결이라도, 어떤 export 때문에 생긴 연결인지 추적되어야 한다.
-
-예:
-
-- `UserPage -> useUser`
-- `loadUserPageData -> fetchUserInfo`
-
-사용자는 선을 통해 파일 간 연결을 보고, 상세는 사이드바나 hover를 통해 export 단위 근거를 확인한다.
-
-### 연결 타입
-
-초기 연결 타입은 다음 정도로 제한한다.
-
-- `render`
-- `use`
-- `call`
-- `request`
+graph와 explorer는 서로 다른 데이터를 보여주는 것이 아니라, **같은 현재 화면 구조를 서로 다른 읽기 방식으로 보여주는 것**입니다.
 
 ---
 
-## 색상 시스템
+## Ownership Interpretation
 
-### 랜덤 색상은 사용하지 않는다
+React Flowmap은 raw markup을 별도 노드 타입으로 기본 노출하지 않습니다.
 
-선택된 export를 구분하기 위해 색상을 사용할 수 있지만, 완전한 랜덤 색상은 사용하지 않습니다.
+대신 사용자가 다음을 추론할 수 있어야 합니다.
 
-이유:
+- 선택한 컴포넌트가 차지하는 전체 영역
+- 그 안에서 이미 자식 컴포넌트가 소유한 영역
+- 남는 부분은 부모가 직접 렌더한 UI일 가능성이 높다는 점
 
-- 같은 export가 매번 다른 색이면 기억할 수 없다.
-- 비슷한 색이 우연히 겹칠 수 있다.
-- 복잡한 그래프일수록 규칙 없는 색은 노이즈가 된다.
+이 해석은 graph, overlay highlight, 문서 가이드를 통해 지원합니다.
 
-### 결정적 자동 색상 사용
-
-각 export는 `filePath + exportName` 기준의 고정된 색을 가진다.
-
-예:
-
-- `src/pages/user-page.tsx#UserPage` -> 항상 동일한 파랑
-- `src/hooks/use-user.ts#useUser` -> 항상 동일한 초록
-
-이 방식은 자동이면서도 재현 가능하다.
+즉, 제품은 raw markup을 세밀하게 분해하기보다 **component ownership을 읽게 만드는 것**에 집중합니다.
 
 ---
 
-## 복잡한 그래프를 다루는 방식
+## Current Scope
 
-React Flowmap는 사용자가 많은 export를 동시에 선택하는 것을 막지 않습니다.  
-복잡한 구조는 시스템의 실제 모습일 수 있기 때문입니다.
+현재 popup workspace가 다루는 것은 `live runtime workspace` 입니다.
 
-대신 다음이 필요합니다.
+즉 현재 범위는 다음으로 제한합니다.
 
-- 현재 선택된 export 목록 표시
-- hover 시 선의 근거 표시
-- 특정 export만 isolate
-- 연결 타입별 필터링
-- 선택 해제 및 초기화가 쉬운 구조
+- mounted runtime component explorer
+- Next.js App Router route file explorer
+- current-route-rooted structure graph
+- props-focused inspector
+- overlay <-> popup BroadcastChannel 동기화
 
-즉, React Flowmap는 복잡성을 제한하는 대신 **복잡성을 읽을 수 있게 돕는 도구**여야 합니다.
+현재 범위에서 제외하는 것:
 
----
-
-## API 노드 처리
-
-API는 일반 파일과는 다른 성격의 특수 노드로 취급할 수 있습니다.
-
-예:
-
-- `GET /api/user`
-- `POST /api/user`
-
-이 노드들은 파일 노드와 다른 시각 스타일을 가질 수 있으며,  
-주로 `request` 타입 연결의 종착점으로 표시됩니다.
+- 전체 소스코드 브라우저
+- repo 전체 파일 탐색기
+- inspector 안의 재귀 descendant tree
+- instance list / instance switching
+- multi-selection
+- request / hook 중심 분석 UI
 
 ---
 
-## 초기 사용자 흐름
+## Implementation Boundaries
 
-### 흐름 1. 파일 중심 탐색
+현재 코드 기준으로 책임은 다음처럼 나눕니다.
 
-1. 사용자는 캔버스에서 파일 노드를 본다.
-2. 관심 있는 파일을 선택한다.
-3. 노드 내부에서 export 목록을 확인한다.
-4. 하나 이상의 export를 선택한다.
-5. 해당 export 기준 연결선이 강조된다.
+### `src/ui/inspector/ComponentOverlay.tsx`
 
-### 흐름 2. 연결 근거 확인
+- app-window overlay
+- picking
+- DOM highlight
+- popup channel bridge
 
-1. 사용자는 연결선을 hover 또는 클릭한다.
-2. 어떤 export가 이 연결을 만들었는지 확인한다.
-3. 사이드바에서 대상 파일, 함수, API와의 관계를 본다.
+### `src/ui/graph-window/GraphWindow.tsx`
 
-### 흐름 3. 영향도 파악
+- popup workspace shell
+- explorer / graph / inspector layout
+- shared selection state
+- toolbar actions
 
-1. 사용자는 특정 파일 또는 export를 선택한다.
-2. 연결된 다른 파일, 훅, 함수, API를 확인한다.
-3. 변경 시 영향 범위를 추정한다.
+### `src/ui/graph-window/FullGraph.tsx`
 
----
+- 중앙 graph canvas
+- layout 계산
+- graph node interaction
 
-## 초기 구현 범위 제안
+### `src/ui/inspector/UnifiedTreeView.tsx`
 
-v1에서는 아래만 확실히 구현하면 충분합니다.
-
-- 파일 노드 렌더링
-- 노드 내부 export 리스트
-- export 다중 선택
-- 선택된 export 기준 연결 강조
-- 우측 사이드바 상세 정보
-- `render`, `use`, `call`, `request` 타입 지원
-- API 특수 노드 표시
-
-다음은 이후 단계로 미룰 수 있습니다.
-
-- 자동 레이아웃 고도화
-- 파일 내부 함수 단위의 완전한 캔버스 확장
-- 타임라인 기반 실행 순서 뷰
-- 협업용 공유 링크 또는 스냅샷
+- runtime explorer tree 렌더링
+- route file + mounted component tree UI
 
 ---
 
-## 요약
+## Why This Split Exists
 
-React Flowmap의 초기 UI는 자유 그래프 편집기가 아니라, **파일 중심의 런타임 관계 탐색기**입니다.
+기존 confusion의 원인은 한 패널이 동시에 세 질문에 답하려 했기 때문입니다.
 
-핵심 구조는 다음과 같습니다.
+- 내가 지금 집은 게 무엇인가
+- 이게 무엇과 연결되는가
+- 이 컴포넌트가 지금 어떤 상태인가
 
-- 파일이 기본 노드다.
-- export가 연결의 의미를 만든다.
-- export는 노드 내부에서 다중 선택할 수 있다.
-- 연결선은 파일 노드에서 뻗어나가지만, 의미는 선택된 export 기준이다.
-- 복잡성은 허용하되, 식별 가능한 시각 규칙으로 통제한다.
+이 질문은 각각 다른 UI가 더 잘 답합니다.
 
-이 문서는 이후 React Flowmap의 데이터 모델, 시각화 레이어, 인터랙션 설계의 기준점으로 사용한다.
+- explorer: 위치와 맥락
+- graph: 연결과 구조
+- inspector: 상태와 입력
+
+이 분리가 유지되어야 제품이 커져도 복잡성이 읽을 수 있는 형태로 남습니다.

@@ -2,19 +2,15 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { FlowmapGraph } from '../../core/types/graph.js';
 import { buildDocIndex, type DocEntry } from '../doc/build-doc-index';
-import type { DockPosition, FoundComp, RfmNextRoute } from './types';
+import type { FoundComp, RfmNextRoute } from './types';
 import {
-  loadDock, saveDock, saveFloatPos,
   findComponentsAt, findElBySymbolId,
-  findElBySymbolIdInSubtree, findAncestorElBySymbolId, getLocForSymbolId,
   findAllMountedRfmComponents, isVisible, getPropsForSymbolId,
   findUnionRectBySymbolId, findAllInstanceRectsBySymbolId, deriveDisplayName,
   findComponentRectByEl,
   buildFiberRelationships, invalidateMountedRfmSnapshot,
 } from './utils';
 import { HoverPreviewBox, ActiveSelectBox } from './Overlays';
-import { FloatingSidebar } from './FloatingSidebar';
-import { SIDEBAR_W } from './tokens';
 import { InspectButton, type FlowmapConfig } from './InspectButton';
 import inspectorCss from './inspector.compiled.css?raw';
 import type { MainToGraph, GraphToMain, PropTypesMap } from './channel';
@@ -60,9 +56,9 @@ function serializeProps(rawProps: Record<string, unknown> | null): Record<string
 }
 
 function applyStaticEdges(
-  entries: import('../doc/build-doc-index').DocEntry[],
+  entries: DocEntry[],
   staticJsx: Record<string, string[]>,
-): import('../doc/build-doc-index').DocEntry[] {
+): DocEntry[] {
   const byId = new Map(entries.map(e => [e.symbolId, e]));
   const byName = new Map(entries.map(e => [e.name, e]));
 
@@ -109,9 +105,9 @@ function computeRouteRect(): DOMRect {
 
 function broadcastToGraph(
   ch: BroadcastChannel,
-  allEntries: import('../doc/build-doc-index').DocEntry[],
+  allEntries: DocEntry[],
   selectedId: string,
-  nextRoutes?: import('./types').RfmNextRoute[] | null,
+  nextRoutes?: RfmNextRoute[] | null,
 ) {
   // 항상 fresh하게 계산 (unmount 반영)
   const mountedIds = new Set(findAllMountedRfmComponents().map(c => c.symbolId));
@@ -138,9 +134,9 @@ function broadcastToGraph(
 // ─── ComponentOverlay ─────────────────────────────────────────────────────────
 
 export function ComponentOverlay({
-  graph, active, onDeactivate, onToggle, onGraphWindowOpen, config = {},
+  graph, active, onDeactivate, onOpenWorkspace, onGraphWindowOpen, config = {},
 }: {
-  graph: FlowmapGraph; active: boolean; onDeactivate: () => void; onToggle?: (() => void) | undefined;
+  graph: FlowmapGraph; active: boolean; onDeactivate: () => void; onOpenWorkspace?: (() => void) | undefined;
   onGraphWindowOpen?: () => void;
   config?: FlowmapConfig;
 }) {
@@ -162,15 +158,6 @@ export function ComponentOverlay({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nextRoutes: RfmNextRoute[] | null = (globalThis as any).__rfmNextRouteTree ?? null;
   const [picking,    setPicking]    = useState(false);
-  const [dockPosition, setDockPosition] = useState<DockPosition>(loadDock);
-  const [floatPos,     setFloatPos]     = useState(() => {
-    try {
-      const s = localStorage.getItem('rfm-float-pos');
-      if (s) return JSON.parse(s) as { x: number; y: number };
-    } catch { /* noop */ }
-    return config.defaultFloatPos
-      ?? { x: Math.max(20, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 360), y: 80 };
-  });
   // ref 교체 후 re-render 강제용 (setSelectedId가 동일값이면 React가 스킵하므로)
   const [, forceRender] = useState(0);
   // 클릭으로 선택된 특정 DOM 요소 — 같은 symbolId가 여러 개일 때 정확한 요소를 기억
@@ -184,7 +171,7 @@ export function ComponentOverlay({
 
   // 채널 핸들러에서 최신 값 참조용 (stale closure 방지)
   const currentDataRef = useRef<{
-    mountedEntries: import('../doc/build-doc-index').DocEntry[]; // allEntries 저장 (broadcastToGraph 내부에서 fresh mount 계산)
+    mountedEntries: DocEntry[]; // allEntries 저장 (broadcastToGraph 내부에서 fresh mount 계산)
     selectedId: string;
   }>({ mountedEntries: [], selectedId: '' });
 
@@ -245,7 +232,6 @@ export function ComponentOverlay({
   useEffect(() => {
     if (shadowRootRef.current) syncShadowStyles(shadowRootRef.current);
     syncPropertyRules();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectorCss]);
 
   // ── BroadcastChannel (그래프 창 연동) ─────────────────────────────────────
@@ -302,14 +288,6 @@ export function ComponentOverlay({
         setRouteHoverRect(null);
       } else if (msg.type === 'pick-start') {
         setPicking(true);
-      } else if (msg.type === 'back-to-overlay') {
-        setGraphWindowOpen(false);
-        graphWinRef.current = null;
-        // 인스펙터는 활성 상태 유지
-      } else if (msg.type === 'window-close') {
-        setGraphWindowOpen(false);
-        graphWinRef.current = null;
-        onDeactivateRef.current(); // 그래프 창 닫히면 inspector 전체 비활성화
       }
     };
 
@@ -321,9 +299,6 @@ export function ComponentOverlay({
 
   const index      = useMemo(() => buildDocIndex(graph), [graph]);
   const graphEntries = useMemo(() => [...index.pages, ...index.components], [index]);
-
-  // symbolId → loc(줄번호) 캐시: 한 번 DOM에서 본 loc은 계속 기억
-  const locCacheRef = useRef(new Map<string, string>());
 
   // DOM 커밋 이후 fiber-walk를 재실행하기 위한 trigger
   // useMemo는 render 도중 실행되므로 최초 렌더 시 DOM이 없어 fiber-walk 결과가 비어있음.
@@ -350,8 +325,7 @@ export function ComponentOverlay({
     if (domVersion === 0) return [...graphEntries];
     const graphIds = new Set(graphEntries.map(e => e.symbolId));
     const extra: DocEntry[] = [];
-    findAllMountedRfmComponents().forEach(({ symbolId, loc }) => {
-      if (loc) locCacheRef.current.set(symbolId, loc);
+    findAllMountedRfmComponents().forEach(({ symbolId }) => {
       if (graphIds.has(symbolId)) return;
       const match = symbolId.match(/^symbol:(.+)#(.+)$/);
       if (!match) return;
@@ -380,6 +354,25 @@ export function ComponentOverlay({
     broadcastToGraph(channelRef.current, allEntries, selectedId, nextRoutes);
   }, [allEntries, selectedId, graphWindowOpen, nextRoutes]);
 
+  // popup refresh는 유지하고, 실제 close일 때만 inspector를 정리한다.
+  useEffect(() => {
+    if (!graphWindowOpen) return;
+
+    const intervalId = window.setInterval(() => {
+      const graphWindow = graphWinRef.current;
+      if (graphWindow && !graphWindow.closed) {
+        return;
+      }
+
+      window.clearInterval(intervalId);
+      setGraphWindowOpen(false);
+      graphWinRef.current = null;
+      onDeactivateRef.current();
+    }, 400);
+
+    return () => window.clearInterval(intervalId);
+  }, [graphWindowOpen]);
+
   // DOM 변화(mount/unmount) 감지 → 그래프창 재동기화
   useEffect(() => {
     if (!graphWindowOpen) return;
@@ -407,12 +400,13 @@ export function ComponentOverlay({
   function openGraphWindow() {
     if (graphWinRef.current && !graphWinRef.current.closed) {
       graphWinRef.current.focus();
-      return;
+      return true;
     }
     // 현재 URL에 ?__rfm=graph 추가 — 별도 라우트 불필요, 모든 프레임워크 동작
     const url = new URL(window.location.href);
     url.searchParams.set('__rfm', 'graph');
     const win = window.open(url.toString(), 'rfm-graph', 'width=1200,height=800');
+    if (!win) return false;
     graphWinRef.current = win;
     setGraphWindowOpen(true);
     onGraphWindowOpen?.();
@@ -425,6 +419,7 @@ export function ComponentOverlay({
         propTypesMap,
       } satisfies MainToGraph);
     }, 600);
+    return true;
   }
 
   // 패널 열림/닫힘
@@ -471,21 +466,6 @@ export function ComponentOverlay({
     };
   }, [active]);
 
-  // 뷰포트 리사이즈 시 float 사이드바가 화면 밖으로 벗어나지 않도록 clamp
-  useEffect(() => {
-    if (!active || dockPosition !== 'float') return;
-    function clamp() {
-      setFloatPos(pos => {
-        const newX = Math.min(pos.x, Math.max(8, window.innerWidth  - SIDEBAR_W - 8));
-        const newY = Math.min(pos.y, Math.max(8, window.innerHeight - 120));
-        return newX === pos.x && newY === pos.y ? pos : { x: newX, y: newY };
-      });
-    }
-    clamp(); // 즉시 실행 (DevTools 열린 상태에서 인스펙터 활성화할 때 대비)
-    window.addEventListener('resize', clamp);
-    return () => window.removeEventListener('resize', clamp);
-  }, [active, dockPosition]);
-
   // 선택된 DOM 요소가 unmount(페이지 전환·필터)되면 대체 인스턴스 탐색 or 선택 해제
   useEffect(() => {
     if (!active) return;
@@ -524,7 +504,6 @@ export function ComponentOverlay({
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         const found = findComponentsAt(x, y);
-        found.forEach(c => { if (c.loc) locCacheRef.current.set(c.symbolId, c.loc); });
         setStack(found);
       });
     }
@@ -582,18 +561,6 @@ export function ComponentOverlay({
     selectedRect = findUnionRectBySymbolId(selectedId);
   }
 
-  // 선택된 컴포넌트 loc: Fiber에서 먼저, 없으면 캐시
-  const selectedLoc = useMemo(() => {
-    if (!selectedId) return null;
-    const fromStack = stack.find(c => c.symbolId === selectedId)?.loc;
-    if (fromStack) { locCacheRef.current.set(selectedId, fromStack); return fromStack; }
-    const el = selectedElRef.current ?? findElBySymbolId(selectedId);
-    const fromFiber = el ? getLocForSymbolId(el, selectedId) : null;
-    if (fromFiber) { locCacheRef.current.set(selectedId, fromFiber); return fromFiber; }
-    return locCacheRef.current.get(selectedId) ?? null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, stack]);
-
   // 동일 symbolId라도 다른 DOM 요소면 hover로 표시 (리스트 아이템 구분)
   const showHoverBox = hoveredComp && (
     hoveredComp.symbolId !== selectedId ||
@@ -603,12 +570,14 @@ export function ComponentOverlay({
   const selectedLabel  = selectedId.split('#').at(-1) ?? '';
 
   function handleButtonClick() {
-    onToggle?.();
+    if (openGraphWindow()) {
+      onOpenWorkspace?.();
+    }
   }
 
   if (!shadowContainer) return null;
 
-  if (!active) {
+  if (!active || !graphWindowOpen) {
     return createPortal(
       <InspectButton onClick={handleButtonClick} positionOverride={config.buttonPosition} />,
       shadowContainer,
@@ -662,69 +631,6 @@ export function ComponentOverlay({
       {!selectedRect && routeRect && (
         <ActiveSelectBox rect={routeRect.rect} label={routeRect.label} />
       )}
-
-      {/* 플로팅 사이드바 — 그래프 창 열려있을 때는 숨김 */}
-      {!graphWindowOpen && <FloatingSidebar
-        stack={stack}
-        selectedId={selectedId}
-        selectedLoc={selectedLoc}
-        allEntries={allEntries}
-        selectedEl={selectedElRef.current}
-        nextRoutes={nextRoutes}
-        dockPosition={dockPosition}
-        floatPos={floatPos}
-        picking={picking}
-        onOpenGraphWindow={openGraphWindow}
-        onPickToggle={() => {
-          if (picking) { setPicking(false); setStack([]); }
-          else { setPicking(true); }
-        }}
-        onDockChange={(pos) => { setDockPosition(pos); saveDock(pos); }}
-        onFloatMove={(pos) => { setFloatPos(pos); saveFloatPos(pos); }}
-        onSelect={(id, el) => {
-          setSelectedId(id);
-          if (el) {
-            selectedElRef.current = el;
-          } else {
-            // element 없이 navigate할 때 (상세 뷰 칩 클릭):
-            // 1) 서브트리 안에서 탐색 (자식 방향)
-            // 2) 없으면 조상에서 탐색 (부모 방향) → n번째 인스턴스 유지
-            const currentEl = selectedElRef.current;
-            if (currentEl) {
-              const inSubtree = findElBySymbolIdInSubtree(currentEl, id);
-              if (inSubtree) {
-                selectedElRef.current = inSubtree;
-              } else {
-                const ancestor = findAncestorElBySymbolId(currentEl, id);
-                if (ancestor) {
-                  selectedElRef.current = ancestor;
-                } else {
-                  // 서브트리·조상 모두 없음 → 전역 Fiber 탐색으로 fallback
-                  selectedElRef.current = findElBySymbolId(id);
-                }
-              }
-            } else {
-              // currentEl이 없을 때 (트리에서 직접 선택): Fiber로 첫 번째 인스턴스 탐색
-              selectedElRef.current = findElBySymbolId(id);
-            }
-          }
-        }}
-        onClose={() => {
-          if (graphWindowOpen && graphWinRef.current && !graphWinRef.current.closed) {
-            graphWinRef.current.close();
-            setGraphWindowOpen(false);
-          }
-          onDeactivate();
-        }}
-        onHighlight={(symbolId, el, els) => setHighlightTarget({
-          symbolId,
-          ...(el !== undefined ? { el } : {}),
-          ...(els !== undefined ? { els } : {}),
-        })}
-        onHighlightEnd={() => setHighlightTarget(null)}
-        onRouteRect={(rect, label) => setRouteRect(rect ? { rect, label } : null)}
-        onRouteHoverRect={(rect, label) => setRouteHoverRect(rect ? { rect, label } : null)}
-      />}
     </>,
     shadowContainer,
   );

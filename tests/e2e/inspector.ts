@@ -20,11 +20,14 @@ export async function shadowQuerySelector(page: Page, selector: string): Promise
 
 /** Inspector button 클릭 */
 export async function clickInspectorButton(page: Page) {
-  await page.evaluate(() => {
-    const host = document.querySelector('[data-rfm-shadow-host]');
-    if (!host || !host.shadowRoot) throw new Error('Shadow host not found');
-    const btn = host.shadowRoot.querySelector('button[data-rfm-overlay]') as HTMLButtonElement;
-    if (!btn) throw new Error('Inspector button not found');
-    btn.click();
-  });
+  await page.locator('button[data-rfm-overlay]').click();
+}
+
+/** Inspector button 클릭 후 workspace popup 대기 */
+export async function openWorkspaceFromInspector(page: Page) {
+  const popupPromise = page.waitForEvent('popup');
+  await clickInspectorButton(page);
+  const popup = await popupPromise;
+  await popup.waitForLoadState('domcontentloaded');
+  return popup;
 }

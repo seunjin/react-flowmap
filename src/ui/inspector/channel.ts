@@ -35,6 +35,4 @@ export type GraphToMain =
   | { type: 'select'; symbolId: string }
   | { type: 'hover'; symbolId: string }
   | { type: 'hover-end' }
-  | { type: 'pick-start' }
-  | { type: 'window-close' }
-  | { type: 'back-to-overlay' };
+  | { type: 'pick-start' };

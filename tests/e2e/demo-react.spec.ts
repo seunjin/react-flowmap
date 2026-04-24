@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { clickInspectorButton, shadowQuerySelector } from './inspector';
+import { openWorkspaceFromInspector, shadowQuerySelector } from './inspector';
 
 const BASE = 'http://localhost:3001';
 
 test.describe('demos/react', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem('rfm-active');
+    });
+  });
+
   test('페이지가 정상 로드된다', async ({ page }) => {
     const response = await page.goto(BASE);
     expect(response?.status()).toBe(200);
@@ -24,13 +30,25 @@ test.describe('demos/react', () => {
     expect(hasButton).toBe(true);
   });
 
-  test('Inspector 버튼 클릭 시 사이드바가 열린다', async ({ page }) => {
+  test('Inspector 버튼 클릭 시 workspace 창이 바로 열린다', async ({ page }) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
-    await clickInspectorButton(page);
-    // 사이드바: data-rfm-overlay 속성을 가진 div (FloatingSidebar)
-    const hasSidebar = await shadowQuerySelector(page, '[data-rfm-sidebar]');
-    expect(hasSidebar).toBe(true);
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup).toHaveURL(/__rfm=graph/);
+    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
+  });
+
+  test('workspace 창 새로고침 후에도 그래프 데이터가 유지된다', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
+
+    const popup = await openWorkspaceFromInspector(page);
+    const mountedSymbols = popup.getByText(/mounted symbols$/).first();
+
+    await expect(mountedSymbols).toHaveText(/^[1-9]\d* mounted symbols$/);
+    await popup.reload();
+    await popup.waitForLoadState('domcontentloaded');
+    await expect(mountedSymbols).toHaveText(/^[1-9]\d* mounted symbols$/);
   });
 
   test('react-router-dom 라우팅으로 상품 상세와 목록 사이를 이동한다', async ({ page }) => {
