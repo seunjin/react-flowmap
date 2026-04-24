@@ -2,6 +2,7 @@
 
 ## 역할
 - 앱 위에 겹쳐지는 overlay inspector UI의 실제 구현 폴더다.
+- 인앱에서는 workspace를 바로 여는 버튼과 highlight bridge만 맡고, 복잡한 탐색은 popup workspace로 넘긴다.
 
 ## 작업 규칙
 - shadow host, overlay selector, popup 흐름은 e2e 계약으로 본다.

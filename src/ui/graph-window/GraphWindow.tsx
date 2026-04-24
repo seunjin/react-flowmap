@@ -31,6 +31,15 @@ function selectionExists(
   return entries.some((entry) => entry.symbolId === selectedId);
 }
 
+function formatRouteBreadcrumb(
+  currentPath: string,
+  activeRoutes: RfmRoute[],
+): string {
+  if (activeRoutes.length === 0) return currentPath;
+  const chain = [...activeRoutes].reverse().map((route) => route.componentName);
+  return `${currentPath} | ${chain.join(" > ")}`;
+}
+
 export function GraphWindow() {
   const [allEntries, setAllEntries] = useState<DocEntry[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -181,6 +190,10 @@ export function GraphWindow() {
     const filePath = selectedId.slice(SSR_PREFIX.length);
     return activeRoutes.find((route) => route.filePath === filePath) ?? null;
   }, [activeRoutes, selectedId]);
+  const routeBreadcrumb = useMemo(
+    () => formatRouteBreadcrumb(currentPath, activeRoutes),
+    [activeRoutes, currentPath],
+  );
   const selectedLabel =
     selectedRoute?.componentName ?? selectedEntry?.name ?? "No selection";
 
@@ -342,6 +355,9 @@ export function GraphWindow() {
                   Graph
                 </div>
                 <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
+                  Route {routeBreadcrumb}
+                </div>
+                <div className="text-[11px] text-rfm-text-400 truncate">
                   Focused on {selectedLabel}
                 </div>
               </div>
@@ -370,7 +386,7 @@ export function GraphWindow() {
               Inspector
             </div>
             <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
-              Props, source metadata, and screen context
+              Props and source metadata
             </div>
           </div>
 

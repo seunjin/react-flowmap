@@ -38,5 +38,6 @@ test.describe('demos/tanstack', () => {
 
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.getByText(/^[1-9]\d* active routes$/)).toBeVisible();
+    await expect(popup.getByText('Route / | App > HomePage')).toBeVisible();
   });
 });

@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { clickInspectorButton, shadowQuerySelector } from './inspector';
+import { openWorkspaceFromInspector, shadowQuerySelector } from './inspector';
 
 const BASE = 'http://localhost:3003';
 
 test.describe('demos/next', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem('rfm-active');
+    });
+  });
+
   test('페이지가 정상 로드된다', async ({ page }) => {
     const response = await page.goto(BASE);
     expect(response?.status()).toBe(200);
@@ -23,20 +29,12 @@ test.describe('demos/next', () => {
     expect(hasButton).toBe(true);
   });
 
-  test('Inspector 버튼 클릭 시 사이드바가 열리고 컴포넌트가 나열된다', async ({ page }) => {
+  test('Inspector 버튼 클릭 시 workspace 창이 바로 열린다', async ({ page }) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
-    await clickInspectorButton(page);
-    await page.waitForTimeout(500);
-    const hasSidebar = await shadowQuerySelector(page, '[data-rfm-sidebar]');
-    expect(hasSidebar).toBe(true);
-    // 컴포넌트 추적 확인 — Header, ComponentA, ComponentB, Badge가 트리에 표시
-    const sidebarText = await page.evaluate(() => {
-      const host = document.querySelector('[data-rfm-shadow-host]');
-      return host?.shadowRoot?.textContent ?? '';
-    });
-    expect(sidebarText).toContain('Header');
-    expect(sidebarText).toContain('ComponentA');
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup).toHaveURL(/__rfm=graph/);
+    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
   });
 
 });
