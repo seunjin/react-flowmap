@@ -5,7 +5,7 @@ A dev-only visual component inspector for React that helps you see how the curre
 - **Pick mode** — click any UI fragment on screen to inspect its owning component
 - **Workspace button** — open the full analysis workspace directly from the app window
 - **Component tree** — browse the mounted component / route structure with search and folder grouping
-- **Graph view** — explore the currently rendered screen structure from the active route root
+- **Graph view** — explore the currently rendered screen structure inside the current route subtree
 - **Props** — inspect live prop values with TypeScript type hints and jump-to-source
 - **Route context** — keep layout / page context visible without making routing the primary object
 - **Fragment support** — components rendering multiple root elements are highlighted across their full area
@@ -115,12 +115,12 @@ Done. Click the `⬡` button in the bottom-right corner to open the inspector.
 
 ## Product Direction
 
-The current product direction is documented in [docs/product-direction.md](/Users/jin/Desktop/dev/react-flowmap/docs/product-direction.md).
+The current product direction is documented in [docs/product-direction.md](./docs/product-direction.md).
 In short:
 
-- the primary job is inspecting a selected UI fragment
-- the graph is a broader context view of the current screen
-- requests / generic runtime metrics are not a primary user-facing goal
+- the primary job is inspecting a selected UI fragment first
+- graph / explorer views provide broader context for the current screen
+- requests / generic runtime metrics are intentionally not a primary user-facing goal
 
 ## Editor integration
 
@@ -140,7 +140,13 @@ flowmapInspect({
 
 **Next.js** (`next.config.ts`):
 ```ts
-withFlowmap({}, { editor: 'cursor' })
+import { withFlowmap } from 'react-flowmap/next';
+
+const nextConfig = {
+  // your existing Next.js config
+};
+
+export default withFlowmap(nextConfig, { editor: 'cursor' });
 ```
 
 Override per-machine without touching config files (`.env.local`):
@@ -151,6 +157,7 @@ NEXT_EDITOR=cursor   # Next.js
 ```
 
 Each editor name is fully autocompleted in TypeScript. You can also pass any custom binary name or absolute path.
+For shared repo config, prefer the Vite / Next plugin option. `config.editor` on `<ReactFlowMap />` is available as a local UI-side override when needed.
 
 ## Options
 
@@ -169,6 +176,7 @@ flowmapInspect({
 withFlowmap(nextConfig, {
   editor: 'cursor',         // editor to open source files
   exclude: [/my-pattern/],  // skip files matching these patterns
+  sidecarPort: 51423,       // editor-open sidecar port
 })
 ```
 
@@ -178,6 +186,7 @@ withFlowmap(nextConfig, {
 <ReactFlowMap
   config={{
     buttonPosition: { bottom: 24, right: 24 }, // ⬡ button position (px)
+    storageKey: 'rfm-active',                  // localStorage key for active state
     persistActive: true,                       // remember whether the workspace is active
     disableFetchInterceptor: false,            // optional internal graph enrichment
   }}
