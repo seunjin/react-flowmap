@@ -280,9 +280,9 @@ export function ComponentOverlay({
         const { mountedEntries, selectedId: sid, routes: currentRoutes } = currentDataRef.current;
         broadcastToGraph(ch, mountedEntries, sid, currentRoutes);
       } else if (msg.type === 'select') {
-        if (msg.symbolId.startsWith('ssr:')) {
-          // 그래프 창에서 서버 라우트 노드 선택 → routeRect 표시
-          const fp = msg.symbolId.slice('ssr:'.length);
+        if (msg.symbolId.startsWith('route:')) {
+          // 그래프 창에서 static route context 선택 → routeRect 표시
+          const fp = msg.symbolId.slice('route:'.length);
           const currentRoutes = getRouteManifest() ?? [];
           const route = currentRoutes.find(r => r.filePath === fp) ?? null;
           if (route) {
@@ -291,6 +291,10 @@ export function ComponentOverlay({
             selectedElRef.current = null;
             setRouteRect({ rect, label: route.componentName });
           }
+        } else if (msg.symbolId.startsWith('static:')) {
+          setSelectedId('');
+          selectedElRef.current = null;
+          setRouteRect(null);
         } else {
           setSelectedId(msg.symbolId);
           setRouteRect(null);
@@ -304,15 +308,17 @@ export function ComponentOverlay({
           } satisfies MainToGraph);
         }
       } else if (msg.type === 'hover') {
-        if (msg.symbolId.startsWith('ssr:')) {
-          // 그래프 창에서 서버 라우트 노드 호버 → routeHoverRect 표시
-          const fp = msg.symbolId.slice('ssr:'.length);
+        if (msg.symbolId.startsWith('route:')) {
+          // 그래프 창에서 static route context 호버 → routeHoverRect 표시
+          const fp = msg.symbolId.slice('route:'.length);
           const currentRoutes = getRouteManifest() ?? [];
           const route = currentRoutes.find(r => r.filePath === fp) ?? null;
           if (route) {
             const rect = computeRouteRect();
             setRouteHoverRect({ rect, label: route.componentName });
           }
+        } else if (msg.symbolId.startsWith('static:')) {
+          setHighlightTarget(null);
         } else {
           setHighlightTarget({ symbolId: msg.symbolId });
         }
@@ -629,7 +635,7 @@ export function ComponentOverlay({
 
   return createPortal(
     <>
-      {/* SSR route hover 프리뷰 */}
+      {/* Static route context hover preview */}
       {routeHoverRect && (
         <HoverPreviewBox rect={routeHoverRect.rect} label={routeHoverRect.label} />
       )}
@@ -670,7 +676,7 @@ export function ComponentOverlay({
         <ActiveSelectBox rect={selectedRect} label={selectedLabel} />
       )}
 
-      {/* SSR route 선택: 실선 (CSR 선택이 없을 때만) */}
+      {/* Static route context selection: live component selection이 없을 때만 */}
       {!selectedRect && routeRect && (
         <ActiveSelectBox rect={routeRect.rect} label={routeRect.label} />
       )}

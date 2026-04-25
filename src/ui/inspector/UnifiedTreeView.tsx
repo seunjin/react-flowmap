@@ -2,8 +2,7 @@ import { useState } from 'react';
 import type React from 'react';
 import { Folder, FileCode, Component, ChevronRight } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
-import type { RfmRoute, RfmServerComponent } from './types';
-import { openInEditor } from './utils';
+import type { RfmRoute } from './types';
 
 // ─── Data types ───────────────────────────────────────────────────────────────
 
@@ -69,20 +68,10 @@ export function buildUnifiedTree(
 ): UnifiedFolder {
   const root: UnifiedFolder = { kind: 'folder', name: '', fullPath: '', children: [] };
 
-  // 런타임 파일 경로 집합 — 이미 자체 노드로 나오는 파일은 import 자식에서 제거
-  const runtimePaths = new Set(
-    displayEntries.map(e => e.filePath).filter((p): p is string => Boolean(p)),
-  );
-
   if (routes) {
     for (const route of routes) {
       const file = ensureFile(root, route.filePath);
-      const filteredChildren = route.children?.filter(child => !runtimePaths.has(child.filePath));
-      const routeWithFiltered: RfmRoute = {
-        ...route,
-        ...(filteredChildren && filteredChildren.length > 0 ? { children: filteredChildren } : {}),
-      };
-      file.route = routeWithFiltered;
+      file.route = route;
     }
   }
 
@@ -105,49 +94,18 @@ export function flattenUnifiedEntries(node: UnifiedFolder | UnifiedFile): DocEnt
 
 const SERVER_ICON_COLOR = 'text-amber-500';
 const SERVER_ICON_COLOR_HOVER = 'text-amber-600';
+const CLIENT_BOUNDARY_ICON_COLOR = 'text-rfm-blue';
+const CLIENT_BOUNDARY_ICON_COLOR_HOVER = 'text-rfm-blue';
 
-// ─── Import 자식 (서버 컴포넌트, 재귀) ────────────────────────────────────────
-
-function ImportNode({
-  node,
-  depth,
-}: {
-  node: RfmServerComponent;
-  depth: number;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const hasChildren = (node.children?.length ?? 0) > 0;
-
-  return (
-    <div>
-      <div
-        className="flex items-center border-l-2 border-transparent hover:bg-rfm-bg-50 cursor-pointer"
-        style={{ padding: `4px 6px 4px ${8 + depth * 14}px` }}
-        onClick={() => openInEditor(node.filePath, '', '1')}
-      >
-        {hasChildren && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
-            className="border-none bg-transparent p-0 cursor-pointer mr-0.5 flex items-center"
-          >
-            <span className={`text-[7px] text-rfm-text-300 inline-block shrink-0 transition-transform duration-120 ${expanded ? 'rotate-90' : 'rotate-0'}`}>▶</span>
-          </button>
-        )}
-        {!hasChildren && <span className="w-[10px] shrink-0" />}
-        <Component
-          size={10}
-          className={`shrink-0 ml-[2px] ${node.isServer ? SERVER_ICON_COLOR : 'text-rfm-text-300'}`}
-        />
-        <span className="text-[12px] font-normal text-rfm-text-400 truncate flex-1 ml-[6px]">
-          {node.componentName}
-        </span>
-      </div>
-      {expanded && hasChildren && node.children!.map((c, i) => (
-        <ImportNode key={`${c.filePath}-${i}`} node={c} depth={depth + 1} />
-      ))}
-    </div>
-  );
+function getRouteIconColor(route: RfmRoute | undefined, fileHovered: boolean): string {
+  if (!route) return fileHovered ? 'text-rfm-text-700' : 'text-rfm-text-400';
+  if (route.executionKind === 'static') {
+    return fileHovered ? SERVER_ICON_COLOR_HOVER : SERVER_ICON_COLOR;
+  }
+  if (route.router === 'next') {
+    return fileHovered ? CLIENT_BOUNDARY_ICON_COLOR_HOVER : CLIENT_BOUNDARY_ICON_COLOR;
+  }
+  return fileHovered ? 'text-rfm-text-700' : 'text-rfm-text-400';
 }
 
 // ─── 파일 노드 ────────────────────────────────────────────────────────────────
@@ -199,9 +157,7 @@ function FileNode({
           className={`shrink-0 ${
             routeSelected ? 'text-rfm-blue'
             : fileSelected ? 'text-rfm-blue'
-            : route?.isServer ? (fileHovered ? SERVER_ICON_COLOR_HOVER : SERVER_ICON_COLOR)
-            : fileHovered ? 'text-rfm-text-700'
-            : 'text-rfm-text-400'
+            : getRouteIconColor(route, fileHovered)
           }`}
         />
         <span
@@ -212,11 +168,6 @@ function FileNode({
           {file.name}
         </span>
       </div>
-
-      {/* 라우트 파일 — 서버 컴포넌트 import 자식 (런타임에 없는 것만) */}
-      {route?.children?.map((child, i) => (
-        <ImportNode key={`${child.filePath}-${i}`} node={child} depth={depth + 1} />
-      ))}
 
       {/* 런타임 컴포넌트 항목 */}
       {entries.map(entry => {
@@ -307,7 +258,7 @@ function FolderNode({
     return <FileNode file={node} depth={depth} {...props} />;
   }
 
-  const hasHovered = node.children.some(c => {
+  const hasHovered = node.children.some((c: UnifiedFolder | UnifiedFile) => {
     if (c.kind === 'file') return c.entries.some(e => props.hoveredIds.has(e.symbolId));
     return false;
   });
@@ -332,7 +283,7 @@ function FolderNode({
           </span>
         </div>
       )}
-      {!collapsed && node.children.map(child => (
+      {!collapsed && node.children.map((child: UnifiedFolder | UnifiedFile) => (
         <FolderNode
           key={child.fullPath}
           node={child}

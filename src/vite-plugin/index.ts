@@ -31,6 +31,8 @@ export type RouteManifestEntry = {
   filePath: string;
   type: 'layout' | 'page';
   componentName: string;
+  nodeKind: 'route';
+  executionKind: 'live';
   isServer: false;
   propTypes?: Record<string, PropTypeEntry>;
 };
@@ -284,6 +286,8 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
           filePath: componentFilePath ?? relPath,
           type: route.type,
           componentName: route.componentName,
+          nodeKind: 'route',
+          executionKind: 'live',
           isServer: false,
           ...(propTypes ? { propTypes } : {}),
         };

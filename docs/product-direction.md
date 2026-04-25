@@ -88,9 +88,9 @@ route와 layout은 제품의 주인공이 아닙니다.
 - 현재 화면의 시작점 표시
 - 현재 subtree의 구조적 컨텍스트 제공
 - component graph를 읽을 때의 상위 문맥 제공
-- 기본 graph canvas에는 별도 route node를 만들지 않고, route 정보는 explorer / header context로 보여줌
+- graph 안에서 다른 컴포넌트와 같은 노드 모델을 쓰되, role과 `SERVER` / `CLIENT` 배지로 의미를 드러냄
 
-즉, route / layout은 핵심 분석 대상이라기보다 **screen context** 입니다.
+즉, route / layout은 별도 화면으로 분리된 대상이 아니라 **같은 그래프 안에서 읽히는 구조 노드** 입니다.
 
 ---
 
@@ -138,3 +138,4 @@ v1에서 React Flowmap이 잘해야 하는 것은 다음입니다.
 ## Related Docs
 
 - [Router-Agnostic Graph Plan](./router-agnostic-graph-plan.md)
+- [Next Hybrid Graph Plan](./next-hybrid-graph-plan.md)

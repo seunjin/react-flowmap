@@ -7,7 +7,7 @@ A dev-only visual component inspector for React that helps you see how the curre
 - **Component tree** — browse the mounted component / route structure with search and folder grouping
 - **Graph view** — explore the currently rendered screen structure inside the current route subtree
 - **Props** — inspect live prop values with TypeScript type hints and jump-to-source
-- **Route context** — keep layout / page context visible without making routing the primary object
+- **Unified graph** — route, server, and client ownership nodes share the same graph with `SERVER` / `CLIENT` badges
 - **Fragment support** — components rendering multiple root elements are highlighted across their full area
 
 > Dev-only. Instrumentation runs only in development mode — zero code injected in production builds.
@@ -25,7 +25,7 @@ It is **not** trying to replace Chrome DevTools or become a general runtime anal
 | Target | Status | What's tracked |
 |---|---|---|
 | Vite + React apps | ✅ Full | All components, including route pages in common client-side routers such as TanStack Router and React Router |
-| Next.js App Router | ⚠️ Partial | `'use client'` components only — server components are not tracked |
+| Next.js App Router | ⚠️ Partial | Active route/layout/page ownership plus live client runtime graph in one canvas |
 
 ## Install
 
@@ -72,7 +72,7 @@ Works the same way with common client-side routers such as TanStack Router or Re
 
 ### Next.js App Router
 
-> **Limitation**: Only `'use client'` components are tracked. Server components (`app/layout.tsx`, `app/page.tsx`, etc.) are not instrumented — they run on the server and have no runtime presence in the browser.
+> **Limitation**: Only `'use client'` files are instrumented for the live runtime graph. Route files and server-owned structure still appear in the same graph, but as `SERVER` ownership nodes rather than live mounted runtime nodes.
 
 **1. Wrap your Next.js config** (`next.config.ts`):
 
@@ -231,6 +231,6 @@ The plugin instruments your React components at dev-time with a lightweight Babe
 - Performs static JSX analysis so the graph remains useful even for conditionally-rendered structures
 - The inspector UI renders inside a Shadow DOM to prevent any style conflicts with your app
 
-For **Vite apps**, all components are instrumented. For **Next.js App Router**, only `'use client'` files are instrumented — server components are never touched.
+For **Vite apps**, all components are instrumented. For **Next.js App Router**, only `'use client'` files are instrumented for live runtime tracking, while route files and server-side ownership stay in the static ownership layer.
 
 All instrumentation is removed in production builds.

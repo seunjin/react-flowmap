@@ -23,8 +23,11 @@ function makeEntry(overrides: Partial<DocEntry> & { symbolId: string; name: stri
 
 function makeRoute(overrides: Partial<RfmNextRoute> & { filePath: string; componentName: string }): RfmNextRoute {
   return {
+    router: 'next',
     urlPath: '/',
     type: 'page',
+    nodeKind: 'route',
+    executionKind: 'static',
     isServer: true,
     ...overrides,
   };
@@ -38,7 +41,13 @@ describe('workspace detail model', () => {
       type: 'layout',
       urlPath: '/dashboard',
       children: [
-        { filePath: 'src/components/dashboard-shell.tsx', componentName: 'DashboardShell', isServer: false },
+        {
+          filePath: 'src/components/dashboard-shell.tsx',
+          componentName: 'DashboardShell',
+          nodeKind: 'client-boundary',
+          executionKind: 'live',
+          isServer: false,
+        },
       ],
     });
     const pageRoute = makeRoute({
@@ -46,7 +55,13 @@ describe('workspace detail model', () => {
       componentName: 'DashboardSettingsPage',
       urlPath: '/dashboard/settings',
       children: [
-        { filePath: 'src/components/settings-panel.tsx', componentName: 'SettingsPanel', isServer: false },
+        {
+          filePath: 'src/components/settings-panel.tsx',
+          componentName: 'SettingsPanel',
+          nodeKind: 'client-boundary',
+          executionKind: 'live',
+          isServer: false,
+        },
       ],
     });
     const selectedEntry = makeEntry({
@@ -75,7 +90,13 @@ describe('workspace detail model', () => {
       componentName: 'DashboardSettingsDetailPage',
       urlPath: '/dashboard/settings/[id]',
       children: [
-        { filePath: 'src/components/setting-detail.tsx', componentName: 'SettingDetail', isServer: false },
+        {
+          filePath: 'src/components/setting-detail.tsx',
+          componentName: 'SettingDetail',
+          nodeKind: 'client-boundary',
+          executionKind: 'live',
+          isServer: false,
+        },
       ],
     });
     const selectedEntry = makeEntry({
@@ -99,12 +120,16 @@ describe('workspace detail model', () => {
       type: 'layout',
       urlPath: '/',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const productRoute = makeRoute({
       filePath: 'src/pages/product-page.tsx',
       componentName: 'ProductPage',
       urlPath: '/product/:productId',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const selectedEntry = makeEntry({
       symbolId: 'symbol:src/widgets/product-detail.tsx#ProductDetail',
@@ -127,24 +152,32 @@ describe('workspace detail model', () => {
       type: 'layout',
       urlPath: '/',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const homeRoute = makeRoute({
       filePath: 'src/pages/home-page.tsx',
       componentName: 'HomePage',
       urlPath: '/',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const productRoute = makeRoute({
       filePath: 'src/pages/product-page.tsx',
       componentName: 'ProductPage',
       urlPath: '/product/:productId',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const cartRoute = makeRoute({
       filePath: 'src/pages/cart-page.tsx',
       componentName: 'CartPage',
       urlPath: '/cart',
       router: 'react-router',
+      executionKind: 'live',
+      isServer: false,
     });
 
     expect(
@@ -163,12 +196,16 @@ describe('workspace detail model', () => {
       type: 'layout',
       urlPath: '/',
       router: 'tanstack-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const detailRoute = makeRoute({
       filePath: 'src/pages/posts/post-page.tsx',
       componentName: 'PostPage',
       urlPath: '/posts/$postId',
       router: 'tanstack-router',
+      executionKind: 'live',
+      isServer: false,
     });
     const selectedEntry = makeEntry({
       symbolId: 'symbol:src/widgets/post-body.tsx#PostBody',

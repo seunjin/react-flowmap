@@ -124,7 +124,7 @@ export function ServerComponentDetail({
                       key={`${child.filePath}-${i}`}
                       name={child.componentName}
                       onClick={() => {
-                        if (!child.isServer) {
+                        if (child.nodeKind === 'client-boundary') {
                           onSelectImportChild(child);
                         } else {
                           openInEditor(child.filePath, '', '1');

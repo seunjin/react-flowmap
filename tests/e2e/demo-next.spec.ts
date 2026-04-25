@@ -37,4 +37,37 @@ test.describe('demos/next', () => {
     await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
   });
 
+  test('Next workspace shows route nodes in the unified graph', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
+    await expect(popup.getByText('Static route shell')).toHaveCount(0);
+    await expect(popup.locator('button[title="RootLayout"]')).toBeVisible();
+  });
+
+  test('Next workspace does not duplicate live client boundary nodes', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
+    await expect(popup.locator('button[title="RootLayout"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="HomePage"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="Header"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ComponentA"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ComponentB"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="Badge"]')).toHaveCount(1);
+  });
+
+  test('Next explorer keeps imported components in their own files instead of inlining them under route files', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    const explorer = popup.locator('aside').first();
+    await expect(explorer.getByText('FlowmapProvider', { exact: true })).toHaveCount(0);
+    await expect(explorer.getByText('Header', { exact: true })).toHaveCount(1);
+    await expect(explorer.getByText('ComponentA', { exact: true })).toHaveCount(1);
+    await expect(explorer.getByText('ComponentB', { exact: true })).toHaveCount(1);
+  });
+
 });

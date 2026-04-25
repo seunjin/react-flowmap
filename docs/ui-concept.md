@@ -90,11 +90,11 @@ UI 혼란을 줄이기 위해 selection 의미를 먼저 고정합니다.
 
 ### Server route selection
 
-Next.js App Router의 서버 라우트는 DOM instance가 없으므로 `ssr:<filePath>` 형태의 synthetic id를 사용합니다.
+Next.js App Router의 route / layout context는 DOM instance가 없으므로 `route:<filePath>` 형태의 synthetic id를 사용합니다.
 
 예:
 
-- `ssr:src/app/products/page.tsx`
+- `route:src/app/products/page.tsx`
 
 이 id는 popup graph/explorer와 overlay route highlight 사이의 공통 키입니다.
 
@@ -133,8 +133,10 @@ popup workspace의 기본 레이아웃은 3패널입니다.
 역할:
 
 - 현재 화면 구조를 넓게 보여준다
-- active route root에서 시작하는 component structure를 시각화한다
+- active route root에서 시작하는 ownership structure를 시각화한다
 - explorer보다 더 넓은 조립 문맥을 제공한다
+- route, server, client 노드를 같은 캔버스 안에서 보여준다
+- role과 `SERVER` / `CLIENT` 배지로 node 의미를 구분한다
 
 이 패널은 "무엇과 연결되는가"에 답합니다.
 
@@ -146,8 +148,8 @@ popup workspace의 기본 레이아웃은 3패널입니다.
 역할:
 
 - 현재 선택된 대상이 어떤 상태인지 보여준다
-- props와 type metadata를 우선적으로 보여준다
-- route / layout context를 보조 정보로 보여준다
+- live node면 props를, static node면 정적 메타데이터를 보여준다
+- type metadata를 우선적으로 보여준다
 - source jump 같은 action을 제공한다
 
 이 패널은 "지금 이건 무엇이고 어떤 상태인가"에 답합니다.
@@ -181,9 +183,8 @@ Inspector는 현재 선택한 항목의 상태를 읽는 패널입니다.
 
 - name
 - file path
-- props
+- live props 또는 static metadata
 - TypeScript props type
-- route / layout context
 - actions
 
 여기서 관계 mini-graph를 기본 UI로 넣지 않습니다.
@@ -209,11 +210,10 @@ props는 inspector의 중심 정보입니다.
 - props type metadata가 있으면 type 힌트 표시
 - 현재 props가 비어 있으면 `No props`
 
-### 3. Screen context
+### 3. Static metadata
 
-- 현재 route / layout context를 짧게 표시한다
-- 선택한 컴포넌트가 현재 화면 안에서 읽히도록 돕는다
-- route는 주인공이 아니라 context로 다룬다
+- route node나 static node라면 정적 타입 정보와 역할을 표시한다
+- live route node라면 live props 아래에 static route metadata를 같이 표시할 수 있다
 
 ### 4. Actions
 

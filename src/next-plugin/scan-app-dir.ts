@@ -151,6 +151,8 @@ function buildImportTree(
     children.push({
       filePath: relPath,
       componentName,
+      nodeKind: client ? 'client-boundary' : 'server-component',
+      executionKind: client ? 'live' : 'static',
       isServer: !client,
       ...(grandChildren.length > 0 ? { children: grandChildren } : {}),
     });
@@ -209,10 +211,13 @@ function scanDir(
         : undefined;
 
       results.push({
+        router: 'next',
         urlPath,
         filePath,
         type,
         componentName,
+        nodeKind: 'route',
+        executionKind: isServer ? 'static' : 'live',
         isServer,
         ...(propTypes ? { propTypes } : {}),
         ...(children.length > 0 ? { children } : {}),

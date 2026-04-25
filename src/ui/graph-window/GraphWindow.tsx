@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SquareMousePointer, Search, X } from "lucide-react";
-import type { DocEntry } from "../doc/build-doc-index";
+import type { DocEntry, DocRef } from "../doc/build-doc-index";
 import type {
   MainToGraph,
   GraphToMain,
@@ -13,21 +13,24 @@ import {
   flattenUnifiedEntries,
   UnifiedTreeView,
 } from "../inspector/UnifiedTreeView";
-import { FullGraph, SSR_PREFIX } from "./FullGraph";
+import { FullGraph, ROUTE_PREFIX } from "./FullGraph";
 import { WorkspaceDetail } from "./WorkspaceDetail";
 import { getActiveRoutesForPath } from "./workspace-detail-model";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
+import type { RfmServerComponent } from "../inspector/types";
+
+const STATIC_PREFIX = "static:";
+const RFM_STATIC_NAMES = new Set([
+  "ReactFlowMap",
+  "FlowmapProvider",
+  "ComponentOverlay",
+]);
 
 function selectionExists(
   selectedId: string,
   entries: DocEntry[],
-  routes: RfmRoute[] | null,
 ): boolean {
   if (!selectedId) return true;
-  if (selectedId.startsWith(SSR_PREFIX)) {
-    const filePath = selectedId.slice(SSR_PREFIX.length);
-    return (routes ?? []).some((route) => route.filePath === filePath);
-  }
   return entries.some((entry) => entry.symbolId === selectedId);
 }
 
@@ -38,6 +41,318 @@ function formatRouteBreadcrumb(
   if (activeRoutes.length === 0) return currentPath;
   const chain = [...activeRoutes].reverse().map((route) => route.componentName);
   return `${currentPath} | ${chain.join(" > ")}`;
+}
+
+function filterStaticChildren(
+  children: RfmServerComponent[] | undefined,
+): RfmServerComponent[] {
+  return (children ?? [])
+    .filter(
+      (child) =>
+        !RFM_STATIC_NAMES.has(child.componentName) &&
+        !child.filePath.includes("react-flowmap"),
+    )
+    .map((child) => ({
+      ...child,
+      ...(child.children
+        ? { children: filterStaticChildren(child.children) }
+        : {}),
+    }));
+}
+
+function toRef(entry: DocEntry): DocRef {
+  return {
+    symbolId: entry.symbolId,
+    name: entry.name,
+    filePath: entry.filePath,
+  };
+}
+
+function cloneEntry(entry: DocEntry): DocEntry {
+  return {
+    ...entry,
+    executionKind: entry.executionKind ?? "live",
+    graphNodeKind: entry.graphNodeKind ?? "component",
+    role: entry.role ?? "component",
+    source: entry.source ?? "runtime",
+    renders: [...entry.renders],
+    renderedBy: [...entry.renderedBy],
+    uses: [...entry.uses],
+    usedBy: [...entry.usedBy],
+    apiCalls: [...entry.apiCalls],
+  };
+}
+
+function findEntryByFileAndName(
+  entries: Iterable<DocEntry>,
+  filePath: string,
+  name: string,
+): DocEntry | null {
+  for (const entry of entries) {
+    if (entry.filePath === filePath && entry.name === name) return entry;
+  }
+  return null;
+}
+
+function attachRenderEdge(
+  entryById: Map<string, DocEntry>,
+  fromId: string,
+  toId: string,
+) {
+  if (fromId === toId) return;
+  const from = entryById.get(fromId);
+  const to = entryById.get(toId);
+  if (!from || !to) return;
+
+  if (!from.renders.some((ref) => ref.symbolId === to.symbolId)) {
+    from.renders.push(toRef(to));
+  }
+  if (!to.renderedBy.some((ref) => ref.symbolId === from.symbolId)) {
+    to.renderedBy.push(toRef(from));
+  }
+}
+
+function entryIdentity(entry: DocEntry): string {
+  return `${entry.filePath}#${entry.name}`;
+}
+
+function preferredEntry(a: DocEntry, b: DocEntry): DocEntry {
+  const score = (entry: DocEntry): number => {
+    if (entry.source === "runtime") return 0;
+    if (entry.source === "route" && entry.executionKind === "live") return 1;
+    if (entry.source === "route") return 2;
+    if (entry.executionKind === "live") return 3;
+    return 4;
+  };
+
+  return score(a) <= score(b) ? a : b;
+}
+
+function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
+  if (entries.length <= 1) return entries;
+
+  const grouped = new Map<string, DocEntry[]>();
+  for (const entry of entries) {
+    const key = entryIdentity(entry);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(entry);
+  }
+
+  const canonicalByOldId = new Map<string, string>();
+  const mergedSeeds = new Map<string, DocEntry>();
+
+  for (const group of grouped.values()) {
+    let canonical = group[0]!;
+    for (const entry of group.slice(1)) {
+      canonical = preferredEntry(canonical, entry);
+    }
+
+    const hasRoute = group.some((entry) => entry.graphNodeKind === "route");
+    const hasLive = group.some((entry) => entry.executionKind === "live");
+    const role =
+      group.find((entry) => entry.role && entry.role !== "component")?.role ??
+      canonical.role ??
+      "component";
+
+    const source = hasRoute
+      ? "route"
+      : group.some((entry) => entry.source === "runtime")
+        ? "runtime"
+        : "static-import";
+
+    const merged: DocEntry = {
+      ...canonical,
+      executionKind: hasLive ? "live" : "static",
+      graphNodeKind: hasRoute ? "route" : canonical.graphNodeKind ?? "component",
+      role,
+      source,
+      renders: [],
+      renderedBy: [],
+      uses: [],
+      usedBy: [],
+      apiCalls: [],
+    };
+
+    mergedSeeds.set(merged.symbolId, merged);
+    for (const entry of group) {
+      canonicalByOldId.set(entry.symbolId, merged.symbolId);
+    }
+  }
+
+  const appendRefs = (
+    refs: DocRef[],
+    target: DocRef[],
+    selfId: string,
+    mergedById: Map<string, DocEntry>,
+  ) => {
+    for (const ref of refs) {
+      const mappedId = canonicalByOldId.get(ref.symbolId) ?? ref.symbolId;
+      if (mappedId === selfId) continue;
+      const mappedEntry = mergedById.get(mappedId);
+      if (!mappedEntry) continue;
+      if (!target.some((existing) => existing.symbolId === mappedId)) {
+        target.push(toRef(mappedEntry));
+      }
+    }
+  };
+
+  const mergedById = new Map(mergedSeeds);
+  for (const group of grouped.values()) {
+    const canonicalId = canonicalByOldId.get(group[0]!.symbolId);
+    if (!canonicalId) continue;
+    const merged = mergedById.get(canonicalId);
+    if (!merged) continue;
+
+    for (const entry of group) {
+      appendRefs(entry.renders, merged.renders, merged.symbolId, mergedById);
+      appendRefs(
+        entry.renderedBy,
+        merged.renderedBy,
+        merged.symbolId,
+        mergedById,
+      );
+      appendRefs(entry.uses, merged.uses, merged.symbolId, mergedById);
+      appendRefs(entry.usedBy, merged.usedBy, merged.symbolId, mergedById);
+
+      for (const apiCall of entry.apiCalls) {
+        if (!merged.apiCalls.some((existing) => existing.apiId === apiCall.apiId)) {
+          merged.apiCalls.push(apiCall);
+        }
+      }
+    }
+  }
+
+  return [...mergedById.values()];
+}
+
+function buildHybridGraphEntries(
+  runtimeEntries: DocEntry[],
+  activeRoutes: RfmRoute[],
+): DocEntry[] {
+  const entryById = new Map<string, DocEntry>(
+    runtimeEntries.map((entry) => [entry.symbolId, cloneEntry(entry)]),
+  );
+
+  function ensureSyntheticEntry(entry: DocEntry): DocEntry {
+    const existing = entryById.get(entry.symbolId);
+    if (existing) return existing;
+    entryById.set(entry.symbolId, entry);
+    return entry;
+  }
+
+  function resolveRouteEntry(route: RfmRoute): DocEntry {
+    const runtimeMatch =
+      route.executionKind === "live"
+        ? findEntryByFileAndName(
+            entryById.values(),
+            route.filePath,
+            route.componentName,
+          )
+        : null;
+
+    if (runtimeMatch) {
+      runtimeMatch.graphNodeKind = "route";
+      runtimeMatch.role = route.type;
+      runtimeMatch.source = "route";
+      runtimeMatch.executionKind = "live";
+      return runtimeMatch;
+    }
+
+    return ensureSyntheticEntry({
+      symbolId: ROUTE_PREFIX + route.filePath,
+      name: route.componentName,
+      filePath: route.filePath,
+      category: "component",
+      executionKind: route.executionKind,
+      graphNodeKind: "route",
+      role: route.type,
+      source: "route",
+      renders: [],
+      renderedBy: [],
+      uses: [],
+      usedBy: [],
+      apiCalls: [],
+    });
+  }
+
+  function resolveImportEntry(node: RfmServerComponent): DocEntry {
+    const runtimeMatch =
+      node.executionKind === "live"
+        ? findEntryByFileAndName(
+            entryById.values(),
+            node.filePath,
+            node.componentName,
+          )
+        : null;
+
+    if (runtimeMatch) {
+      runtimeMatch.executionKind = "live";
+      runtimeMatch.role = runtimeMatch.role ?? "component";
+      return runtimeMatch;
+    }
+
+    return ensureSyntheticEntry({
+      symbolId: `${STATIC_PREFIX}${node.filePath}#${node.componentName}`,
+      name: node.componentName,
+      filePath: node.filePath,
+      category: "component",
+      executionKind: node.executionKind,
+      graphNodeKind: "component",
+      role: "component",
+      source: "static-import",
+      renders: [],
+      renderedBy: [],
+      uses: [],
+      usedBy: [],
+      apiCalls: [],
+    });
+  }
+
+  function connectImportTree(
+    parentEntry: DocEntry,
+    children: RfmServerComponent[] | undefined,
+  ) {
+    for (const child of filterStaticChildren(children)) {
+      const childEntry = resolveImportEntry(child);
+      attachRenderEdge(entryById, parentEntry.symbolId, childEntry.symbolId);
+      if (child.children?.length) {
+        connectImportTree(childEntry, child.children);
+      }
+    }
+  }
+
+  let previousRouteEntry: DocEntry | null = null;
+  for (const route of [...activeRoutes].reverse()) {
+    const routeEntry = resolveRouteEntry(route);
+    if (
+      previousRouteEntry &&
+      previousRouteEntry.symbolId !== routeEntry.symbolId
+    ) {
+      attachRenderEdge(
+        entryById,
+        previousRouteEntry.symbolId,
+        routeEntry.symbolId,
+      );
+    }
+    connectImportTree(routeEntry, route.children);
+    previousRouteEntry = routeEntry;
+  }
+
+  return mergeGraphEntries([...entryById.values()]);
+}
+
+function getGraphIdForRoute(
+  route: RfmRoute,
+  entries: DocEntry[],
+): string {
+  return (
+    entries.find(
+      (entry) =>
+        entry.source === "route" &&
+        entry.filePath === route.filePath &&
+        entry.name === route.componentName,
+    )?.symbolId ?? ROUTE_PREFIX + route.filePath
+  );
 }
 
 export function GraphWindow() {
@@ -108,14 +423,18 @@ export function GraphWindow() {
     () => getActiveRoutesForPath(routes ?? [], currentPath),
     [routes, currentPath],
   );
+  const graphEntries = useMemo(
+    () => buildHybridGraphEntries(allEntries, activeRoutes),
+    [activeRoutes, allEntries],
+  );
 
   useEffect(() => {
-    if (!selectionExists(selectedId, allEntries, activeRoutes)) {
+    if (!selectionExists(selectedId, graphEntries)) {
       setSelectedId("");
       selectedIdRef.current = "";
       setCurrentProps(null);
     }
-  }, [activeRoutes, allEntries, selectedId]);
+  }, [graphEntries, selectedId]);
 
   useEffect(() => {
     selectedTreeRef.current?.scrollIntoView({
@@ -151,6 +470,20 @@ export function GraphWindow() {
     sendToMain({ type: "hover-end" });
   }, [sendToMain]);
 
+  const handleSelectRoute = useCallback(
+    (route: RfmRoute) => {
+      handleSelect(getGraphIdForRoute(route, graphEntries));
+    },
+    [graphEntries, handleSelect],
+  );
+
+  const handleHoverRoute = useCallback(
+    (route: RfmRoute) => {
+      handleHover(getGraphIdForRoute(route, graphEntries));
+    },
+    [graphEntries, handleHover],
+  );
+
   const handlePickToggle = useCallback(() => {
     if (picking) {
       setPicking(false);
@@ -162,13 +495,13 @@ export function GraphWindow() {
 
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return allEntries;
-    return allEntries.filter(
+    if (!query) return graphEntries;
+    return graphEntries.filter(
       (entry) =>
         entry.name.toLowerCase().includes(query) ||
         entry.filePath.toLowerCase().includes(query),
     );
-  }, [allEntries, searchQuery]);
+  }, [graphEntries, searchQuery]);
 
   const unifiedTree = useMemo(
     () => buildUnifiedTree(activeRoutes, filteredEntries),
@@ -183,13 +516,24 @@ export function GraphWindow() {
     [hoveredId],
   );
 
-  const selectedEntry =
-    allEntries.find((entry) => entry.symbolId === selectedId) ?? null;
+  const selectedEntry = useMemo(
+    () => graphEntries.find((entry) => entry.symbolId === selectedId) ?? null,
+    [graphEntries, selectedId],
+  );
   const selectedRoute = useMemo<RfmRoute | null>(() => {
-    if (!selectedId.startsWith(SSR_PREFIX)) return null;
-    const filePath = selectedId.slice(SSR_PREFIX.length);
+    if (selectedEntry?.source === "route") {
+      return (
+        activeRoutes.find(
+          (route) =>
+            route.filePath === selectedEntry.filePath &&
+            route.componentName === selectedEntry.name,
+        ) ?? null
+      );
+    }
+    if (!selectedId.startsWith(ROUTE_PREFIX)) return null;
+    const filePath = selectedId.slice(ROUTE_PREFIX.length);
     return activeRoutes.find((route) => route.filePath === filePath) ?? null;
-  }, [activeRoutes, selectedId]);
+  }, [activeRoutes, selectedEntry, selectedId]);
   const routeBreadcrumb = useMemo(
     () => formatRouteBreadcrumb(currentPath, activeRoutes),
     [activeRoutes, currentPath],
@@ -333,12 +677,12 @@ export function GraphWindow() {
               onSelect={handleSelect}
               onDetail={() => {}}
               onActivateRoute={(route) =>
-                handleSelect(SSR_PREFIX + route.filePath)
+                handleSelectRoute(route)
               }
               onSelectRoute={(route) =>
-                handleSelect(SSR_PREFIX + route.filePath)
+                handleSelectRoute(route)
               }
-              onHoverRoute={(route) => handleHover(SSR_PREFIX + route.filePath)}
+              onHoverRoute={handleHoverRoute}
               onHoverRouteEnd={handleHoverEnd}
               onHover={handleHover}
               onHoverEnd={handleHoverEnd}
@@ -362,14 +706,14 @@ export function GraphWindow() {
                 </div>
               </div>
               <div className="text-[10px] text-rfm-text-400 uppercase tracking-[0.08em]">
-                Render / use view
+                Unified ownership view
               </div>
             </div>
           </div>
 
           <div className="min-h-0 flex-1 flex">
             <FullGraph
-              entries={allEntries}
+              entries={graphEntries}
               selectedId={selectedId}
               staticJsx={staticJsx}
               fiberRelations={fiberRelations}

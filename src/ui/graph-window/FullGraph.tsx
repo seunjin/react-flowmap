@@ -3,8 +3,8 @@ import type { DocEntry } from '../doc/build-doc-index';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const NODE_W = 160;
-const NODE_H = 34;
+const NODE_W = 188;
+const NODE_H = 38;
 const LEVEL_GAP = 72;  // vertical gap between depth levels
 const NODE_GAP  = 20;  // horizontal gap between nodes in same level
 const LEVEL_STEP = NODE_H + LEVEL_GAP;
@@ -13,7 +13,55 @@ const PAD = 40;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export const SSR_PREFIX = 'ssr:';
+export const ROUTE_PREFIX = 'route:';
+
+function formatRoleBadge(role: LayoutNode['entry']['role']): string | null {
+  if (!role || role === 'component') return null;
+  return role === 'not-found'
+    ? 'NOT FOUND'
+    : role.replace('-', ' ').toUpperCase();
+}
+
+function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean) {
+  if (entry.category === 'hook') {
+    return {
+      bg: isSelected ? '#ede9fe' : '#f5f3ff',
+      border: '#c4b5fd',
+      text: '#6d28d9',
+      dot: '#8b5cf6',
+      badgeBg: '#ede9fe',
+      badgeText: '#6d28d9',
+    };
+  }
+  if (entry.category === 'function') {
+    return {
+      bg: isSelected ? '#dcfce7' : '#f0fdf4',
+      border: '#86efac',
+      text: '#166534',
+      dot: '#22c55e',
+      badgeBg: '#dcfce7',
+      badgeText: '#166534',
+    };
+  }
+  if (entry.executionKind === 'static') {
+    return {
+      bg: isSelected ? '#fef3c7' : '#fffbeb',
+      border: '#fbbf24',
+      text: '#92400e',
+      dot: '#f59e0b',
+      badgeBg: '#fef3c7',
+      badgeText: '#92400e',
+    };
+  }
+  return {
+    bg: isSelected ? '#dbeafe' : '#f8fafc',
+    border: '#93c5fd',
+    text: '#1e3a8a',
+    dot: '#3b82f6',
+    badgeBg: '#eff6ff',
+    badgeText: '#1d4ed8',
+  };
+}
 
 interface LayoutNode {
   entry: DocEntry;
@@ -66,7 +114,13 @@ export function buildLayout(
   if (allEntries.length === 0) return { nodes: [], edges: [], canvasW: 300, canvasH: 200 };
 
   const byId  = new Map(allEntries.map(e => [e.symbolId, e]));
-  const byName = new Map(entries.map(e => [e.name, e]));
+  const byName = new Map<string, DocEntry>();
+  for (const entry of entries) {
+    const existing = byName.get(entry.name);
+    if (!existing || (existing.source !== 'runtime' && entry.source === 'runtime')) {
+      byName.set(entry.name, entry);
+    }
+  }
   const ownershipChildIds = buildOwnershipChildIds(entries, fiberRelations);
 
   // ── Build combined adjacency: runtime renders/uses + fiberRelations ──
@@ -352,11 +406,9 @@ export function FullGraph({
         {/* Nodes */}
         {layout.nodes.map(({ entry, x, y }) => {
           const isSelected = entry.symbolId === selectedId;
-          const catColor = entry.category === 'hook'
-            ? { bg: '#f5f3ff', border: '#ddd6fe', text: '#7c3aed' }
-            : entry.category === 'function'
-              ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' }
-              : { bg: '#f9fafb', border: '#e5e7eb', text: '#374151' };
+          const palette = getNodePalette(entry, isSelected);
+          const executionBadge = entry.executionKind === 'static' ? 'SERVER' : 'CLIENT';
+          const roleBadge = formatRoleBadge(entry.role);
 
           return (
             <button
@@ -370,8 +422,8 @@ export function FullGraph({
                 position: 'absolute',
                 left: x, top: y,
                 width: NODE_W, height: NODE_H,
-                background: isSelected ? '#eff6ff' : catColor.bg,
-                border: `${isSelected ? 2 : 1}px solid ${isSelected ? '#3b82f6' : catColor.border}`,
+                background: palette.bg,
+                border: `${isSelected ? 2 : 1}px solid ${isSelected ? '#3b82f6' : palette.border}`,
                 borderRadius: 8,
                 display: 'flex', alignItems: 'center',
                 padding: '0 10px',
@@ -384,15 +436,41 @@ export function FullGraph({
               {/* category dot */}
               <span style={{
                 width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: isSelected ? '#3b82f6' : catColor.border,
+                background: isSelected ? '#3b82f6' : palette.dot,
               }} />
               <span style={{
                 fontSize: 11.5, fontWeight: isSelected ? 600 : 500,
-                color: isSelected ? '#1d4ed8' : catColor.text,
+                color: isSelected ? '#1d4ed8' : palette.text,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 flex: 1, textAlign: 'left',
               }}>
                 {entry.name}
+              </span>
+              {roleBadge && (
+                <span style={{
+                  fontSize: 8.5,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  color: palette.badgeText,
+                  background: palette.badgeBg,
+                  padding: '2px 5px',
+                  borderRadius: 999,
+                  flexShrink: 0,
+                }}>
+                  {roleBadge}
+                </span>
+              )}
+              <span style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                color: palette.badgeText,
+                background: palette.badgeBg,
+                padding: '2px 5px',
+                borderRadius: 999,
+                flexShrink: 0,
+              }}>
+                {executionBadge}
               </span>
             </button>
           );

@@ -180,10 +180,6 @@
   margin-top: calc(var(--spacing) * 2);
 }
 
-.mr-0\.5 {
-  margin-right: calc(var(--spacing) * .5);
-}
-
 .mr-1 {
   margin-right: calc(var(--spacing) * 1);
 }
@@ -202,14 +198,6 @@
 
 .mb-3 {
   margin-bottom: calc(var(--spacing) * 3);
-}
-
-.ml-\[2px\] {
-  margin-left: 2px;
-}
-
-.ml-\[6px\] {
-  margin-left: 6px;
 }
 
 .box-border {
@@ -290,10 +278,6 @@
 
 .w-90 {
   width: calc(var(--spacing) * 90);
-}
-
-.w-\[10px\] {
-  width: 10px;
 }
 
 .w-\[320px\] {

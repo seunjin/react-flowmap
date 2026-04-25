@@ -33,11 +33,17 @@ export type DomRelNode = {
 export type RfmNextRouteType = 'layout' | 'page' | 'loading' | 'error' | 'not-found' | 'template';
 export type RfmRouteSource = 'next' | 'react-router' | 'tanstack-router';
 export type RfmRouteType = RfmNextRouteType;
+export type RfmExecutionKind = 'static' | 'live';
+export type RfmImportNodeKind = 'server-component' | 'client-boundary';
+export type RfmRouteNodeKind = 'route';
 
-/** import 정적 분석으로 추출한 서버/클라이언트 컴포넌트 트리 노드 */
+/** import 정적 분석으로 추출한 server/static 또는 client boundary 트리 노드 */
 export type RfmNextServerComponent = {
   filePath: string;
   componentName: string;
+  nodeKind: RfmImportNodeKind;
+  executionKind: RfmExecutionKind;
+  /** true = server/static file, false = 'use client' boundary */
   isServer: boolean;
   children?: RfmNextServerComponent[];
 };
@@ -56,7 +62,11 @@ export type RfmNextRoute = {
   type: RfmNextRouteType;
   /** 컴포넌트 이름 (예: "HomePage", "DashboardLayout") */
   componentName: string;
-  /** true = 서버 컴포넌트, false = 'use client' */
+  /** route metadata node */
+  nodeKind: RfmRouteNodeKind;
+  /** static route file or live route context */
+  executionKind: RfmExecutionKind;
+  /** true = server/static route file, false = 'use client' route boundary */
   isServer: boolean;
   /** ts-morph 정적 분석으로 추출한 props 타입 */
   propTypes?: Record<string, PropTypeEntry>;

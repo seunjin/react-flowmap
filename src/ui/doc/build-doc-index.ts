@@ -24,6 +24,10 @@ export type DocEntry = {
   name: string;
   filePath: string;
   category: 'page' | 'component' | 'hook' | 'function';
+  executionKind?: 'static' | 'live';
+  graphNodeKind?: 'route' | 'component';
+  role?: 'layout' | 'page' | 'loading' | 'error' | 'not-found' | 'template' | 'component';
+  source?: 'runtime' | 'route' | 'static-import';
   renders: DocRef[];
   renderedBy: DocRef[];
   uses: DocRef[];
@@ -160,6 +164,10 @@ export function buildDocIndex(graph: FlowmapGraph): DocIndex {
       name: sym.name,
       filePath,
       category: categorize(sym.id),
+      executionKind: 'live',
+      graphNodeKind: 'component',
+      role: 'component',
+      source: 'runtime',
       renders: out.filter((e) => e.kind === 'render').map((e) => toRef(e.target)).filter(Boolean) as DocRef[],
       renderedBy: inc.filter((e) => e.kind === 'render').map((e) => toRef(e.source)).filter(Boolean) as DocRef[],
       uses: out.filter((e) => e.kind === 'use').map((e) => toRef(e.target)).filter(Boolean) as DocRef[],
