@@ -213,6 +213,7 @@ props는 inspector의 중심 정보입니다.
 ### 3. Static metadata
 
 - route node나 static node라면 정적 타입 정보와 역할을 표시한다
+- `SERVER` node라면 parent layout과 reachable client boundaries를 같이 표시한다
 - live route node라면 live props 아래에 static route metadata를 같이 표시할 수 있다
 
 ### 4. Actions

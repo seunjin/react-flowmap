@@ -15,7 +15,11 @@ import {
 } from "../inspector/UnifiedTreeView";
 import { FullGraph, ROUTE_PREFIX } from "./FullGraph";
 import { WorkspaceDetail } from "./WorkspaceDetail";
-import { getActiveRoutesForPath } from "./workspace-detail-model";
+import {
+  getActiveRoutesForPath,
+  getEntryScreenContext,
+  getRouteScreenContext,
+} from "./workspace-detail-model";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
 import type { RfmServerComponent } from "../inspector/types";
 
@@ -534,6 +538,23 @@ export function GraphWindow() {
     const filePath = selectedId.slice(ROUTE_PREFIX.length);
     return activeRoutes.find((route) => route.filePath === filePath) ?? null;
   }, [activeRoutes, selectedEntry, selectedId]);
+  const selectedContext = useMemo(
+    () =>
+      selectedEntry
+        ? getEntryScreenContext(selectedEntry, activeRoutes, currentPath)
+        : { route: null, parentLayout: null },
+    [activeRoutes, currentPath, selectedEntry],
+  );
+  const selectedRouteContext = useMemo(
+    () =>
+      selectedRoute
+        ? getRouteScreenContext(selectedRoute, activeRoutes)
+        : { parentLayout: null },
+    [activeRoutes, selectedRoute],
+  );
+  const detailRoute = selectedRoute ?? selectedContext.route;
+  const detailParentLayout =
+    selectedRouteContext.parentLayout ?? selectedContext.parentLayout;
   const routeBreadcrumb = useMemo(
     () => formatRouteBreadcrumb(currentPath, activeRoutes),
     [activeRoutes, currentPath],
@@ -738,6 +759,8 @@ export function GraphWindow() {
             <WorkspaceDetail
               entry={selectedEntry}
               route={selectedRoute}
+              contextRoute={detailRoute}
+              parentLayout={detailParentLayout}
               props={currentProps}
               propTypesMap={propTypesMap}
             />

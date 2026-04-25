@@ -276,7 +276,8 @@ edge 스타일도 구분합니다.
 
 - file path
 - route role
-- static import children
+- parent layout
+- reachable client boundaries
 - static prop types
 - source jump
 

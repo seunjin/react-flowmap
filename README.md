@@ -25,7 +25,7 @@ It is **not** trying to replace Chrome DevTools or become a general runtime anal
 | Target | Status | What's tracked |
 |---|---|---|
 | Vite + React apps | ✅ Full | All components, including route pages in common client-side routers such as TanStack Router and React Router |
-| Next.js App Router | ⚠️ Partial | Active route/layout/page ownership plus live client runtime graph in one canvas |
+| Next.js App Router | ⚠️ Partial | Active route/layout/page ownership plus live client runtime graph in one canvas. `SERVER` nodes show structure and static types, not live props. |
 
 ## Install
 
@@ -73,6 +73,12 @@ Works the same way with common client-side routers such as TanStack Router or Re
 ### Next.js App Router
 
 > **Limitation**: Only `'use client'` files are instrumented for the live runtime graph. Route files and server-owned structure still appear in the same graph, but as `SERVER` ownership nodes rather than live mounted runtime nodes.
+
+In the inspector:
+
+- `CLIENT` nodes behave like normal React runtime nodes: live props, type hints, source jump
+- `SERVER` nodes show structure metadata: role, parent layout, reachable client boundaries, static prop types
+- `SERVER` nodes do **not** expose live prop values in the browser
 
 **1. Wrap your Next.js config** (`next.config.ts`):
 

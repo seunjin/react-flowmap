@@ -70,4 +70,18 @@ test.describe('demos/next', () => {
     await expect(explorer.getByText('ComponentB', { exact: true })).toHaveCount(1);
   });
 
+  test('Next server route detail shows parent layout and reachable client boundaries', async ({ page }) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    await popup.locator('button[title="HomePage"]').click();
+    const inspector = popup.locator('aside').nth(1);
+    await expect(inspector.getByText('Parent Layout')).toBeVisible();
+    await expect(inspector.getByText('RootLayout')).toBeVisible();
+    await expect(inspector.getByText('Client Boundaries Reached')).toBeVisible();
+    await expect(inspector.getByText('Header')).toBeVisible();
+    await expect(inspector.getByText('ComponentA')).toBeVisible();
+    await expect(inspector.getByText('ComponentB')).toBeVisible();
+  });
+
 });

@@ -3,8 +3,14 @@ import { ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { PropTypesMap } from '../inspector/channel';
 import { PropRow } from '../inspector/PropRow';
-import type { RfmRoute } from '../inspector/types';
+import type { RfmRoute, RfmServerComponent } from '../inspector/types';
 import { openInEditor } from '../inspector/utils';
+
+const INTERNAL_COMPONENT_NAMES = new Set([
+  'ReactFlowMap',
+  'FlowmapProvider',
+  'ComponentOverlay',
+]);
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -148,6 +154,137 @@ function LivePropsNotice({
   );
 }
 
+function matchesImportNode(
+  node: RfmServerComponent,
+  filePath: string,
+  componentName: string,
+): boolean {
+  return node.filePath === filePath && node.componentName === componentName;
+}
+
+function findImportNode(
+  children: RfmServerComponent[] | undefined,
+  filePath: string,
+  componentName: string,
+): RfmServerComponent | null {
+  for (const child of children ?? []) {
+    if (matchesImportNode(child, filePath, componentName)) {
+      return child;
+    }
+    const nested = findImportNode(child.children, filePath, componentName);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function collectClientBoundaryNames(
+  children: RfmServerComponent[] | undefined,
+  seen = new Set<string>(),
+): string[] {
+  const names: string[] = [];
+
+  for (const child of children ?? []) {
+    if (
+      INTERNAL_COMPONENT_NAMES.has(child.componentName) ||
+      child.filePath.includes('react-flowmap')
+    ) {
+      continue;
+    }
+
+    if (child.nodeKind === 'client-boundary') {
+      if (!seen.has(child.componentName)) {
+        seen.add(child.componentName);
+        names.push(child.componentName);
+      }
+      continue;
+    }
+
+    names.push(...collectClientBoundaryNames(child.children, seen));
+  }
+
+  return names;
+}
+
+function getClientBoundariesForRoute(route: RfmRoute | null): string[] {
+  if (!route) return [];
+  return collectClientBoundaryNames(route.children);
+}
+
+function getClientBoundariesForEntry(
+  entry: DocEntry,
+  contextRoute: RfmRoute | null,
+): string[] {
+  if (!contextRoute) return [];
+  if (
+    contextRoute.filePath === entry.filePath &&
+    contextRoute.componentName === entry.name
+  ) {
+    return collectClientBoundaryNames(contextRoute.children);
+  }
+
+  const importNode = findImportNode(
+    contextRoute.children,
+    entry.filePath,
+    entry.name,
+  );
+  return collectClientBoundaryNames(importNode?.children);
+}
+
+function StructureSection({
+  contextRoute,
+  parentLayout,
+  clientBoundaries,
+}: {
+  contextRoute: RfmRoute | null;
+  parentLayout: RfmRoute | null;
+  clientBoundaries: string[];
+}) {
+  const hasStructure =
+    contextRoute !== null ||
+    parentLayout !== null ||
+    clientBoundaries.length > 0;
+
+  if (!hasStructure) return null;
+
+  return (
+    <Section label="Structure">
+      <div className="flex flex-col gap-3">
+        {contextRoute ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium text-rfm-text-500">Owner Route</span>
+            <span className="text-[11px] text-rfm-text-900">{contextRoute.componentName}</span>
+          </div>
+        ) : null}
+        {parentLayout ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium text-rfm-text-500">Parent Layout</span>
+            <span className="text-[11px] text-rfm-text-900">{parentLayout.componentName}</span>
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium text-rfm-text-500">Client Boundaries Reached</span>
+          {clientBoundaries.length === 0 ? (
+            <span className="text-[11px] text-rfm-text-400">
+              No client boundary is reachable from this server-owned node.
+            </span>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {clientBoundaries.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center rounded-full bg-rfm-blue-light px-2 py-0.5 text-[10px] font-medium text-rfm-blue"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function ComponentDetail({
   entry,
   route,
@@ -160,7 +297,11 @@ function ComponentDetail({
   propTypesMap: PropTypesMap;
 }) {
   const executionLabel = entry.executionKind === 'static' ? 'SERVER' : 'CLIENT';
-  const role = route?.type ?? entry.role;
+  const isRouteEntry =
+    !!route &&
+    route.filePath === entry.filePath &&
+    route.componentName === entry.name;
+  const role = isRouteEntry ? route.type : entry.role;
 
   return (
     <>
@@ -171,10 +312,10 @@ function ComponentDetail({
         onOpen={() => openInEditor(entry.filePath, entry.symbolId)}
       />
       <PropsSection props={props} symbolId={entry.symbolId} propTypesMap={propTypesMap} />
-      {route ? (
+      {isRouteEntry ? (
         <StaticTypeSection
           label="Static Prop Types"
-          propTypes={route.propTypes}
+          propTypes={route?.propTypes}
           emptyText="No static type metadata for this route file."
         />
       ) : null}
@@ -184,14 +325,19 @@ function ComponentDetail({
 
 function StaticComponentDetail({
   entry,
+  contextRoute,
+  parentLayout,
 }: {
   entry: DocEntry;
+  contextRoute: RfmRoute | null;
+  parentLayout: RfmRoute | null;
 }) {
   const isServerNode = entry.executionKind === 'static';
   const executionLabel = isServerNode ? 'SERVER component' : 'CLIENT boundary';
   const noticeBody = isServerNode
     ? 'Live props are unavailable for SERVER nodes because they are not mounted in the browser runtime. Flowmap can only show static ownership and source-derived type metadata here.'
     : 'This node is coming from static route ownership, not from a mounted browser instance. Select the mounted CLIENT node in the graph to inspect live props.';
+  const clientBoundaries = getClientBoundariesForEntry(entry, contextRoute);
 
   return (
     <>
@@ -206,18 +352,26 @@ function StaticComponentDetail({
         title="Live Props"
         body={noticeBody}
       />
+      <StructureSection
+        contextRoute={contextRoute}
+        parentLayout={parentLayout}
+        clientBoundaries={clientBoundaries}
+      />
     </>
   );
 }
 
 function RouteDetail({
   route,
+  parentLayout,
 }: {
   route: RfmRoute;
+  parentLayout: RfmRoute | null;
 }) {
   const routeRole = formatRole(route.type);
   const executionLabel = route.executionKind === 'static' ? 'SERVER' : 'CLIENT';
   const showLivePropsNotice = route.executionKind === 'static';
+  const clientBoundaries = getClientBoundariesForRoute(route);
 
   return (
     <>
@@ -235,6 +389,14 @@ function RouteDetail({
         />
       ) : null}
 
+      {showLivePropsNotice ? (
+        <StructureSection
+          contextRoute={route}
+          parentLayout={parentLayout}
+          clientBoundaries={clientBoundaries}
+        />
+      ) : null}
+
       <StaticTypeSection
         label="Static Prop Types"
         propTypes={route.propTypes}
@@ -247,11 +409,15 @@ function RouteDetail({
 export function WorkspaceDetail({
   entry,
   route,
+  contextRoute,
+  parentLayout,
   props,
   propTypesMap,
 }: {
   entry: DocEntry | null;
   route: RfmRoute | null;
+  contextRoute: RfmRoute | null;
+  parentLayout: RfmRoute | null;
   props: Record<string, unknown> | null;
   propTypesMap: PropTypesMap;
 }) {
@@ -273,19 +439,27 @@ export function WorkspaceDetail({
         entry && entry.executionKind === 'live' ? (
           <ComponentDetail
             entry={entry}
-            route={route}
+            route={contextRoute}
             props={props}
             propTypesMap={propTypesMap}
           />
         ) : (
-          <RouteDetail route={route} />
+          <RouteDetail
+            route={route}
+            parentLayout={parentLayout}
+          />
         )
       ) : entry ? (
         entry.source === 'static-import' ? (
-          <StaticComponentDetail entry={entry} />
+          <StaticComponentDetail
+            entry={entry}
+            contextRoute={contextRoute}
+            parentLayout={parentLayout}
+          />
         ) : (
           <ComponentDetail
             entry={entry}
+            route={contextRoute}
             props={props}
             propTypesMap={propTypesMap}
           />

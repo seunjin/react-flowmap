@@ -287,12 +287,12 @@ export function ComponentOverlay({
           const route = currentRoutes.find(r => r.filePath === fp) ?? null;
           if (route) {
             const rect = computeRouteRect();
-            setSelectedId('');
+            setSelectedId(msg.symbolId);
             selectedElRef.current = null;
             setRouteRect({ rect, label: route.componentName });
           }
         } else if (msg.symbolId.startsWith('static:')) {
-          setSelectedId('');
+          setSelectedId(msg.symbolId);
           selectedElRef.current = null;
           setRouteRect(null);
         } else {

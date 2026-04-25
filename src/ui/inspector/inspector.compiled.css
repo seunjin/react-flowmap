@@ -650,6 +650,10 @@
   padding-inline: 7px;
 }
 
+.py-0\.5 {
+  padding-block: calc(var(--spacing) * .5);
+}
+
 .py-1 {
   padding-block: calc(var(--spacing) * 1);
 }

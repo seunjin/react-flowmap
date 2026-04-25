@@ -194,6 +194,12 @@ Next.js App Router의 static route file은 DOM instance가 없기 때문에 synt
 React Flowmap은 구조만 보여주는 데서 멈추지 않고, 선택한 조각을 실제로 수정 가능한 상태로 연결해야 합니다.
 그래서 props와 TypeScript type metadata는 핵심 데이터 개념으로 취급합니다.
 
+Next.js App Router의 `SERVER` node에서는 여기에 추가로 다음 정보가 중요합니다.
+
+- parent layout
+- reachable client boundaries
+- live props unavailable 상태
+
 ---
 
 ## Selection Model
