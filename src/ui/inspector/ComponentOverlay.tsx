@@ -272,6 +272,33 @@ function getVisibleDescendantRects(
   return rects;
 }
 
+function isFixedOrStickyElement(el: HTMLElement): boolean {
+  const position = window.getComputedStyle(el).position;
+  return position === "fixed" || position === "sticky";
+}
+
+function getFixedOrStickyVisualRects(
+  scopeEl: HTMLElement,
+  ownerEl: HTMLElement,
+): DOMRect[] {
+  const elements = Array.from(scopeEl.querySelectorAll<HTMLElement>("*"));
+  if (isFixedOrStickyElement(scopeEl)) elements.unshift(scopeEl);
+
+  return elements
+    .filter((el) => isFixedOrStickyElement(el))
+    .filter((el) => !shouldSkipOwnerVisualElement(el, ownerEl))
+    .map(getVisibleElementRect)
+    .filter((rect): rect is DOMRect => rect !== null);
+}
+
+function hasFixedOrStickyVisual(ownerEl: HTMLElement): boolean {
+  if (isFixedOrStickyElement(ownerEl)) return true;
+  return Array.from(ownerEl.querySelectorAll<HTMLElement>("*")).some(
+    (el) =>
+      isFixedOrStickyElement(el) && !shouldSkipOwnerVisualElement(el, ownerEl),
+  );
+}
+
 function getOwnerAnchorElements(ownerEl: HTMLElement): HTMLElement[] {
   const anchors = Array.from(
     ownerEl.querySelectorAll<HTMLElement>(OWNER_ANCHOR_SELECTOR),
@@ -294,6 +321,11 @@ export function getOwnerVisualRect(ownerEl: HTMLElement): DOMRect | null {
   }
 
   if (shouldSkipOwnerVisualElement(ownerEl, ownerEl)) return null;
+
+  const positionedRect = unionVisibleRects(
+    getFixedOrStickyVisualRects(ownerEl, ownerEl),
+  );
+  if (positionedRect) return positionedRect;
 
   const ownerRect = getVisibleElementRect(ownerEl);
   if (ownerRect) return ownerRect;
@@ -405,7 +437,12 @@ function buildOwnerOverlayBoxes(
   state: OwnerOverlayState,
 ): OwnerOverlayBox[] {
   const label = labelFromSymbolId(symbolId);
-  return findOwnerElements(symbolId)
+  const ownerElements = findOwnerElements(symbolId);
+  const fixedOrStickyOwnerElements = ownerElements.filter(hasFixedOrStickyVisual);
+  return (fixedOrStickyOwnerElements.length > 0
+    ? fixedOrStickyOwnerElements
+    : ownerElements
+  )
     .map((el, index) => {
       const rect = getOwnerVisualRect(el);
       return rect
@@ -477,6 +514,7 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
     const cleanup = autoUpdate(ownerEl, floatingEl, update, {
       ancestorResize: true,
       ancestorScroll: true,
+      animationFrame: true,
       elementResize: true,
       layoutShift: true,
     });

@@ -93,6 +93,10 @@
   position: static;
 }
 
+.sticky {
+  position: sticky;
+}
+
 .start {
   inset-inline-start: var(--spacing);
 }

@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.10
+
+### Patch Changes
+
+- Keep floating owner overlays synchronized with fixed or sticky visual targets during scroll and layout changes.
+
 ## 1.0.0-rc.9
 
 ### Patch Changes

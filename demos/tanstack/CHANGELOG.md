@@ -1,5 +1,12 @@
 # react-flowmap-demo-tanstack
 
+## 0.0.5-rc.5
+
+### Patch Changes
+
+- Updated dependencies
+  - react-flowmap@1.0.0-rc.10
+
 ## 0.0.5-rc.4
 
 ### Patch Changes

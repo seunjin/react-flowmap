@@ -36,7 +36,7 @@ describe('getOwnerVisualRect', () => {
     document.body.innerHTML = '';
   });
 
-  it('uses the owner marker rect by default even when a fixed child exists', () => {
+  it('uses a fixed child as the visual rect when the owner marker wraps layout chrome', () => {
     const owner = document.createElement('header');
     const fixedBar = document.createElement('div');
     fixedBar.style.position = 'fixed';
@@ -47,9 +47,9 @@ describe('getOwnerVisualRect', () => {
     setRect(fixedBar, new DOMRect(0, 0, 1920, 56));
 
     expect(rectSnapshot(getOwnerVisualRect(owner))).toEqual({
-      left: 17,
-      top: 2,
-      width: 1886,
+      left: 0,
+      top: 0,
+      width: 1920,
       height: 56,
     });
   });
