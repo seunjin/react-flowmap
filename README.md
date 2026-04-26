@@ -134,17 +134,17 @@ In short:
 
 ## Editor integration
 
-Set the `editor` option to jump directly to source from the inspector:
+Source jumps default to VS Code (`code`). In the Flowmap workspace, use the **IDE** select to switch editors per browser/profile without changing project config. The selection is stored in localStorage; choose **Project default** to go back to the plugin setting.
+
+Set the `editor` option only when you want a shared project fallback:
 
 **Vite** (`vite.config.ts`):
 ```ts
 flowmapInspect({
   editor: 'cursor',       // Cursor
   // editor: 'code',      // VS Code
-  // editor: 'windsurf',  // Windsurf
-  // editor: 'zed',       // Zed
   // editor: 'antigravity', // Google Antigravity
-  // editor: 'codium',    // VSCodium (or 'vscodium')
+  // editor: 'vim',       // Vim
 })
 ```
 
@@ -159,15 +159,8 @@ const nextConfig = {
 export default withFlowmap(nextConfig, { editor: 'cursor' });
 ```
 
-Override per-machine without touching config files (`.env.local`):
-
-```bash
-VITE_EDITOR=cursor   # Vite
-NEXT_EDITOR=cursor   # Next.js
-```
-
-Each editor name is fully autocompleted in TypeScript. You can also pass any custom binary name or absolute path.
-For shared repo config, prefer the Vite / Next plugin option. `config.editor` on `<ReactFlowMap />` is available as a local UI-side override when needed.
+Each editor name is fully autocompleted in TypeScript. You can also pass any custom binary name or absolute path through the Vite / Next plugin option.
+For shared repo config, prefer the Vite / Next plugin option. `config.editor` on `<ReactFlowMap />` is available as a local UI-side default when needed, but the workspace IDE select wins once a user chooses an editor.
 
 ## Options
 

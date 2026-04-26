@@ -1,11 +1,19 @@
 import { existsSync } from 'node:fs';
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Project, TypeFormatFlags, ts } from 'ts-morph';
+import { Project, TypeFormatFlags, ts, type Type } from 'ts-morph';
 import type { Plugin } from 'vite';
 import { transformFlowmap } from '../../packages/babel-plugin/src/index.js';
+import {
+  DEFAULT_EDITOR_ID,
+  EDITOR_OPTIONS,
+  getEditorCommand,
+  getEditorLabel,
+  normalizeKnownEditorId,
+  type KnownEditorId,
+} from '../editor.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -61,7 +69,7 @@ function resolveImportedComponentPath(
 }
 
 /** 타입의 선언 위치(파일, 라인)를 반환. node_modules / lib 타입은 null */
-function getTypeDefLoc(type: import('ts-morph').Type): { file: string; line: number } | null {
+function getTypeDefLoc(type: Type): { file: string; line: number } | null {
   const sym = type.getSymbol() ?? type.getAliasSymbol();
   if (!sym) return null;
   // union 타입에서 null/undefined 제거 후 첫 번째 의미있는 선언
@@ -119,25 +127,69 @@ function extractPropsViaTsMorph(
 }
 
 // ─── 에디터 열기 ──────────────────────────────────────────────────────────────
-function openInEditor(absPath: string, line: number, editor: string): void {
-  const target = `${absPath}:${line}`;
-
-  const vscodeFamily = ['code', 'cursor', 'antigravity', 'windsurf', 'codium', 'vscodium'];
-  const isVscodeFamily = vscodeFamily.some(e => editor === e || editor.endsWith(`/${e}`));
-
-  const cmd = isVscodeFamily
-    ? `"${editor}" -g "${target}"`
-    : editor === 'zed'
-      ? `zed "${target}"`
-      : `"${editor}" "${absPath}"`;
-
+function buildEditorEnv(): NodeJS.ProcessEnv {
   const extraPaths = [
     `${process.env['HOME'] ?? ''}/.antigravity/antigravity/bin`,
     '/usr/local/bin',
     '/opt/homebrew/bin',
     `${process.env['HOME'] ?? ''}/.local/bin`,
   ].join(':');
-  const env = { ...process.env, PATH: `${extraPaths}:${process.env['PATH'] ?? ''}` };
+  return { ...process.env, PATH: `${extraPaths}:${process.env['PATH'] ?? ''}` };
+}
+
+function isCommandAvailable(command: string, env: NodeJS.ProcessEnv): boolean {
+  try {
+    execSync(`command -v ${command}`, { stdio: 'ignore', env });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getEditorAvailability(editorCmd: string) {
+  const env = buildEditorEnv();
+  const projectDefaultId = normalizeKnownEditorId(editorCmd);
+
+  return {
+    defaultEditor: projectDefaultId,
+    defaultLabel: projectDefaultId ? getEditorLabel(projectDefaultId) : 'Custom',
+    editors: EDITOR_OPTIONS.map((option) => ({
+      id: option.id,
+      label: option.label,
+      available:
+        isCommandAvailable(option.command, env) ||
+        (process.platform === 'darwin' &&
+          (option.macAppPaths ?? []).some((appPath) => existsSync(appPath))),
+    })),
+  };
+}
+
+function resolveEditorCommand(editorParam: string | null, editorCmd: string): string {
+  const selected = normalizeKnownEditorId(editorParam);
+  return selected ? getEditorCommand(selected) : editorParam ?? editorCmd;
+}
+
+function openInEditor(absPath: string, line: number, editor: string): void {
+  const target = `${absPath}:${line}`;
+
+  const vscodeFamily = ['code', 'cursor', 'antigravity'];
+  const isVscodeFamily = vscodeFamily.some(e => editor === e || editor.endsWith(`/${e}`));
+  const vimFamily = ['vim', 'vi'];
+  const isVimFamily = vimFamily.some(e => editor === e || editor.endsWith(`/${e}`));
+
+  let cmd: string;
+  if (isVscodeFamily) {
+    cmd = `"${editor}" -g "${target}"`;
+  } else if (isVimFamily && process.platform === 'darwin') {
+    const escaped = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    cmd = `osascript -e 'tell application "Terminal" to do script "${editor} +${line} \\"${escaped}\\""' -e 'tell application "Terminal" to activate'`;
+  } else if (isVimFamily) {
+    cmd = `"${editor}" -n +"${line}" "${absPath}"`;
+  } else {
+    cmd = `"${editor}" "${absPath}"`;
+  }
+
+  const env = buildEditorEnv();
 
   exec(cmd, { env }, (err) => {
     if (err) {
@@ -151,13 +203,7 @@ function openInEditor(absPath: string, line: number, editor: string): void {
 
 // ─── 플러그인 ─────────────────────────────────────────────────────────────────
 export type EditorName =
-  | 'code'
-  | 'cursor'
-  | 'antigravity'
-  | 'windsurf'
-  | 'codium'
-  | 'vscodium'
-  | 'zed'
+  | KnownEditorId
   | (string & {});
 
 export type FlowmapInspectOptions = {
@@ -167,7 +213,7 @@ export type FlowmapInspectOptions = {
 
 export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
   let root = process.cwd();
-  let editorCmd = process.env['VITE_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
+  const editorCmd = options.editor ?? getEditorCommand(DEFAULT_EDITOR_ID);
   let isDev = false;
   const symbolLocMap = new Map<string, number>();
   let tsProject: Project | null = null;
@@ -182,8 +228,6 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
     configResolved(config) {
       root = config.root;
       isDev = config.command === 'serve';
-      const fromEnv = (config.env as Record<string, string | undefined>)['VITE_EDITOR'];
-      if (fromEnv) editorCmd = fromEnv;
 
       if (isDev) {
         const tsconfigPath = resolve(root, 'tsconfig.json');
@@ -211,6 +255,12 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
     },
 
     configureServer(server) {
+      server.middlewares.use('/__rfm-editors', (_req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(getEditorAvailability(editorCmd)));
+      });
+
       server.middlewares.use('/__rfm-open', (req, res) => {
         const qs = req.url?.split('?')[1] ?? '';
         const params = new URLSearchParams(qs);
@@ -231,9 +281,10 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         }
 
         const absPath = resolve(root, file);
-        openInEditor(absPath, line, editorParam ?? editorCmd);
+        const resolvedEditor = resolveEditorCommand(editorParam, editorCmd);
+        openInEditor(absPath, line, resolvedEditor);
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, file: absPath, line, editor: editorCmd }));
+        res.end(JSON.stringify({ ok: true, file: absPath, line, editor: resolvedEditor }));
       });
     },
 

@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { KnownEditorId } from '../../editor.js';
 
 // ─── Brand Symbol ─────────────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ export type FlowmapConfig = {
   /** 인스펙터 버튼 위치 */
   buttonPosition?: { bottom?: number; right?: number; left?: number };
   /** 에디터 열기에 사용할 커맨드 */
-  editor?: 'code' | 'cursor' | 'antigravity' | 'windsurf' | 'codium' | 'vscodium' | 'zed' | 'vim' | 'nvim' | (string & {});
+  editor?: KnownEditorId | (string & {});
 };
 
 // ─── InspectButton ────────────────────────────────────────────────────────────

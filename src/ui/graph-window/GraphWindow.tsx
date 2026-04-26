@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ExternalLink, SquareMousePointer, Search, X } from "lucide-react";
+import {
+  ExternalLink,
+  PanelRightClose,
+  PanelRightOpen,
+  Search,
+  SquareMousePointer,
+  X,
+} from "lucide-react";
 import type { DocEntry, DocRef } from "../doc/build-doc-index";
 import type {
   MainToGraph,
@@ -21,6 +28,7 @@ import {
   getRouteScreenContext,
 } from "./workspace-detail-model";
 import { openInEditor } from "../inspector/utils";
+import { EditorSelect } from "../inspector/EditorSelect";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
 import type { RfmServerComponent } from "../inspector/types";
 
@@ -31,15 +39,14 @@ const RFM_STATIC_NAMES = new Set([
   "ComponentOverlay",
 ]);
 
-function selectionExists(
-  selectedId: string,
-  entries: DocEntry[],
-): boolean {
+function selectionExists(selectedId: string, entries: DocEntry[]): boolean {
   if (!selectedId) return true;
   return entries.some((entry) => entry.symbolId === selectedId);
 }
 
-function formatRole(role: DocEntry["role"] | RfmRoute["type"] | undefined): string {
+function formatRole(
+  role: DocEntry["role"] | RfmRoute["type"] | undefined,
+): string {
   if (!role) return "Component";
   if (role === "not-found") return "Not Found";
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -67,20 +74,6 @@ function SelectionSummaryContent({
     : formatRole(entry?.role ?? "component");
   const routeLabel = contextRoute?.componentName ?? currentPath;
   const parentLabel = parentLayout?.componentName ?? null;
-  const canOpen = filePath.length > 0;
-
-  const handleOpen = () => {
-    if (!canOpen) return;
-    if (route) {
-      openInEditor(filePath, "", "1");
-      return;
-    }
-    openInEditor(
-      filePath,
-      entry?.source === "static-import" ? "" : entry?.symbolId ?? "",
-      entry?.source === "static-import" ? "1" : null,
-    );
-  };
 
   return (
     <>
@@ -115,16 +108,6 @@ function SelectionSummaryContent({
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={handleOpen}
-            disabled={!canOpen}
-            title={canOpen ? `Open ${filePath}` : "No source file"}
-            className="h-7 shrink-0 flex items-center gap-1.5 rounded-[6px] border border-rfm-border-light bg-transparent px-2.5 text-[11px] font-medium text-rfm-text-500 hover:bg-rfm-bg-100 hover:text-rfm-text-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
-          >
-            <ExternalLink size={12} />
-            Open source
-          </button>
         </>
       ) : (
         <div className="min-w-0 flex-1">
@@ -132,11 +115,49 @@ function SelectionSummaryContent({
             No UI selected
           </div>
           <div className="mt-0.5 text-[11px] text-rfm-text-400">
-            Pick an element from the app window or choose a component from Explorer.
+            Pick an element from the app window or choose a component from
+            Explorer.
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function OpenSourceButton({
+  entry,
+  route,
+}: {
+  entry: DocEntry | null;
+  route: RfmRoute | null;
+}) {
+  const filePath = route?.filePath ?? entry?.filePath ?? "";
+  const canOpen = filePath.length > 0;
+
+  const handleOpen = () => {
+    if (!canOpen) return;
+    if (route) {
+      openInEditor(filePath, "", "1");
+      return;
+    }
+    openInEditor(
+      filePath,
+      entry?.source === "static-import" ? "" : entry?.symbolId ?? "",
+      entry?.source === "static-import" ? "1" : null,
+    );
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleOpen}
+      disabled={!canOpen}
+      title={canOpen ? `Open ${filePath}` : "No source file"}
+      className="h-7 shrink-0 flex items-center gap-1.5 rounded-md border border-rfm-border-light bg-transparent px-2.5 text-[11px] font-medium text-rfm-text-500 hover:bg-rfm-bg-100 hover:text-rfm-text-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+    >
+      <ExternalLink size={12} />
+      Open source
+    </button>
   );
 }
 
@@ -254,13 +275,15 @@ function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
     const source = hasRoute
       ? "route"
       : group.some((entry) => entry.source === "runtime")
-        ? "runtime"
-        : "static-import";
+      ? "runtime"
+      : "static-import";
 
     const merged: DocEntry = {
       ...canonical,
       executionKind: hasLive ? "live" : "static",
-      graphNodeKind: hasRoute ? "route" : canonical.graphNodeKind ?? "component",
+      graphNodeKind: hasRoute
+        ? "route"
+        : canonical.graphNodeKind ?? "component",
       role,
       source,
       renders: [],
@@ -312,7 +335,9 @@ function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
       appendRefs(entry.usedBy, merged.usedBy, merged.symbolId, mergedById);
 
       for (const apiCall of entry.apiCalls) {
-        if (!merged.apiCalls.some((existing) => existing.apiId === apiCall.apiId)) {
+        if (
+          !merged.apiCalls.some((existing) => existing.apiId === apiCall.apiId)
+        ) {
           merged.apiCalls.push(apiCall);
         }
       }
@@ -438,10 +463,7 @@ function buildHybridGraphEntries(
   return mergeGraphEntries([...entryById.values()]);
 }
 
-function getGraphIdForRoute(
-  route: RfmRoute,
-  entries: DocEntry[],
-): string {
+function getGraphIdForRoute(route: RfmRoute, entries: DocEntry[]): string {
   return (
     entries.find(
       (entry) =>
@@ -469,6 +491,7 @@ export function GraphWindow() {
   const [picking, setPicking] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredId, setHoveredId] = useState("");
+  const [detailPanelOpen, setDetailPanelOpen] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const selectedIdRef = useRef("");
   const selectedTreeRef = useRef<HTMLButtonElement | null>(null);
@@ -499,12 +522,14 @@ export function GraphWindow() {
           setSelectedId(msg.selectedId);
           selectedIdRef.current = msg.selectedId;
           setCurrentProps(null);
+          if (msg.selectedId) setDetailPanelOpen(true);
         }
       } else if (msg.type === "pick-result") {
         setSelectedId(msg.symbolId);
         selectedIdRef.current = msg.symbolId;
         setCurrentProps(null);
         setPicking(false);
+        setDetailPanelOpen(true);
       } else if (
         msg.type === "props-update" &&
         msg.symbolId === selectedIdRef.current
@@ -546,9 +571,17 @@ export function GraphWindow() {
 
   const handleSelect = useCallback(
     (symbolId: string) => {
+      const isSameSelection = symbolId === selectedIdRef.current;
+      if (isSameSelection) {
+        setDetailPanelOpen((open) => !open);
+        sendToMain({ type: "select", symbolId });
+        return;
+      }
+
       setSelectedId(symbolId);
       selectedIdRef.current = symbolId;
       setCurrentProps(null);
+      setDetailPanelOpen(true);
       sendToMain({ type: "select", symbolId });
     },
     [sendToMain],
@@ -734,6 +767,10 @@ export function GraphWindow() {
           <SquareMousePointer size={12} />
           {picking ? "Picking…" : "Pick element"}
         </button>
+
+        <OpenSourceButton entry={selectedEntry} route={selectedRoute} />
+
+        <EditorSelect />
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -784,12 +821,8 @@ export function GraphWindow() {
               showDetailButton={false}
               onSelect={handleSelect}
               onDetail={() => {}}
-              onActivateRoute={(route) =>
-                handleSelectRoute(route)
-              }
-              onSelectRoute={(route) =>
-                handleSelectRoute(route)
-              }
+              onActivateRoute={(route) => handleSelectRoute(route)}
+              onSelectRoute={(route) => handleSelectRoute(route)}
               onHoverRoute={handleHoverRoute}
               onHoverRouteEnd={handleHoverEnd}
               onHover={handleHover}
@@ -814,27 +847,50 @@ export function GraphWindow() {
           </div>
         </section>
 
-        <aside className="w-90  border-l border-rfm-border flex flex-col overflow-hidden bg-white">
-          <div className="px-4 py-3 border-b border-rfm-border shrink-0">
-            <div className="text-[12px] font-semibold text-rfm-text-900">
-              Inspector
+        {detailPanelOpen ? (
+          <aside className="w-90 border-l border-rfm-border flex flex-col overflow-hidden bg-white">
+            <div className="px-4 py-3 border-b border-rfm-border shrink-0 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[12px] font-semibold text-rfm-text-900">
+                  Inspector
+                </div>
+                <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
+                  Props, runtime data, and screen context
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailPanelOpen(false)}
+                title="Collapse inspector"
+                className="h-7 w-7 shrink-0 flex items-center justify-center rounded-md border border-rfm-border-light bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
+              >
+                <PanelRightClose size={14} />
+              </button>
             </div>
-            <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
-              Props, runtime data, and screen context
-            </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <WorkspaceDetail
-              entry={selectedEntry}
-              route={selectedRoute}
-              contextRoute={detailRoute}
-              parentLayout={detailParentLayout}
-              props={currentProps}
-              propTypesMap={propTypesMap}
-            />
-          </div>
-        </aside>
+            <div className="flex-1 overflow-y-auto">
+              <WorkspaceDetail
+                entry={selectedEntry}
+                route={selectedRoute}
+                contextRoute={detailRoute}
+                parentLayout={detailParentLayout}
+                props={currentProps}
+                propTypesMap={propTypesMap}
+              />
+            </div>
+          </aside>
+        ) : (
+          <aside className="border-l border-rfm-border bg-white flex flex-col items-center py-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setDetailPanelOpen(true)}
+              title="Open inspector"
+              className="h-7 w-7 flex items-center justify-center rounded-md border border-rfm-border-light bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
+            >
+              <PanelRightOpen size={14} />
+            </button>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -1,9 +1,17 @@
 import { createServer } from 'node:http';
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanAppDirectory } from './scan-app-dir.js';
+import {
+  DEFAULT_EDITOR_ID,
+  EDITOR_OPTIONS,
+  getEditorCommand,
+  getEditorLabel,
+  normalizeKnownEditorId,
+} from '../editor.js';
+import { existsSync } from 'node:fs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NextConfig = Record<string, any>;
@@ -12,19 +20,59 @@ const _require = createRequire(import.meta.url);
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
 
 // ─── 에디터 열기 ──────────────────────────────────────────────────────────────
+function buildEditorEnv(): NodeJS.ProcessEnv {
+  const extraPaths = [
+    `${process.env['HOME'] ?? ''}/.antigravity/antigravity/bin`,
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    `${process.env['HOME'] ?? ''}/.local/bin`,
+  ].join(':');
+  return { ...process.env, PATH: `${extraPaths}:${process.env['PATH'] ?? ''}` };
+}
+
+function isCommandAvailable(command: string, env: NodeJS.ProcessEnv): boolean {
+  try {
+    execSync(`command -v ${command}`, { stdio: 'ignore', env });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getEditorAvailability(editorCmd: string) {
+  const env = buildEditorEnv();
+  const projectDefaultId = normalizeKnownEditorId(editorCmd);
+
+  return {
+    defaultEditor: projectDefaultId,
+    defaultLabel: projectDefaultId ? getEditorLabel(projectDefaultId) : 'Custom',
+    editors: EDITOR_OPTIONS.map((option) => ({
+      id: option.id,
+      label: option.label,
+      available:
+        isCommandAvailable(option.command, env) ||
+        (process.platform === 'darwin' &&
+          (option.macAppPaths ?? []).some((appPath) => existsSync(appPath))),
+    })),
+  };
+}
+
+function resolveEditorCommand(editorParam: string | null, editorCmd: string): string {
+  const selected = normalizeKnownEditorId(editorParam);
+  return selected ? getEditorCommand(selected) : editorParam ?? editorCmd;
+}
+
 function openInEditor(absPath: string, line: number, editor: string): void {
   const target = `${absPath}:${line}`;
-  const vscodeFamily = ['code', 'cursor', 'antigravity', 'windsurf', 'codium', 'vscodium'];
+  const vscodeFamily = ['code', 'cursor', 'antigravity'];
   const isVscodeFamily = vscodeFamily.some(e => editor === e || editor.endsWith(`/${e}`));
 
-  const vimFamily = ['vim', 'vi', 'nvim', 'neovim'];
+  const vimFamily = ['vim', 'vi'];
   const isVimFamily = vimFamily.some(e => editor === e || editor.endsWith(`/${e}`));
 
   let cmd: string;
   if (isVscodeFamily) {
     cmd = `"${editor}" -g "${target}"`;
-  } else if (editor === 'zed') {
-    cmd = `zed "${target}"`;
   } else if (isVimFamily) {
     // TTY 없이 실행 시 .swp 파일 생성 방지: -n (no swap), +N (line jump)
     // macOS: Terminal.app에서 열어서 실제로 편집 가능하게 함
@@ -38,13 +86,7 @@ function openInEditor(absPath: string, line: number, editor: string): void {
     cmd = `"${editor}" "${absPath}"`;
   }
 
-  const extraPaths = [
-    `${process.env['HOME'] ?? ''}/.antigravity/antigravity/bin`,
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-    `${process.env['HOME'] ?? ''}/.local/bin`,
-  ].join(':');
-  const env = { ...process.env, PATH: `${extraPaths}:${process.env['PATH'] ?? ''}` };
+  const env = buildEditorEnv();
 
   exec(cmd, { env }, (err) => {
     if (err && isVscodeFamily) {
@@ -66,6 +108,7 @@ function startSidecar(port: number, root: string, editorCmd: string): void {
   _sidecarStarted = true;
 
   const server = createServer((req, res) => {
+    const pathname = req.url?.split('?')[0] ?? '';
     const qs = req.url?.split('?')[1] ?? '';
     const params = new URLSearchParams(qs);
     const file = params.get('file');
@@ -75,13 +118,18 @@ function startSidecar(port: number, root: string, editorCmd: string): void {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
 
+    if (pathname === '/__rfm-editors') {
+      res.end(JSON.stringify(getEditorAvailability(editorCmd)));
+      return;
+    }
+
     if (!file) {
       res.statusCode = 400;
       res.end(JSON.stringify({ ok: false, error: 'missing file' }));
       return;
     }
 
-    const resolvedEditor = editorParam ?? editorCmd;
+    const resolvedEditor = resolveEditorCommand(editorParam, editorCmd);
     console.log(`[react-flowmap] open: ${file} (editor: ${resolvedEditor})`);
     openInEditor(resolve(root, file), line, resolvedEditor);
     res.end(JSON.stringify({ ok: true }));
@@ -115,7 +163,7 @@ export function withFlowmap(
 ): NextConfig {
   const root = process.cwd();
   const editorCmd =
-    process.env['NEXT_EDITOR'] ?? options.editor ?? process.env['EDITOR'] ?? 'code';
+    options.editor ?? getEditorCommand(DEFAULT_EDITOR_ID);
   const port = options.sidecarPort ?? 51423;
 
   const loaderPath = _pluginDir.endsWith('/dist') || _pluginDir.includes('/dist/')

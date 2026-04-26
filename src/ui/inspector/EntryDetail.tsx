@@ -2,7 +2,7 @@ import type React from 'react';
 import { ExternalLink } from 'lucide-react';
 import type { DocEntry } from '../doc/build-doc-index';
 import type { ComponentPropTypes } from './types';
-import { getComponentPropsFromEl } from './utils';
+import { getComponentPropsFromEl, openInEditor } from './utils';
 import { PropRow } from './PropRow';
 import { MiniRelationGraph, GraphNode, GraphConnector } from './MiniRelationGraph';
 
@@ -113,10 +113,7 @@ export function EntryDetail({ entry, selectedEl, onNavigate, onHover, onHoverEnd
                 {propsDefLoc && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const params = new URLSearchParams({ file: propsDefLoc.file, line: String(propsDefLoc.line) });
-                      fetch(`/__rfm-open?${params.toString()}`).catch(() => {});
-                    }}
+                    onClick={() => openInEditor(propsDefLoc.file, '', String(propsDefLoc.line))}
                     title={`Go to Props type\n${propsDefLoc.file}:${propsDefLoc.line}`}
                     className="flex items-center text-rfm-text-300 hover:text-rfm-blue cursor-pointer border-none bg-transparent p-0 transition-all"
                   >

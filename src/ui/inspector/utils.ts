@@ -1,5 +1,11 @@
 import type { DockPosition, DomRelNode, FoundComp } from './types';
 import { SIDEBAR_W, BOTTOM_H } from './tokens';
+import {
+  EDITOR_OPTIONS,
+  EDITOR_SELECTION_STORAGE_KEY,
+  isKnownEditorId,
+  type KnownEditorId,
+} from '../../editor.js';
 
 // ─── Dock persistence ─────────────────────────────────────────────────────────
 
@@ -86,14 +92,91 @@ export function setEditorOverride(editor: string | undefined) {
   _editorOverride = editor ?? null;
 }
 
-export function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
+export type EditorSelection = 'project' | KnownEditorId;
+
+export type AvailableEditor = {
+  id: KnownEditorId;
+  label: string;
+  available: boolean;
+};
+
+export type EditorAvailability = {
+  defaultEditor: KnownEditorId | null;
+  defaultLabel: string;
+  editors: AvailableEditor[];
+};
+
+export const DEFAULT_EDITOR_AVAILABILITY: EditorAvailability = {
+  defaultEditor: 'code',
+  defaultLabel: 'VS Code',
+  editors: EDITOR_OPTIONS.map((option) => ({
+    id: option.id,
+    label: option.label,
+    available: option.id === 'code',
+  })),
+};
+
+export const EDITOR_SELECTION_EVENT = 'rfm-editor-selection-change';
+
+function getOpenBase(): string {
   // Next.js: globalThis.__rfmOpenUrl = 'http://127.0.0.1:51423' (사이드카)
   // Vite: undefined → 상대 URL로 fallback (Vite 미들웨어 처리)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const base: string = (globalThis as any).__rfmOpenUrl ?? '';
+  return (globalThis as any).__rfmOpenUrl ?? '';
+}
+
+export function getStoredEditorSelection(): KnownEditorId | null {
+  try {
+    const value = localStorage.getItem(EDITOR_SELECTION_STORAGE_KEY);
+    return isKnownEditorId(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredEditorSelection(selection: EditorSelection): void {
+  try {
+    if (selection === 'project') {
+      localStorage.removeItem(EDITOR_SELECTION_STORAGE_KEY);
+    } else {
+      localStorage.setItem(EDITOR_SELECTION_STORAGE_KEY, selection);
+    }
+  } catch {
+    // noop
+  }
+
+  window.dispatchEvent(new CustomEvent(EDITOR_SELECTION_EVENT, {
+    detail: { selection },
+  }));
+}
+
+export async function fetchEditorAvailability(): Promise<EditorAvailability> {
+  try {
+    const res = await fetch(`${getOpenBase()}/__rfm-editors`);
+    if (!res.ok) return DEFAULT_EDITOR_AVAILABILITY;
+    const data = await res.json() as EditorAvailability;
+    return {
+      defaultEditor: isKnownEditorId(data.defaultEditor)
+        ? data.defaultEditor
+        : DEFAULT_EDITOR_AVAILABILITY.defaultEditor,
+      defaultLabel: typeof data.defaultLabel === 'string'
+        ? data.defaultLabel
+        : DEFAULT_EDITOR_AVAILABILITY.defaultLabel,
+      editors: Array.isArray(data.editors) && data.editors.length > 0
+        ? data.editors.filter((editor) => isKnownEditorId(editor.id))
+        : DEFAULT_EDITOR_AVAILABILITY.editors,
+    };
+  } catch {
+    return DEFAULT_EDITOR_AVAILABILITY;
+  }
+}
+
+export function openInEditor(filePath: string, symbolId: string, loc?: string | null) {
+  const base = getOpenBase();
   const params = new URLSearchParams({ file: filePath, symbolId });
   if (loc) params.set('line', loc);
-  if (_editorOverride) params.set('editor', _editorOverride);
+  const selectedEditor = getStoredEditorSelection() ?? _editorOverride;
+  if (selectedEditor) params.set('editor', selectedEditor);
   fetch(`${base}/__rfm-open?${params.toString()}`).catch(() => {});
 }
 
