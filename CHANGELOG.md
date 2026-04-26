@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.6
+
+### Patch Changes
+
+- Mark static owner DOM inside component wrapper roots such as Next Link so server components like PostCard are observed as STATIC-DOM instead of STATIC-DECLARED.
+
 ## 1.0.0-rc.5
 
 ### Patch Changes

@@ -268,6 +268,28 @@ export const ServerWorkflow = () => <section>Workflow</section>;
     );
   });
 
+  it('falls back to host descendants when a server component returns a component wrapper', () => {
+    const code = `
+import Link from 'next/link';
+
+export function PostCard() {
+  return (
+    <Link href="/posts/hello">
+      <article>Post</article>
+    </Link>
+  );
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/components/post-card.tsx', {
+      relPath: 'src/components/post-card.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain(
+      'data-rfm-static-owner="src/components/post-card.tsx#PostCard"',
+    );
+  });
+
   it('adds static owner markers to nested server component roots in the same file', () => {
     const code = `
 export function PostCard() {

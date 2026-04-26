@@ -618,6 +618,7 @@ export function buildDebugSnapshot({
   staticJsx,
   fiberRelations,
   propTypesMap,
+  observedStaticOwnerKeys,
 }: {
   allEntries: DocEntry[];
   graphEntries: DocEntry[];
@@ -628,6 +629,7 @@ export function buildDebugSnapshot({
   staticJsx: Record<string, string[]>;
   fiberRelations: Record<string, string[]>;
   propTypesMap: PropTypesMap;
+  observedStaticOwnerKeys: string[];
 }) {
   return {
     type: "react-flowmap-debug-snapshot",
@@ -652,6 +654,7 @@ export function buildDebugSnapshot({
     graphEntries: graphEntries.map(summarizeEntry),
     staticJsx,
     fiberRelations,
+    observedStaticOwnerKeys,
     propTypeKeys: Object.keys(propTypesMap),
   };
 }
@@ -823,6 +826,7 @@ export function GraphWindow() {
         staticJsx,
         fiberRelations,
         propTypesMap,
+        observedStaticOwnerKeys,
       }),
     [
       activeRoutes,
@@ -834,6 +838,7 @@ export function GraphWindow() {
       routes,
       selectedId,
       staticJsx,
+      observedStaticOwnerKeys,
     ],
   );
 

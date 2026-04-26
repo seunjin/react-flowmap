@@ -285,6 +285,31 @@ function addStaticOwnerAttribute(node: unknown, attrName: string, ownerId: strin
   return true;
 }
 
+function markHostChildren(
+  node: unknown,
+  attrName: string,
+  ownerId: string,
+  options: MarkOwnerOptions = {},
+): boolean {
+  if (!t.isJSXElement(node)) return false;
+
+  let modified = false;
+  for (const child of (node as { children: unknown[] }).children) {
+    if (t.isJSXExpressionContainer(child)) {
+      modified = markStaticOwnerReturnValue(
+        (child as { expression: unknown }).expression,
+        attrName,
+        ownerId,
+        options,
+      ) || modified;
+    } else {
+      modified = markStaticOwnerReturnValue(child, attrName, ownerId, options) || modified;
+    }
+  }
+
+  return modified;
+}
+
 function createGraphWindowGuardScriptElement(): unknown {
   const scriptName = t.jsxIdentifier('script');
   return t.jsxElement(
@@ -358,7 +383,10 @@ function markStaticOwnerReturnValue(
     const guardModified = options.injectGraphWindowGuard
       ? ensureGraphWindowGuardOnHtml(node)
       : false;
-    return ownerModified || guardModified;
+    const childModified = ownerModified
+      ? false
+      : markHostChildren(node, attrName, ownerId, options);
+    return ownerModified || guardModified || childModified;
   }
 
   if (t.isJSXFragment(node)) {

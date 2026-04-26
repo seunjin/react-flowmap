@@ -8,7 +8,6 @@
     "@react-flowmap/babel-plugin": "0.1.0"
   },
   "changesets": [
-    "quiet-markers-align",
-    "static-screen-ownership"
+    "warm-postcard-markers"
   ]
 }

@@ -101,6 +101,7 @@ describe('graph window hybrid Next graph', () => {
       activeRoutes: [route],
       staticJsx: {},
       fiberRelations: {},
+      observedStaticOwnerKeys: [],
       propTypesMap: {
         [searchProvider.symbolId]: {
           props: {
