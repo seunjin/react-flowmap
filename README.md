@@ -29,31 +29,11 @@ It is **not** trying to replace Chrome DevTools or become a general runtime anal
 | Vite + React apps | ✅ Full | All components, including route pages in common client-side routers such as TanStack Router and React Router |
 | Next.js App Router | ⚠️ Partial | Active route/layout/page ownership plus live client runtime graph in one canvas. `SERVER` nodes show structure and static types, not live props. |
 
-## Demo Screenshots
+## Preview
 
-The repository demos intentionally render the same **Flowmap Ops** dashboard in each supported integration. The UI includes a dashboard route, a reports route, repeated metric cards, stateful filters, checklists, timeline rows, and a sync request so the inspector can be compared across frameworks without changing the scenario.
+After setup, click the Flowmap button in your app to open the workspace window. This is the main view users work with: current screen ownership on the canvas, source files on the left, and selected component details on the right.
 
-| Vite React | TanStack Router | Next.js App Router |
-|---|---|---|
-| ![Flowmap Ops Vite React demo](docs/assets/flowmap-demo-react.png) | ![Flowmap Ops TanStack Router demo](docs/assets/flowmap-demo-tanstack.png) | ![Flowmap Ops Next.js App Router demo](docs/assets/flowmap-demo-next.png) |
-
-The Next.js demo also exercises the hybrid server/client graph:
-
-![React Flowmap workspace showing the Next.js server and client graph](docs/assets/flowmap-workspace-next.png)
-
-Run the demos locally:
-
-```bash
-pnpm demo:react     # http://localhost:3001
-pnpm demo:tanstack  # http://localhost:3002
-pnpm demo:next      # http://localhost:3003
-```
-
-Regenerate the README screenshots after UI changes:
-
-```bash
-pnpm docs:screenshots
-```
+![React Flowmap workspace showing the current screen graph, source explorer, and inspector panel](docs/assets/flowmap-workspace-next.png)
 
 ## Install
 

@@ -8,29 +8,12 @@ import { chromium } from '@playwright/test';
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assetsDir = resolve(rootDir, 'docs/assets');
 
-const demos = [
-  {
-    id: 'react',
-    command: 'pnpm',
-    args: ['demo:react'],
-    url: 'http://localhost:3001',
-    screenshot: 'flowmap-demo-react.png',
-  },
-  {
-    id: 'tanstack',
-    command: 'pnpm',
-    args: ['demo:tanstack'],
-    url: 'http://localhost:3002',
-    screenshot: 'flowmap-demo-tanstack.png',
-  },
-  {
-    id: 'next',
-    command: 'pnpm',
-    args: ['demo:next'],
-    url: 'http://localhost:3003',
-    screenshot: 'flowmap-demo-next.png',
-  },
-];
+const demo = {
+  id: 'next',
+  command: 'pnpm',
+  args: ['demo:next'],
+  url: 'http://localhost:3003',
+};
 
 const ownedProcesses = [];
 let stopping = false;
@@ -116,18 +99,6 @@ async function ensureDemoRunning(demo) {
   throw new Error(`Timed out waiting for ${demo.id} at ${demo.url}`);
 }
 
-async function captureApp(browser, demo) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 980 }, deviceScaleFactor: 1 });
-  await page.addInitScript(() => {
-    localStorage.removeItem('rfm-active');
-  });
-  await page.goto(demo.url);
-  await page.getByRole('heading', { name: 'Flowmap Ops' }).waitFor();
-  await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 10_000 });
-  await page.screenshot({ path: resolve(assetsDir, demo.screenshot) });
-  await page.close();
-}
-
 async function captureWorkspace(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 980 }, deviceScaleFactor: 1 });
   await page.addInitScript(() => {
@@ -148,16 +119,10 @@ async function captureWorkspace(browser) {
 
 async function main() {
   await mkdir(assetsDir, { recursive: true });
-
-  for (const demo of demos) {
-    await ensureDemoRunning(demo);
-  }
+  await ensureDemoRunning(demo);
 
   const browser = await chromium.launch();
   try {
-    for (const demo of demos) {
-      await captureApp(browser, demo);
-    }
     await captureWorkspace(browser);
   } finally {
     await browser.close();
