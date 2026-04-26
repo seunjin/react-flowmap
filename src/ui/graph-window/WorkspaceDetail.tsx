@@ -127,6 +127,16 @@ function LivePropsNotice({ title, body }: { title: string; body: string }) {
   );
 }
 
+function ScreenHighlightNotice({ body }: { body: string }) {
+  return (
+    <Section label="Screen Highlight">
+      <p className="m-0 text-[11px] text-rfm-text-400 leading-relaxed">
+        {body}
+      </p>
+    </Section>
+  );
+}
+
 function matchesImportNode(
   node: RfmServerComponent,
   filePath: string,
@@ -340,6 +350,7 @@ function RouteDetail({
   parentLayout: RfmRoute | null;
 }) {
   const showLivePropsNotice = route.executionKind === "static";
+  const isLayoutRoute = route.type === "layout";
   const clientBoundaries = getClientBoundariesForRoute(route);
 
   return (
@@ -357,6 +368,10 @@ function RouteDetail({
           title="Runtime Data"
           body="Static route file. Live props are not available in the browser runtime."
         />
+      ) : null}
+
+      {isLayoutRoute ? (
+        <ScreenHighlightNotice body="Layout routes describe shared route context. Flowmap does not draw a single screen region for them because their DOM ownership usually spans the page shell." />
       ) : null}
 
       <StaticTypeSection

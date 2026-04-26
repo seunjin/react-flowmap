@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.13
+
+### Patch Changes
+
+- Clarify layout route highlighting behavior in the detail panel and separate ownership badge colors from selected static node backgrounds.
+
 ## 1.0.0-rc.12
 
 ### Patch Changes

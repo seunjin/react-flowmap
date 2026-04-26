@@ -45,7 +45,7 @@ function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean, isHover
   }
   if (entry.executionKind === 'static') {
     return {
-      bg: isSelected ? '#fef3c7' : isHovered ? '#fffbeb' : '#ffffff',
+      bg: isSelected ? '#fff7ed' : isHovered ? '#fffbeb' : '#ffffff',
       border: isSelected ? '#f59e0b' : isHovered ? '#fbbf24' : '#fde68a',
       text: '#92400e',
       dot: '#f59e0b',
@@ -60,6 +60,35 @@ function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean, isHover
     dot: '#3b82f6',
     badgeBg: '#eff6ff',
     badgeText: '#1d4ed8',
+  };
+}
+
+function getOwnershipBadgePalette(ownershipKind: string) {
+  if (ownershipKind === 'LIVE') {
+    return {
+      bg: '#dbeafe',
+      text: '#1d4ed8',
+      border: '#bfdbfe',
+    };
+  }
+  if (ownershipKind === 'STATIC-DOM') {
+    return {
+      bg: '#ffedd5',
+      text: '#9a3412',
+      border: '#fed7aa',
+    };
+  }
+  if (ownershipKind === 'STATIC-DECLARED') {
+    return {
+      bg: '#fef3c7',
+      text: '#92400e',
+      border: '#fde68a',
+    };
+  }
+  return {
+    bg: '#f1f5f9',
+    text: '#475569',
+    border: '#e2e8f0',
   };
 }
 
@@ -434,6 +463,7 @@ export function FullGraph({
           const ownershipBadge =
             entry.ownershipKind ??
             (entry.executionKind === 'static' ? 'STATIC-DECLARED' : 'LIVE');
+          const ownershipBadgePalette = getOwnershipBadgePalette(ownershipBadge);
           const roleBadge = formatRoleBadge(entry.role);
 
           return (
@@ -522,8 +552,9 @@ export function FullGraph({
                   fontSize: 9,
                   fontWeight: 700,
                   letterSpacing: '0.05em',
-                  color: palette.badgeText,
-                  background: palette.badgeBg,
+                  color: ownershipBadgePalette.text,
+                  background: ownershipBadgePalette.bg,
+                  border: `1px solid ${ownershipBadgePalette.border}`,
                   padding: '2px 5px',
                   borderRadius: 5,
                   flexShrink: 0,

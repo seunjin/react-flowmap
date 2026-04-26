@@ -116,6 +116,35 @@ describe('WorkspaceDetail', () => {
     expect(text).not.toContain('Syncing live props');
   });
 
+  it('explains why layout routes do not receive a single screen highlight', () => {
+    const route = makeRoute({
+      filePath: 'src/app/layout.tsx',
+      componentName: 'RootLayout',
+      type: 'layout',
+    });
+    const entry = makeEntry({
+      symbolId: 'route:src/app/layout.tsx',
+      name: 'RootLayout',
+      filePath: route.filePath,
+      executionKind: 'static',
+      graphNodeKind: 'route',
+      role: 'layout',
+      source: 'route',
+      ownershipKind: 'STATIC-DOM',
+    });
+
+    const container = renderWorkspaceDetail({
+      entry,
+      route,
+      contextRoute: route,
+    });
+    const text = container.textContent ?? '';
+
+    expect(text).toContain('Screen Highlight');
+    expect(text).toContain('Layout routes describe shared route context');
+    expect(text).toContain('does not draw a single screen region');
+  });
+
   it('shows server import nodes as static-only instead of live prop panels', () => {
     const entry = makeEntry({
       symbolId: 'symbol:src/app/_components/ServerPanel.tsx#ServerPanel',
