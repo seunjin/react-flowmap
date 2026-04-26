@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.12
+
+### Patch Changes
+
+- Use one visual style system for live and static owner overlays so hover and selected states render consistently across CSR and SSR ownership paths.
+
 ## 1.0.0-rc.11
 
 ### Patch Changes

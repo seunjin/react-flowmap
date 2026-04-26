@@ -28,6 +28,7 @@
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-outline-style: solid;
       --tw-duration: initial;
     }
   }
@@ -42,7 +43,6 @@
     --color-red-700: oklch(50.5% .213 27.518);
     --color-amber-500: oklch(76.9% .188 70.08);
     --color-amber-600: oklch(66.6% .179 58.318);
-    --color-gray-300: oklch(87.2% .01 258.338);
     --color-white: #fff;
     --spacing: .25rem;
     --font-weight-normal: 400;
@@ -135,14 +135,6 @@
 
 .z-10 {
   z-index: 10;
-}
-
-.z-9998 {
-  z-index: 9998;
-}
-
-.z-9999 {
-  z-index: 9999;
 }
 
 .z-10001 {
@@ -535,11 +527,6 @@
   border-left-width: 3.5px;
 }
 
-.border-dashed {
-  --tw-border-style: dashed;
-  border-style: dashed;
-}
-
 .border-none {
   --tw-border-style: none;
   border-style: none;
@@ -605,10 +592,6 @@
   background-color: #fafafa;
 }
 
-.bg-\[rgba\(59\,130\,246\,0\.05\)\] {
-  background-color: #3b82f60d;
-}
-
 .bg-\[rgba\(243\,244\,246\,0\.7\)\] {
   background-color: #f3f4f6b3;
 }
@@ -623,10 +606,6 @@
 
 .bg-\[rgba\(255\,255\,255\,0\.5\)\] {
   background-color: #ffffff80;
-}
-
-.bg-gray-300 {
-  background-color: var(--color-gray-300);
 }
 
 .bg-red-50 {
@@ -685,10 +664,6 @@
   padding-inline: calc(var(--spacing) * 4);
 }
 
-.px-\[7px\] {
-  padding-inline: 7px;
-}
-
 .py-0\.5 {
   padding-block: calc(var(--spacing) * .5);
 }
@@ -715,10 +690,6 @@
 
 .py-\[5px\] {
   padding-block: 5px;
-}
-
-.py-px {
-  padding-block: 1px;
 }
 
 .pt-1 {
@@ -902,6 +873,11 @@
 .shadow-\[0_8px_24px_rgba\(15\,23\,42\,0\.12\)\] {
   --tw-shadow: 0 8px 24px var(--tw-shadow-color, #0f172a1f);
   box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+.outline {
+  outline-style: var(--tw-outline-style);
+  outline-width: 1px;
 }
 
 .transition {
@@ -1169,6 +1145,12 @@
   syntax: "*";
   inherits: false;
   initial-value: 0 0 #0000;
+}
+
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
 }
 
 @property --tw-duration {

@@ -8,6 +8,6 @@
     "@react-flowmap/babel-plugin": "0.1.0"
   },
   "changesets": [
-    "trim-layout-overlays"
+    "unified-owner-overlay-visuals"
   ]
 }

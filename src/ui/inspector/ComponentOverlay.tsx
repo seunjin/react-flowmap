@@ -24,7 +24,7 @@ import {
   buildFiberRelationships,
   invalidateMountedRfmSnapshot,
 } from "./utils";
-import { HoverPreviewBox, ActiveSelectBox } from "./Overlays";
+import { HoverPreviewBox, ActiveSelectBox, OVERLAY_VISUALS } from "./Overlays";
 import { InspectButton, type FlowmapConfig } from "./InspectButton";
 import inspectorCss from "./inspector.compiled.css?raw";
 import type { MainToGraph, GraphToMain, PropTypesMap } from "./channel";
@@ -495,6 +495,7 @@ function buildOwnerOverlayBoxes(
 
 function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
   const selected = box.state === "selected";
+  const visual = selected ? OVERLAY_VISUALS.selected : OVERLAY_VISUALS.hovered;
   const floatingElRef = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<OverlayRect | null>(() => {
     const ownerRect = getOwnerVisualRect(box.ownerEl);
@@ -579,12 +580,10 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
         width,
         height,
         boxSizing: "border-box",
-        boxShadow: selected ? "0 0 0 2px #3b82f6" : "0 0 0 1.5px #64748b",
-        background: selected
-          ? "rgba(59,130,246,0.05)"
-          : "rgba(100,116,139,0.04)",
+        outline: visual.outline,
+        background: visual.background,
         pointerEvents: "none",
-        zIndex: selected ? 2147483646 : 2147483645,
+        zIndex: visual.zIndex,
       }}
     >
       <div
@@ -595,10 +594,10 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
           top: labelPosition?.top ?? top,
           left: labelPosition?.left ?? left,
           borderRadius: "4px 4px 0 0",
-          background: selected ? "#3b82f6" : "#94a3b8",
+          background: visual.labelBackground,
           color: "#ffffff",
           fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
-          fontSize: selected ? 11 : 10,
+          fontSize: visual.labelFontSize,
           fontWeight: 600,
           lineHeight: 1.6,
           padding: "1px 7px",
