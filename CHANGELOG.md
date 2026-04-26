@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.11
+
+### Patch Changes
+
+- Avoid drawing viewport-sized overlays for layout route context nodes and keep owner boxes from covering selected content edges.
+
 ## 1.0.0-rc.10
 
 ### Patch Changes

@@ -163,8 +163,6 @@ const STATIC_PREFIX = "static:";
 const ROUTE_PREFIX = "route:";
 const STATIC_OWNER_ATTRS = ["rfmStaticOwner", "rfmStatic"] as const;
 const RUNTIME_OWNER_ATTRS = ["rfmOwner"] as const;
-const OWNER_SELECTED_INSET_PX = 2;
-const OWNER_HOVERED_INSET_PX = 1.5;
 
 type OwnerOverlayState = "selected" | "hovered";
 
@@ -355,12 +353,47 @@ function staticOwnerKeyFromSymbolId(symbolId: string): string | null {
   return null;
 }
 
-function labelFromSymbolId(symbolId: string): string {
+function routeFromSymbolId(symbolId: string): RfmRoute | null {
   if (symbolId.startsWith(ROUTE_PREFIX)) {
     const filePath = symbolId.slice(ROUTE_PREFIX.length);
-    const route = getRouteManifest()?.find(
-      (item) => item.filePath === filePath,
+    return (
+      getRouteManifest()?.find((item) => item.filePath === filePath) ?? null
     );
+  }
+
+  if (symbolId.startsWith(STATIC_PREFIX)) {
+    const ownerKey = staticOwnerKeyFromSymbolId(symbolId);
+    if (!ownerKey) return null;
+    return (
+      getRouteManifest()?.find(
+        (item) => `${item.filePath}#${item.componentName}` === ownerKey,
+      ) ?? null
+    );
+  }
+
+  return null;
+}
+
+function isLayoutRouteOwner(symbolId: string): boolean {
+  const route = routeFromSymbolId(symbolId);
+  if (route?.type === "layout") return true;
+
+  if (symbolId.startsWith(ROUTE_PREFIX)) {
+    return /(^|\/)layout\.[jt]sx?$/.test(symbolId.slice(ROUTE_PREFIX.length));
+  }
+
+  if (symbolId.startsWith(STATIC_PREFIX)) {
+    const ownerKey = staticOwnerKeyFromSymbolId(symbolId);
+    const filePath = ownerKey?.split("#")[0] ?? "";
+    return /(^|\/)layout\.[jt]sx?$/.test(filePath);
+  }
+
+  return false;
+}
+
+function labelFromSymbolId(symbolId: string): string {
+  if (symbolId.startsWith(ROUTE_PREFIX)) {
+    const route = routeFromSymbolId(symbolId);
     if (route) return route.componentName;
   }
 
@@ -436,6 +469,8 @@ function buildOwnerOverlayBoxes(
   symbolId: string,
   state: OwnerOverlayState,
 ): OwnerOverlayBox[] {
+  if (isLayoutRouteOwner(symbolId)) return [];
+
   const label = labelFromSymbolId(symbolId);
   const ownerElements = findOwnerElements(symbolId);
   const fixedOrStickyOwnerElements = ownerElements.filter(hasFixedOrStickyVisual);
@@ -460,7 +495,6 @@ function buildOwnerOverlayBoxes(
 
 function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
   const selected = box.state === "selected";
-  const inset = selected ? OWNER_SELECTED_INSET_PX : OWNER_HOVERED_INSET_PX;
   const floatingElRef = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<OverlayRect | null>(() => {
     const ownerRect = getOwnerVisualRect(box.ownerEl);
@@ -526,10 +560,10 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
 
   if (!rect) return null;
 
-  const left = rect.left + inset;
-  const top = rect.top + inset;
-  const width = Math.max(0, rect.width - inset * 2);
-  const height = Math.max(0, rect.height - inset * 2);
+  const left = rect.left;
+  const top = rect.top;
+  const width = Math.max(0, rect.width);
+  const height = Math.max(0, rect.height);
 
   return (
     <div
@@ -545,7 +579,7 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
         width,
         height,
         boxSizing: "border-box",
-        border: selected ? "2px solid #3b82f6" : "1.5px solid #64748b",
+        boxShadow: selected ? "0 0 0 2px #3b82f6" : "0 0 0 1.5px #64748b",
         background: selected
           ? "rgba(59,130,246,0.05)"
           : "rgba(100,116,139,0.04)",

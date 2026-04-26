@@ -170,6 +170,18 @@ test.describe('demos/next', () => {
     expect(overlay!.backgroundColor).toBe('rgba(59, 130, 246, 0.05)');
   });
 
+  test('Next layout route nodes do not draw viewport-sized owner overlays', async ({ page }) => {
+    const rootLayoutId = 'route:src/app/layout.tsx';
+
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
+
+    await popup.locator('button[title="RootLayout"]').click();
+    await expect.poll(async () => await getOwnerOverlayState(page, rootLayoutId)).toBeNull();
+  });
+
   test('Next reports route shows nested layout and report client boundaries', async ({ page }) => {
     await page.goto(`${BASE}/reports`);
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
