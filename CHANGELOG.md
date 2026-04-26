@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.14
+
+### Patch Changes
+
+- Use fiber-derived owner regions for live client component overlays so client components with fragments, wrappers, or unstable DOM markers still receive reliable screen highlights.
+
 ## 1.0.0-rc.13
 
 ### Patch Changes

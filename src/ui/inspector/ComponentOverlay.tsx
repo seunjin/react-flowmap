@@ -170,7 +170,8 @@ type OwnerOverlayBox = {
   symbolId: string;
   state: OwnerOverlayState;
   label: string;
-  ownerEl: HTMLElement;
+  ownerEl?: HTMLElement;
+  rect?: DOMRect;
   index: number;
 };
 
@@ -469,6 +470,20 @@ function buildOwnerOverlayBoxes(
   symbolId: string,
   state: OwnerOverlayState,
 ): OwnerOverlayBox[] {
+  if (
+    !symbolId.startsWith(STATIC_PREFIX) &&
+    !symbolId.startsWith(ROUTE_PREFIX)
+  ) {
+    const label = labelFromSymbolId(symbolId);
+    return findAllInstanceRectsBySymbolId(symbolId).map((rect, index) => ({
+      symbolId,
+      state,
+      label,
+      rect,
+      index,
+    }));
+  }
+
   if (isLayoutRouteOwner(symbolId)) return [];
 
   const label = labelFromSymbolId(symbolId);
@@ -478,7 +493,7 @@ function buildOwnerOverlayBoxes(
     ? fixedOrStickyOwnerElements
     : ownerElements
   )
-    .map((el, index) => {
+    .map<OwnerOverlayBox | null>((el, index) => {
       const rect = getOwnerVisualRect(el);
       return rect
         ? {
@@ -493,21 +508,39 @@ function buildOwnerOverlayBoxes(
     .filter((box): box is OwnerOverlayBox => box !== null);
 }
 
+function canUseOwnerOverlay(symbolId: string): boolean {
+  if (
+    !symbolId.startsWith(STATIC_PREFIX) &&
+    !symbolId.startsWith(ROUTE_PREFIX)
+  ) {
+    return findAllInstanceRectsBySymbolId(symbolId).length > 0;
+  }
+  if (isLayoutRouteOwner(symbolId)) return false;
+  return findOwnerElements(symbolId).length > 0;
+}
+
 function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
   const selected = box.state === "selected";
   const visual = selected ? OVERLAY_VISUALS.selected : OVERLAY_VISUALS.hovered;
   const floatingElRef = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<OverlayRect | null>(() => {
-    const ownerRect = getOwnerVisualRect(box.ownerEl);
+    const ownerRect =
+      box.rect ?? (box.ownerEl ? getOwnerVisualRect(box.ownerEl) : null);
     return ownerRect ? rectToOverlayRect(ownerRect) : null;
   });
   const [labelPosition, setLabelPosition] =
     useState<FloatingLabelPosition | null>(null);
 
   useLayoutEffect(() => {
+    if (box.rect) {
+      setRect(rectToOverlayRect(box.rect));
+      setLabelPosition(null);
+      return;
+    }
+
     const ownerEl = box.ownerEl;
     const floatingEl = floatingElRef.current;
-    if (!floatingEl) return;
+    if (!ownerEl || !floatingEl) return;
 
     let active = true;
     const update = () => {
@@ -557,7 +590,7 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
       active = false;
       cleanup();
     };
-  }, [box.ownerEl]);
+  }, [box.ownerEl, box.rect]);
 
   if (!rect) return null;
 
@@ -885,15 +918,16 @@ export function ComponentOverlay({
         } else {
           setSelectedId(msg.symbolId);
           setRouteRect(null);
-          if (findOwnerElements(msg.symbolId).length > 0) {
-            selectedElRef.current = null;
-            ensureOwnerVisible(msg.symbolId, () => {
-              forceRender((n) => n + 1);
-            });
-          } else {
-            const el = findElBySymbolId(msg.symbolId);
-            selectedElRef.current = el;
-          }
+          const el = findElBySymbolId(msg.symbolId);
+          selectedElRef.current = el;
+          el?.scrollIntoView({
+            block: "center",
+            inline: "nearest",
+            behavior: "auto",
+          });
+          window.requestAnimationFrame(() => {
+            forceRender((n) => n + 1);
+          });
           const props = serializeProps(getPropsForSymbolId(msg.symbolId));
           ch.postMessage({
             type: "props-update",
@@ -923,14 +957,10 @@ export function ComponentOverlay({
           setHighlightTarget(null);
           setRouteHoverRect(null);
           setOwnerHoverId(msg.symbolId);
-        } else if (findOwnerElements(msg.symbolId).length > 0) {
+        } else {
           setHighlightTarget(null);
           setRouteHoverRect(null);
           setOwnerHoverId(msg.symbolId);
-        } else {
-          setHighlightTarget({ symbolId: msg.symbolId });
-          setRouteHoverRect(null);
-          setOwnerHoverId("");
         }
       } else if (msg.type === "hover-end") {
         setHighlightTarget(null);
@@ -1280,7 +1310,7 @@ export function ComponentOverlay({
     selectedRect = findUnionRectBySymbolId(selectedId);
   }
   const selectedUsesOwnerHighlight = selectedId
-    ? findOwnerElements(selectedId).length > 0
+    ? canUseOwnerOverlay(selectedId)
     : false;
   if (selectedUsesOwnerHighlight) {
     selectedRect = null;
