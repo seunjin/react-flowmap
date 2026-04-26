@@ -270,13 +270,13 @@ export const ServerWorkflow = () => <section>Workflow</section>;
 
   it('falls back to host descendants when a server component returns a component wrapper', () => {
     const code = `
-import Link from 'next/link';
+import { CardShell } from './CardShell';
 
 export function PostCard() {
   return (
-    <Link href="/posts/hello">
+    <CardShell>
       <article>Post</article>
-    </Link>
+    </CardShell>
   );
 }
 `.trim();
@@ -288,6 +288,28 @@ export function PostCard() {
     expect(result!.code).toContain(
       'data-rfm-static-owner="src/components/post-card.tsx#PostCard"',
     );
+  });
+
+  it('marks Next Link roots directly because Link forwards DOM attributes to the anchor', () => {
+    const code = `
+import Link from 'next/link';
+
+export function PostCard() {
+  return (
+    <Link href="/posts/hello">
+      <div>Thumb</div>
+      <div>Text</div>
+    </Link>
+  );
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/components/post-card.tsx', {
+      relPath: 'src/components/post-card.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain('<Link href="/posts/hello" data-rfm-static-owner="src/components/post-card.tsx#PostCard">');
+    expect(result!.code.match(/data-rfm-static-owner="src\/components\/post-card\.tsx#PostCard"/g)).toHaveLength(1);
   });
 
   it('adds static owner markers to nested server component roots in the same file', () => {

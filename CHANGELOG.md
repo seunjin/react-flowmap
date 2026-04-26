@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.7
+
+### Patch Changes
+
+- Mark Next Link static owner roots directly so card components render a single owner overlay instead of separate child boxes.
+
 ## 1.0.0-rc.6
 
 ### Patch Changes

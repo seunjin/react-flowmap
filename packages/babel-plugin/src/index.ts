@@ -275,8 +275,32 @@ function isHostJsxElement(node: unknown): boolean {
   return t.isJSXIdentifier(name) && /^[a-z]/.test((name as { name: string }).name);
 }
 
+function isOwnerForwardingJsxElement(
+  node: unknown,
+  ownerForwardingComponents: Set<string> | undefined,
+): boolean {
+  if (!t.isJSXElement(node) || !ownerForwardingComponents) return false;
+  const name = (node as { openingElement: { name: unknown } }).openingElement.name;
+  return t.isJSXIdentifier(name) && ownerForwardingComponents.has((name as { name: string }).name);
+}
+
 function addStaticOwnerAttribute(node: unknown, attrName: string, ownerId: string): boolean {
   if (!isHostJsxElement(node)) return false;
+  if (getJsxAttribute(node, attrName)) return false;
+
+  (node as { openingElement: { attributes: unknown[] } }).openingElement.attributes.push(
+    t.jsxAttribute(t.jsxIdentifier(attrName), t.stringLiteral(ownerId)),
+  );
+  return true;
+}
+
+function addOwnerForwardingAttribute(
+  node: unknown,
+  attrName: string,
+  ownerId: string,
+  ownerForwardingComponents: Set<string> | undefined,
+): boolean {
+  if (!isOwnerForwardingJsxElement(node, ownerForwardingComponents)) return false;
   if (getJsxAttribute(node, attrName)) return false;
 
   (node as { openingElement: { attributes: unknown[] } }).openingElement.attributes.push(
@@ -370,6 +394,7 @@ function ensureGraphWindowGuardOnHtml(node: unknown): boolean {
 
 type MarkOwnerOptions = {
   injectGraphWindowGuard?: boolean;
+  ownerForwardingComponents?: Set<string>;
 };
 
 function markStaticOwnerReturnValue(
@@ -379,7 +404,14 @@ function markStaticOwnerReturnValue(
   options: MarkOwnerOptions = {},
 ): boolean {
   if (t.isJSXElement(node)) {
-    const ownerModified = addStaticOwnerAttribute(node, attrName, ownerId);
+    const ownerModified =
+      addStaticOwnerAttribute(node, attrName, ownerId) ||
+      addOwnerForwardingAttribute(
+        node,
+        attrName,
+        ownerId,
+        options.ownerForwardingComponents,
+      );
     const guardModified = options.injectGraphWindowGuard
       ? ensureGraphWindowGuardOnHtml(node)
       : false;
@@ -657,6 +689,7 @@ export function transformStaticOwnerMarks(
 
   const { relPath, attributeName = DEFAULT_STATIC_OWNER_ATTR } = opts;
   const ownerLocs = new Map<string, number>();
+  const ownerForwardingComponents = new Set<string>();
 
   let ast: unknown;
   try {
@@ -672,12 +705,25 @@ export function transformStaticOwnerMarks(
   let modified = false;
 
   traverse(ast, {
+    ImportDeclaration(path: { node: { source: { value: string }; specifiers: unknown[] } }) {
+      if (path.node.source.value !== 'next/link') return;
+      for (const specifier of path.node.specifiers) {
+        if (t.isImportDefaultSpecifier(specifier) || t.isImportSpecifier(specifier)) {
+          const localName = (specifier as { local?: { name?: string } }).local?.name;
+          if (localName) ownerForwardingComponents.add(localName);
+        }
+      }
+    },
+
     FunctionDeclaration(path: { node: { id: { name: string } | null; loc?: { start: { line: number } } } }) {
       const name = path.node.id?.name;
       if (!name || !/^[A-Z]/.test(name)) return;
       const line = path.node.loc?.start.line ?? 1;
       const ownerId = `${relPath}#${name}`;
-      if (injectStaticOwnerIntoFn(path, ownerId, attributeName, { injectGraphWindowGuard: true })) {
+      if (injectStaticOwnerIntoFn(path, ownerId, attributeName, {
+        injectGraphWindowGuard: true,
+        ownerForwardingComponents,
+      })) {
         ownerLocs.set(ownerId, line);
         modified = true;
       }
@@ -704,7 +750,10 @@ export function transformStaticOwnerMarks(
       const line = path.node.loc?.start.line ?? 1;
       const ownerId = `${relPath}#${name}`;
       const initPath = path.get('init');
-      if (injectStaticOwnerIntoFn(initPath, ownerId, attributeName, { injectGraphWindowGuard: true })) {
+      if (injectStaticOwnerIntoFn(initPath, ownerId, attributeName, {
+        injectGraphWindowGuard: true,
+        ownerForwardingComponents,
+      })) {
         ownerLocs.set(ownerId, line);
         modified = true;
       }
