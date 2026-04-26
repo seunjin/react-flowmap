@@ -25,6 +25,25 @@ const DEFAULT_EXCLUDE = [
   /rfm-runtime/,
 ];
 
+const DEFAULT_STATIC_OWNER_ATTR = 'data-rfm-static-owner';
+const DEFAULT_RUNTIME_OWNER_ATTR = 'data-rfm-owner';
+const GRAPH_WINDOW_GUARD_STYLE_ATTR = 'data-rfm-graph-window-guard';
+const GRAPH_WINDOW_GUARD_SCRIPT_ATTR = 'data-rfm-graph-window-guard-script';
+const GRAPH_WINDOW_GUARD_CSS =
+  'html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f8fafc!important}' +
+  'body>:not([data-rfm-graph-root]){display:none!important}';
+const GRAPH_WINDOW_GUARD_SCRIPT = [
+  '(function(){',
+  'try{',
+  "if(new URLSearchParams(location.search).get('__rfm')!=='graph')return;",
+  `if(document.head.querySelector('style[${GRAPH_WINDOW_GUARD_STYLE_ATTR}]'))return;`,
+  "var s=document.createElement('style');",
+  `s.setAttribute('${GRAPH_WINDOW_GUARD_STYLE_ATTR}','');`,
+  `s.textContent=${JSON.stringify(GRAPH_WINDOW_GUARD_CSS)};`,
+  'document.head.appendChild(s);',
+  '}catch(_){}})();',
+].join('');
+
 // ─── JSX를 __RfmCtx.Provider로 감싸기 ────────────────────────────────────────
 function createProviderElement(child: unknown, symbolId: string): unknown {
   const memberExpr = t.jsxMemberExpression(
@@ -89,6 +108,7 @@ function injectIntoFn(fnPath: unknown, symbolId: string, _line: number, fileRef:
   fn.traverse({
     ReturnStatement(retPath: { node: { argument: unknown } }) {
       if (retPath.node.argument) {
+        markStaticOwnerReturnValue(retPath.node.argument, DEFAULT_RUNTIME_OWNER_ATTR, symbolId);
         retPath.node.argument = wrapWithProvider(retPath.node.argument, symbolId);
       }
     },
@@ -117,6 +137,22 @@ export type TransformResult = {
   staticJsxMap: Map<string, string[]>;
   /** 라우터별 정적 route manifest */
   routeManifestEntries: RouteManifestEntry[];
+};
+
+export type StaticOwnerTransformOptions = {
+  /** 프로젝트 루트 기준 상대 경로. data-rfm-static-owner 값 생성에 사용 */
+  relPath: string;
+  /** 변환 제외 패턴 */
+  exclude?: RegExp[];
+  /** 서버 렌더 DOM에 주입할 owner marker attribute */
+  attributeName?: string;
+};
+
+export type StaticOwnerTransformResult = {
+  code: string;
+  map: unknown;
+  /** static owner id → 소스 라인 번호 */
+  ownerLocs: Map<string, number>;
 };
 
 type RouteManifestEntry = {
@@ -181,6 +217,11 @@ function getJsxIdentifierName(name: unknown): string | null {
   return t.isJSXIdentifier(name) ? (name as { name: string }).name : null;
 }
 
+function getJsxElementName(node: unknown): string | null {
+  if (!t.isJSXElement(node)) return null;
+  return getJsxIdentifierName((node as { openingElement: { name: unknown } }).openingElement.name);
+}
+
 function getObjectPropertyName(key: unknown): string | null {
   if (t.isIdentifier(key)) return (key as { name: string }).name;
   if (t.isStringLiteral(key)) return (key as { value: string }).value;
@@ -226,6 +267,169 @@ function getJsxAttribute(node: unknown, attrName: string): unknown {
     && t.isJSXIdentifier((attr as { name: unknown }).name)
     && ((attr as { name: { name: string } }).name).name === attrName
   )) ?? null;
+}
+
+function isHostJsxElement(node: unknown): boolean {
+  if (!t.isJSXElement(node)) return false;
+  const name = (node as { openingElement: { name: unknown } }).openingElement.name;
+  return t.isJSXIdentifier(name) && /^[a-z]/.test((name as { name: string }).name);
+}
+
+function addStaticOwnerAttribute(node: unknown, attrName: string, ownerId: string): boolean {
+  if (!isHostJsxElement(node)) return false;
+  if (getJsxAttribute(node, attrName)) return false;
+
+  (node as { openingElement: { attributes: unknown[] } }).openingElement.attributes.push(
+    t.jsxAttribute(t.jsxIdentifier(attrName), t.stringLiteral(ownerId)),
+  );
+  return true;
+}
+
+function createGraphWindowGuardScriptElement(): unknown {
+  const scriptName = t.jsxIdentifier('script');
+  return t.jsxElement(
+    t.jsxOpeningElement(
+      scriptName,
+      [
+        t.jsxAttribute(t.jsxIdentifier(GRAPH_WINDOW_GUARD_SCRIPT_ATTR), t.stringLiteral('')),
+        t.jsxAttribute(
+          t.jsxIdentifier('dangerouslySetInnerHTML'),
+          t.jsxExpressionContainer(
+            t.objectExpression([
+              t.objectProperty(t.identifier('__html'), t.stringLiteral(GRAPH_WINDOW_GUARD_SCRIPT)),
+            ]),
+          ),
+        ),
+      ],
+      false,
+    ),
+    t.jsxClosingElement(scriptName),
+    [],
+    false,
+  );
+}
+
+function createGraphWindowGuardHeadElement(): unknown {
+  const headName = t.jsxIdentifier('head');
+  return t.jsxElement(
+    t.jsxOpeningElement(headName, [], false),
+    t.jsxClosingElement(headName),
+    [createGraphWindowGuardScriptElement()],
+    false,
+  );
+}
+
+function hasGraphWindowGuardScript(node: unknown): boolean {
+  return t.isJSXElement(node)
+    && getJsxElementName(node) === 'script'
+    && Boolean(getJsxAttribute(node, GRAPH_WINDOW_GUARD_SCRIPT_ATTR));
+}
+
+function ensureGraphWindowGuardOnHtml(node: unknown): boolean {
+  if (!t.isJSXElement(node) || getJsxElementName(node) !== 'html') return false;
+
+  const htmlNode = node as { children: unknown[] };
+  const headNode = htmlNode.children.find((child) => (
+    t.isJSXElement(child) && getJsxElementName(child) === 'head'
+  )) as { children: unknown[] } | undefined;
+
+  if (headNode) {
+    if (headNode.children.some(hasGraphWindowGuardScript)) return false;
+    headNode.children.unshift(createGraphWindowGuardScriptElement());
+    return true;
+  }
+
+  htmlNode.children.unshift(createGraphWindowGuardHeadElement());
+  return true;
+}
+
+type MarkOwnerOptions = {
+  injectGraphWindowGuard?: boolean;
+};
+
+function markStaticOwnerReturnValue(
+  node: unknown,
+  attrName: string,
+  ownerId: string,
+  options: MarkOwnerOptions = {},
+): boolean {
+  if (t.isJSXElement(node)) {
+    const ownerModified = addStaticOwnerAttribute(node, attrName, ownerId);
+    const guardModified = options.injectGraphWindowGuard
+      ? ensureGraphWindowGuardOnHtml(node)
+      : false;
+    return ownerModified || guardModified;
+  }
+
+  if (t.isJSXFragment(node)) {
+    let modified = false;
+    for (const child of (node as { children: unknown[] }).children) {
+      if (t.isJSXExpressionContainer(child)) {
+        modified = markStaticOwnerReturnValue(
+          (child as { expression: unknown }).expression,
+          attrName,
+          ownerId,
+          options,
+        ) || modified;
+      } else {
+        modified = markStaticOwnerReturnValue(child, attrName, ownerId, options) || modified;
+      }
+    }
+    return modified;
+  }
+
+  if (t.isConditionalExpression(node)) {
+    const expr = node as { consequent: unknown; alternate: unknown };
+    const consequentModified = markStaticOwnerReturnValue(expr.consequent, attrName, ownerId, options);
+    const alternateModified = markStaticOwnerReturnValue(expr.alternate, attrName, ownerId, options);
+    return consequentModified || alternateModified;
+  }
+
+  if (t.isLogicalExpression(node) && (node as { operator: string }).operator === '&&') {
+    return markStaticOwnerReturnValue((node as { right: unknown }).right, attrName, ownerId, options);
+  }
+
+  if (t.isParenthesizedExpression?.(node)) {
+    return markStaticOwnerReturnValue((node as { expression: unknown }).expression, attrName, ownerId, options);
+  }
+
+  if (t.isTSAsExpression?.(node) || t.isTSSatisfiesExpression?.(node) || t.isTSNonNullExpression?.(node)) {
+    return markStaticOwnerReturnValue((node as { expression: unknown }).expression, attrName, ownerId, options);
+  }
+
+  return false;
+}
+
+function injectStaticOwnerIntoFn(
+  fnPath: unknown,
+  ownerId: string,
+  attrName: string,
+  options: MarkOwnerOptions = {},
+): boolean {
+  const fn = fnPath as {
+    node: { type: string; body: unknown };
+    traverse: (v: unknown) => void;
+  };
+
+  if (fn.node.type === 'ArrowFunctionExpression' && !t.isBlockStatement(fn.node.body)) {
+    return markStaticOwnerReturnValue(fn.node.body, attrName, ownerId, options);
+  }
+
+  if (!t.isBlockStatement(fn.node.body)) return false;
+
+  let modified = false;
+  fn.traverse({
+    ReturnStatement(retPath: { node: { argument: unknown } }) {
+      if (retPath.node.argument) {
+        modified = markStaticOwnerReturnValue(retPath.node.argument, attrName, ownerId, options) || modified;
+      }
+    },
+    FunctionDeclaration:     { enter(p: { skip: () => void }) { p.skip(); } },
+    FunctionExpression:      { enter(p: { skip: () => void }) { p.skip(); } },
+    ArrowFunctionExpression: { enter(p: { skip: () => void }) { p.skip(); } },
+  });
+
+  return modified;
 }
 
 function readRouteComponentFromJsx(
@@ -405,6 +609,89 @@ function extractTanStackRoutes(
         : {}),
       line: route.line,
     }));
+}
+
+// ─── 서버 렌더 owner marker 변환 ─────────────────────────────────────────────
+/**
+ * 서버 컴포넌트가 반환하는 최상위 host JSX에 static owner marker를 주입합니다.
+ * React runtime context 없이 HTML data attribute만 추가하므로 Next.js Server Component에도 안전합니다.
+ */
+export function transformStaticOwnerMarks(
+  code: string,
+  fileId: string,
+  opts: StaticOwnerTransformOptions,
+): StaticOwnerTransformResult | null {
+  if (!/\.[jt]sx$/.test(fileId)) return null;
+  if (fileId.includes('node_modules')) return null;
+
+  const excludePatterns = [...DEFAULT_EXCLUDE, ...(opts.exclude ?? [])];
+  if (excludePatterns.some((re) => re.test(fileId))) return null;
+
+  const { relPath, attributeName = DEFAULT_STATIC_OWNER_ATTR } = opts;
+  const ownerLocs = new Map<string, number>();
+
+  let ast: unknown;
+  try {
+    ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['typescript', 'jsx'],
+      errorRecovery: true,
+    });
+  } catch {
+    return null;
+  }
+
+  let modified = false;
+
+  traverse(ast, {
+    FunctionDeclaration(path: { node: { id: { name: string } | null; loc?: { start: { line: number } } } }) {
+      const name = path.node.id?.name;
+      if (!name || !/^[A-Z]/.test(name)) return;
+      const line = path.node.loc?.start.line ?? 1;
+      const ownerId = `${relPath}#${name}`;
+      if (injectStaticOwnerIntoFn(path, ownerId, attributeName, { injectGraphWindowGuard: true })) {
+        ownerLocs.set(ownerId, line);
+        modified = true;
+      }
+    },
+
+    VariableDeclarator(
+      path: {
+        node: {
+          id: unknown;
+          init: { type: string } | null;
+          loc?: { start: { line: number } };
+        };
+        get: (k: string) => unknown;
+      },
+    ) {
+      if (!t.isIdentifier(path.node.id)) return;
+      const name = (path.node.id as { name: string }).name;
+      if (!/^[A-Z]/.test(name)) return;
+      const init = path.node.init;
+      if (!init || (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')) {
+        return;
+      }
+
+      const line = path.node.loc?.start.line ?? 1;
+      const ownerId = `${relPath}#${name}`;
+      const initPath = path.get('init');
+      if (injectStaticOwnerIntoFn(initPath, ownerId, attributeName, { injectGraphWindowGuard: true })) {
+        ownerLocs.set(ownerId, line);
+        modified = true;
+      }
+    },
+  });
+
+  if (!modified) return null;
+
+  const { code: newCode, map } = generate(
+    ast,
+    { sourceMaps: true, sourceFileName: fileId },
+    code,
+  ) as { code: string; map: unknown };
+
+  return { code: newCode, map, ownerLocs };
 }
 
 // ─── 핵심 변환 함수 ───────────────────────────────────────────────────────────

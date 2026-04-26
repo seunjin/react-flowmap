@@ -24,6 +24,44 @@ export type ReactFlowMapConfig = FlowmapConfig & {
 };
 
 const emptyGraph: FlowmapGraph = { nodes: [], edges: [] };
+const GRAPH_WINDOW_ROOT_ATTR = 'data-rfm-graph-root';
+
+function isGraphWindowLocation(): boolean {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('__rfm') === 'graph';
+}
+
+function installGraphWindowPageGuard(): void {
+  if (typeof document === 'undefined') return;
+
+  if (document.head.querySelector('style[data-rfm-graph-window-guard]')) return;
+
+  const style = document.createElement('style');
+  style.setAttribute('data-rfm-graph-window-guard', '');
+  style.textContent = `
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #f8fafc !important;
+}
+body > :not([${GRAPH_WINDOW_ROOT_ATTR}]) {
+  display: none !important;
+}
+`;
+  document.head.appendChild(style);
+}
+
+function uninstallGraphWindowPageGuard(): void {
+  if (typeof document === 'undefined') return;
+  document.head.querySelector('style[data-rfm-graph-window-guard]')?.remove();
+}
+
+if (isGraphWindowLocation()) {
+  installGraphWindowPageGuard();
+}
 
 export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = {}) {
   const {
@@ -36,10 +74,16 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
   useEffect(() => { setEditorOverride(config.editor); }, [config.editor]);
 
   // ?__rfm=graph 감지 — window.open()으로 열린 그래프 창 팝업인 경우
-  // SSR hydration mismatch 방지를 위해 useEffect에서 감지
+  // module-level guard가 앱 root를 먼저 숨기고, React tree는 hydration 후 graph mode로 전환한다.
   const [isGraphMode, setIsGraphMode] = useState(false);
   useEffect(() => {
-    setIsGraphMode(new URLSearchParams(window.location.search).get('__rfm') === 'graph');
+    const next = isGraphWindowLocation();
+    setIsGraphMode(next);
+    if (next) {
+      installGraphWindowPageGuard();
+    } else {
+      uninstallGraphWindowPageGuard();
+    }
   }, []);
 
   const [active, setActive] = useState(() => {
@@ -88,7 +132,10 @@ export function ReactFlowMap({ config = {} }: { config?: ReactFlowMapConfig } = 
   // 기존 라우트(/rfm-graph) 없이도 모든 프레임워크에서 동작
   if (isGraphMode) {
     return createPortal(
-      <div style={{ position: 'fixed', inset: 0, zIndex: 2147483647, background: '#ffffff' }}>
+      <div
+        data-rfm-graph-root
+        style={{ position: 'fixed', inset: 0, zIndex: 2147483647, background: '#ffffff' }}
+      >
         <GraphWindow />
       </div>,
       document.body,

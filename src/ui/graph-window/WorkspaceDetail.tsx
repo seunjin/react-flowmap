@@ -1,20 +1,26 @@
-import type React from 'react';
-import { ExternalLink } from 'lucide-react';
-import type { DocEntry } from '../doc/build-doc-index';
-import type { PropTypesMap } from '../inspector/channel';
-import { PropRow } from '../inspector/PropRow';
-import type { RfmRoute, RfmServerComponent } from '../inspector/types';
-import { openInEditor } from '../inspector/utils';
+import type React from "react";
+import { ExternalLink } from "lucide-react";
+import type { DocEntry } from "../doc/build-doc-index";
+import type { PropTypesMap } from "../inspector/channel";
+import { PropRow } from "../inspector/PropRow";
+import type { RfmRoute, RfmServerComponent } from "../inspector/types";
+import { openInEditor } from "../inspector/utils";
 
 const INTERNAL_COMPONENT_NAMES = new Set([
-  'ReactFlowMap',
-  'FlowmapProvider',
-  'ComponentOverlay',
+  "ReactFlowMap",
+  "FlowmapProvider",
+  "ComponentOverlay",
 ]);
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="px-4 py-4 border-b border-rfm-border">
+    <section className="px-4 py-3 border-b border-rfm-border">
       <span className="text-[9px] font-bold text-rfm-text-400 tracking-[0.07em] uppercase block mb-3">
         {label}
       </span>
@@ -23,50 +29,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function SelectionHeader({
-  name,
-  filePath,
-  meta,
-  onOpen,
-}: {
-  name: string;
-  filePath: string;
-  meta?: string;
-  onOpen: () => void;
-}) {
-  return (
-    <div className="px-4 py-4 border-b border-rfm-border">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-[15px] font-semibold text-rfm-text-900 truncate">{name}</h2>
-          {meta ? (
-            <p className="m-0 mt-1 text-[10px] text-rfm-text-400 truncate">{meta}</p>
-          ) : null}
-          <p className="m-0 mt-2 text-[10px] text-rfm-text-400 font-mono break-all">
-            {filePath || '—'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          title="Open in editor"
-          className="w-7 h-7 shrink-0 flex items-center justify-center rounded border border-rfm-border-light bg-transparent text-rfm-text-400 hover:text-rfm-text-700 hover:bg-rfm-bg-100 cursor-pointer transition-all"
-        >
-          <ExternalLink size={12} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function formatRole(role: DocEntry['role'] | RfmRoute['type'] | undefined): string {
-  if (!role) return 'Component';
-  if (role === 'not-found') return 'Not Found';
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
-
 function PropsSection({
-  label = 'Props',
+  label = "Props",
   props,
   symbolId,
   propTypesMap,
@@ -83,7 +47,9 @@ function PropsSection({
   return (
     <Section label={label}>
       {props === null ? (
-        <p className="m-0 text-[11px] text-rfm-text-400">Syncing live props...</p>
+        <p className="m-0 text-[11px] text-rfm-text-400">
+          Syncing live props...
+        </p>
       ) : propEntries.length === 0 ? (
         <p className="m-0 text-[11px] text-rfm-text-400">No props.</p>
       ) : (
@@ -92,7 +58,9 @@ function PropsSection({
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => openInEditor(propsDefLoc.file, '', String(propsDefLoc.line))}
+                onClick={() =>
+                  openInEditor(propsDefLoc.file, "", String(propsDefLoc.line))
+                }
                 title={`Go to Props type\n${propsDefLoc.file}:${propsDefLoc.line}`}
                 className="flex items-center gap-1 text-[10px] text-rfm-text-400 hover:text-rfm-blue cursor-pointer border-none bg-transparent p-0 transition-all"
               >
@@ -103,7 +71,12 @@ function PropsSection({
           )}
           <div className="flex flex-col gap-[5px]">
             {propEntries.map(([name, value]) => (
-              <PropRow key={name} name={name} value={value} typeEntry={compPropTypes?.props?.[name]} />
+              <PropRow
+                key={name}
+                name={name}
+                value={value}
+                typeEntry={compPropTypes?.props?.[name]}
+              />
             ))}
           </div>
         </div>
@@ -130,7 +103,13 @@ function StaticTypeSection({
       ) : (
         <div className="flex flex-col gap-[5px]">
           {propEntries.map(([name, typeEntry]) => (
-            <PropRow key={name} name={name} value={undefined} typeEntry={typeEntry} typeOnly />
+            <PropRow
+              key={name}
+              name={name}
+              value={undefined}
+              typeEntry={typeEntry}
+              typeOnly
+            />
           ))}
         </div>
       )}
@@ -138,13 +117,7 @@ function StaticTypeSection({
   );
 }
 
-function LivePropsNotice({
-  title,
-  body,
-}: {
-  title: string;
-  body: string;
-}) {
+function LivePropsNotice({ title, body }: { title: string; body: string }) {
   return (
     <Section label={title}>
       <p className="m-0 text-[11px] text-rfm-text-400 leading-relaxed">
@@ -186,12 +159,12 @@ function collectClientBoundaryNames(
   for (const child of children ?? []) {
     if (
       INTERNAL_COMPONENT_NAMES.has(child.componentName) ||
-      child.filePath.includes('react-flowmap')
+      child.filePath.includes("react-flowmap")
     ) {
       continue;
     }
 
-    if (child.nodeKind === 'client-boundary') {
+    if (child.nodeKind === "client-boundary") {
       if (!seen.has(child.componentName)) {
         seen.add(child.componentName);
         names.push(child.componentName);
@@ -247,22 +220,32 @@ function StructureSection({
   if (!hasStructure) return null;
 
   return (
-    <Section label="Structure">
+    <Section label="Screen Context">
       <div className="flex flex-col gap-3">
         {contextRoute ? (
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-rfm-text-500">Owner Route</span>
-            <span className="text-[11px] text-rfm-text-900">{contextRoute.componentName}</span>
+            <span className="text-[10px] font-medium text-rfm-text-500">
+              Owner Route
+            </span>
+            <span className="text-[11px] text-rfm-text-900">
+              {contextRoute.componentName}
+            </span>
           </div>
         ) : null}
         {parentLayout ? (
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-rfm-text-500">Parent Layout</span>
-            <span className="text-[11px] text-rfm-text-900">{parentLayout.componentName}</span>
+            <span className="text-[10px] font-medium text-rfm-text-500">
+              Parent Layout
+            </span>
+            <span className="text-[11px] text-rfm-text-900">
+              {parentLayout.componentName}
+            </span>
           </div>
         ) : null}
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium text-rfm-text-500">Client Boundaries Reached</span>
+          <span className="text-[10px] font-medium text-rfm-text-500">
+            Client Boundaries Reached
+          </span>
           {clientBoundaries.length === 0 ? (
             <span className="text-[11px] text-rfm-text-400">
               No client boundary is reachable from this server-owned node.
@@ -296,22 +279,18 @@ function ComponentDetail({
   props: Record<string, unknown> | null;
   propTypesMap: PropTypesMap;
 }) {
-  const executionLabel = entry.executionKind === 'static' ? 'SERVER' : 'CLIENT';
   const isRouteEntry =
     !!route &&
     route.filePath === entry.filePath &&
     route.componentName === entry.name;
-  const role = isRouteEntry ? route.type : entry.role;
 
   return (
     <>
-      <SelectionHeader
-        name={entry.name}
-        filePath={entry.filePath}
-        meta={`${formatRole(role)} · ${executionLabel}`}
-        onOpen={() => openInEditor(entry.filePath, entry.symbolId)}
+      <PropsSection
+        props={props}
+        symbolId={entry.symbolId}
+        propTypesMap={propTypesMap}
       />
-      <PropsSection props={props} symbolId={entry.symbolId} propTypesMap={propTypesMap} />
       {isRouteEntry ? (
         <StaticTypeSection
           label="Static Prop Types"
@@ -332,31 +311,20 @@ function StaticComponentDetail({
   contextRoute: RfmRoute | null;
   parentLayout: RfmRoute | null;
 }) {
-  const isServerNode = entry.executionKind === 'static';
-  const executionLabel = isServerNode ? 'SERVER component' : 'CLIENT boundary';
+  const isServerNode = entry.executionKind === "static";
   const noticeBody = isServerNode
-    ? 'Live props are unavailable for SERVER nodes because they are not mounted in the browser runtime. Flowmap can only show static ownership and source-derived type metadata here.'
-    : 'This node is coming from static route ownership, not from a mounted browser instance. Select the mounted CLIENT node in the graph to inspect live props.';
+    ? "Static-only node. Live props are not available in the browser runtime."
+    : "Static boundary node. Select the mounted CLIENT node to inspect live props.";
   const clientBoundaries = getClientBoundariesForEntry(entry, contextRoute);
 
   return (
     <>
-      <SelectionHeader
-        name={entry.name}
-        filePath={entry.filePath}
-        meta={executionLabel}
-        onOpen={() => openInEditor(entry.filePath, '', '1')}
-      />
-
-      <LivePropsNotice
-        title="Live Props"
-        body={noticeBody}
-      />
       <StructureSection
         contextRoute={contextRoute}
         parentLayout={parentLayout}
         clientBoundaries={clientBoundaries}
       />
+      <LivePropsNotice title="Runtime Data" body={noticeBody} />
     </>
   );
 }
@@ -368,32 +336,23 @@ function RouteDetail({
   route: RfmRoute;
   parentLayout: RfmRoute | null;
 }) {
-  const routeRole = formatRole(route.type);
-  const executionLabel = route.executionKind === 'static' ? 'SERVER' : 'CLIENT';
-  const showLivePropsNotice = route.executionKind === 'static';
+  const showLivePropsNotice = route.executionKind === "static";
   const clientBoundaries = getClientBoundariesForRoute(route);
 
   return (
     <>
-      <SelectionHeader
-        name={route.componentName}
-        filePath={route.filePath}
-        meta={`${routeRole} · ${executionLabel}`}
-        onOpen={() => openInEditor(route.filePath, '', '1')}
-      />
-
-      {showLivePropsNotice ? (
-        <LivePropsNotice
-          title="Live Props"
-          body="Live props are unavailable for SERVER route files because they do not exist as mounted component instances in the browser. Only static prop types inferred from source can be shown here."
-        />
-      ) : null}
-
       {showLivePropsNotice ? (
         <StructureSection
           contextRoute={route}
           parentLayout={parentLayout}
           clientBoundaries={clientBoundaries}
+        />
+      ) : null}
+
+      {showLivePropsNotice ? (
+        <LivePropsNotice
+          title="Runtime Data"
+          body="Static route file. Live props are not available in the browser runtime."
         />
       ) : null}
 
@@ -423,11 +382,11 @@ export function WorkspaceDetail({
 }) {
   if (!entry && !route) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center p-6">
         <p className="m-0 text-[11px] text-rfm-text-400 text-center leading-relaxed">
-          Pick a component or select a route file
+          Pick a UI component or select a route file
           <br />
-          to inspect live props or static type metadata.
+          to inspect ownership, source, and screen context.
         </p>
       </div>
     );
@@ -436,7 +395,7 @@ export function WorkspaceDetail({
   return (
     <div className="flex flex-col">
       {route ? (
-        entry && entry.executionKind === 'live' ? (
+        entry && entry.executionKind === "live" ? (
           <ComponentDetail
             entry={entry}
             route={contextRoute}
@@ -444,13 +403,10 @@ export function WorkspaceDetail({
             propTypesMap={propTypesMap}
           />
         ) : (
-          <RouteDetail
-            route={route}
-            parentLayout={parentLayout}
-          />
+          <RouteDetail route={route} parentLayout={parentLayout} />
         )
       ) : entry ? (
-        entry.source === 'static-import' ? (
+        entry.source === "static-import" ? (
           <StaticComponentDetail
             entry={entry}
             contextRoute={contextRoute}

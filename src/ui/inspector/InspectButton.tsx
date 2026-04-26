@@ -47,7 +47,7 @@ export function InspectButton({
       data-rfm-overlay
       type="button"
       onClick={onClick}
-      title="Component Inspector"
+      title="Open React Flowmap"
       className="fixed w-11 h-11 rounded-full border-none bg-rfm-blue text-white cursor-pointer flex items-center justify-center shadow-[0_2px_10px_rgba(59,130,246,0.4)] transition-all duration-180 z-10001"
       style={{
         bottom,

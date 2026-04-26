@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { transformFlowmap } from '../../packages/babel-plugin/src/index';
+import { transformFlowmap, transformStaticOwnerMarks } from '../../packages/babel-plugin/src/index';
 
 const OPTS = { relPath: 'src/app.tsx' };
 
@@ -29,6 +29,23 @@ export function App() {
     expect(result).not.toBeNull();
     expect(result!.code).toContain('__RfmCtx');
     expect(result!.code).toContain('__useRfmRecord');
+    expect(result!.code).toContain('__RfmCtx.Provider');
+  });
+
+  it('adds runtime owner markers to component host roots', () => {
+    const code = `
+export function UserCard() {
+  return <article />;
+}
+`.trim();
+    const result = transformFlowmap(code, 'src/user-card.tsx', {
+      relPath: 'src/user-card.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain(
+      'data-rfm-owner="symbol:src/user-card.tsx#UserCard"',
+    );
     expect(result!.code).toContain('__RfmCtx.Provider');
   });
 
@@ -216,5 +233,70 @@ const homeRoute = createRoute({
       exclude: [/storybook/],
     });
     expect(result).toBeNull();
+  });
+});
+
+describe('transformStaticOwnerMarks', () => {
+  it('adds a static owner marker to server component host roots without runtime imports', () => {
+    const code = `
+export function ServerOverview() {
+  return <section><h2>Overview</h2></section>;
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/app/_components/ServerOverview.tsx', {
+      relPath: 'src/app/_components/ServerOverview.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain(
+      'data-rfm-static-owner="src/app/_components/ServerOverview.tsx#ServerOverview"',
+    );
+    expect(result!.code).not.toContain('__RfmCtx');
+  });
+
+  it('adds markers to arrow function expression roots', () => {
+    const code = `
+export const ServerWorkflow = () => <section>Workflow</section>;
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/app/_components/ServerWorkflow.tsx', {
+      relPath: 'src/app/_components/ServerWorkflow.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain(
+      'data-rfm-static-owner="src/app/_components/ServerWorkflow.tsx#ServerWorkflow"',
+    );
+  });
+
+  it('does not mark component-only roots because they do not own a host DOM box', () => {
+    const code = `
+import { ClientCard } from './ClientCard';
+
+export function ServerShell() {
+  return <ClientCard />;
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/app/_components/ServerShell.tsx', {
+      relPath: 'src/app/_components/ServerShell.tsx',
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('injects an early graph window guard into root html returns', () => {
+    const code = `
+export default function RootLayout({ children }) {
+  return <html><body>{children}</body></html>;
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/app/layout.tsx', {
+      relPath: 'src/app/layout.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain('data-rfm-graph-window-guard-script');
+    expect(result!.code).toContain('data-rfm-graph-window-guard');
+    expect(result!.code).toContain("location.search).get('__rfm')!=='graph'");
+    expect(result!.code).toContain('data-rfm-static-owner="src/app/layout.tsx#RootLayout"');
   });
 });

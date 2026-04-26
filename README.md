@@ -1,10 +1,10 @@
 # react-flowmap
 
-A dev-only visual component inspector for React that helps you see how the current screen is composed.
+A dev-only screen-to-code inspector for React and Next.js apps that helps you see which components, files, and route context compose the current screen.
 
 - **Pick mode** — click any UI fragment on screen to inspect its owning component
 - **Workspace button** — open the full analysis workspace directly from the app window
-- **Component tree** — browse the mounted component / route structure with search and folder grouping
+- **Component tree** — browse the current screen's component / route structure with search and folder grouping
 - **Graph view** — explore the currently rendered screen structure inside the current route subtree
 - **Props** — inspect live prop values with TypeScript type hints and jump-to-source
 - **Unified graph** — route, server, and client ownership nodes share the same graph with `SERVER` / `CLIENT` badges
@@ -15,7 +15,9 @@ A dev-only visual component inspector for React that helps you see how the curre
 React Flowmap is built for questions like:
 
 - "What component owns this UI?"
+- "Which file should I open to change this part of the screen?"
 - "How is this screen assembled right now?"
+- "Which route or layout is this UI rendered under?"
 - "Which parts are already componentized, and which areas still look like parent-owned markup?"
 
 It is **not** trying to replace Chrome DevTools or become a general runtime analysis platform.
@@ -127,7 +129,7 @@ The current product direction is documented in [docs/product-direction.md](https
 In short:
 
 - the primary job is inspecting a selected UI fragment first
-- graph / explorer views provide broader context for the current screen
+- graph / explorer views connect the selected UI back to the current screen's component tree, files, and route context
 - requests / generic runtime metrics are intentionally not a primary user-facing goal
 
 ## Editor integration

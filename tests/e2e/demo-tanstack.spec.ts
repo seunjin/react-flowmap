@@ -29,7 +29,7 @@ test.describe('demos/tanstack', () => {
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup).toHaveURL(/__rfm=graph/);
-    await expect(popup.getByText('Flowmap Workspace')).toBeVisible();
+    await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
   });
 
   test('workspace 창이 tanstack route context를 표시한다', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('demos/tanstack', () => {
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 5000 });
 
     const popup = await openWorkspaceFromInspector(page);
-    await expect(popup.getByText(/^[1-9]\d* active routes$/)).toBeVisible();
-    await expect(popup.getByText('Route / | App > HomePage')).toBeVisible();
+    await expect(popup.locator('button[title="App"]').first()).toBeVisible();
+    await expect(popup.locator('button[title="HomePage"]').first()).toBeVisible();
   });
 });

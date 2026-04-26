@@ -3,9 +3,9 @@ import type { DocEntry } from '../doc/build-doc-index';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const NODE_W = 188;
-const NODE_H = 38;
-const LEVEL_GAP = 72;  // vertical gap between depth levels
+const NODE_W = 204;
+const NODE_H = 56;
+const LEVEL_GAP = 76;  // vertical gap between depth levels
 const NODE_GAP  = 20;  // horizontal gap between nodes in same level
 const LEVEL_STEP = NODE_H + LEVEL_GAP;
 const NODE_STEP  = NODE_W + NODE_GAP;
@@ -18,15 +18,15 @@ export const ROUTE_PREFIX = 'route:';
 function formatRoleBadge(role: LayoutNode['entry']['role']): string | null {
   if (!role || role === 'component') return null;
   return role === 'not-found'
-    ? 'NOT FOUND'
-    : role.replace('-', ' ').toUpperCase();
+    ? 'Not found'
+    : role.replace('-', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean) {
+function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean, isHovered: boolean) {
   if (entry.category === 'hook') {
     return {
-      bg: isSelected ? '#ede9fe' : '#f5f3ff',
-      border: '#c4b5fd',
+      bg: isSelected ? '#ede9fe' : isHovered ? '#f5f3ff' : '#ffffff',
+      border: isSelected ? '#8b5cf6' : isHovered ? '#a78bfa' : '#ddd6fe',
       text: '#6d28d9',
       dot: '#8b5cf6',
       badgeBg: '#ede9fe',
@@ -35,8 +35,8 @@ function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean) {
   }
   if (entry.category === 'function') {
     return {
-      bg: isSelected ? '#dcfce7' : '#f0fdf4',
-      border: '#86efac',
+      bg: isSelected ? '#dcfce7' : isHovered ? '#f0fdf4' : '#ffffff',
+      border: isSelected ? '#22c55e' : isHovered ? '#4ade80' : '#bbf7d0',
       text: '#166534',
       dot: '#22c55e',
       badgeBg: '#dcfce7',
@@ -45,8 +45,8 @@ function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean) {
   }
   if (entry.executionKind === 'static') {
     return {
-      bg: isSelected ? '#fef3c7' : '#fffbeb',
-      border: '#fbbf24',
+      bg: isSelected ? '#fef3c7' : isHovered ? '#fffbeb' : '#ffffff',
+      border: isSelected ? '#f59e0b' : isHovered ? '#fbbf24' : '#fde68a',
       text: '#92400e',
       dot: '#f59e0b',
       badgeBg: '#fef3c7',
@@ -54,8 +54,8 @@ function getNodePalette(entry: LayoutNode['entry'], isSelected: boolean) {
     };
   }
   return {
-    bg: isSelected ? '#dbeafe' : '#f8fafc',
-    border: '#93c5fd',
+    bg: isSelected ? '#dbeafe' : isHovered ? '#eff6ff' : '#ffffff',
+    border: isSelected ? '#3b82f6' : isHovered ? '#93c5fd' : '#e5e7eb',
     text: '#1e3a8a',
     dot: '#3b82f6',
     badgeBg: '#eff6ff',
@@ -273,11 +273,23 @@ function edgePath(
   return `M ${sx} ${sy} C ${sx} ${sy + cp}, ${ex} ${ey - cp}, ${ex} ${ey}`;
 }
 
+function getCenteredPan(
+  container: HTMLElement,
+  layout: Pick<Layout, 'canvasW' | 'canvasH'>,
+): { x: number; y: number } {
+  const { width, height } = container.getBoundingClientRect();
+  return {
+    x: Math.max(0, (width - layout.canvasW) / 2),
+    y: Math.max(0, (height - layout.canvasH) / 2),
+  };
+}
+
 // ─── FullGraph ────────────────────────────────────────────────────────────────
 
 export function FullGraph({
   entries,
   selectedId,
+  hoveredId,
   staticJsx,
   fiberRelations,
   onSelect,
@@ -286,6 +298,7 @@ export function FullGraph({
 }: {
   entries: DocEntry[];
   selectedId: string;
+  hoveredId: string;
   staticJsx: Record<string, string[]>;
   fiberRelations: Record<string, string[]>;
   onSelect: (symbolId: string) => void;
@@ -302,16 +315,19 @@ export function FullGraph({
   const [zoom, setZoom] = useState(1);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const initializedViewRef = useRef(false);
 
-  // 초기 pan: 캔버스를 컨테이너 중앙으로
+  // 초기 pan: 최초 graph data가 들어왔을 때만 중앙 정렬한다.
+  // 이후 graph-update/selection/hover는 사용자가 이동한 viewport를 보존한다.
   useEffect(() => {
+    if (initializedViewRef.current || layout.nodes.length === 0) return;
     const el = containerRef.current;
     if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    setPan({
-      x: Math.max(0, (width  - layout.canvasW) / 2),
-      y: Math.max(0, (height - layout.canvasH) / 2),
+    const frameId = window.requestAnimationFrame(() => {
+      setPan(getCenteredPan(el, layout));
+      initializedViewRef.current = true;
     });
+    return () => window.cancelAnimationFrame(frameId);
   }, [layout]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -347,6 +363,7 @@ export function FullGraph({
   return (
     <div
       ref={containerRef}
+      data-rfm-graph-viewport
       className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing select-none bg-[#fafafa]"
       onMouseDown={onMouseDown}
       onWheel={onWheel}
@@ -356,8 +373,9 @@ export function FullGraph({
         type="button"
         onClick={() => {
           const el = containerRef.current;
-          const { width, height } = el?.getBoundingClientRect() ?? { width: 0, height: 0 };
-          setPan({ x: Math.max(0, (width - layout.canvasW) / 2), y: Math.max(0, (height - layout.canvasH) / 2) });
+          if (el) {
+            setPan(getCenteredPan(el, layout));
+          }
           setZoom(1);
         }}
         className="absolute bottom-3 right-3 z-10 text-[10px] text-rfm-text-400 border border-rfm-border-light bg-white rounded-md px-2 py-1 hover:text-rfm-text-700 hover:border-rfm-text-300 transition-colors"
@@ -366,6 +384,7 @@ export function FullGraph({
       </button>
 
       <div
+        data-rfm-graph-canvas
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
@@ -384,7 +403,11 @@ export function FullGraph({
             const from = layout.nodes.find(n => n.entry.symbolId === edge.fromId);
             const to   = layout.nodes.find(n => n.entry.symbolId === edge.toId);
             if (!from || !to) return null;
-            const isHighlighted = edge.fromId === selectedId || edge.toId === selectedId;
+            const isHighlighted =
+              edge.fromId === selectedId ||
+              edge.toId === selectedId ||
+              edge.fromId === hoveredId ||
+              edge.toId === hoveredId;
             return (
               <path
                 key={i}
@@ -406,7 +429,8 @@ export function FullGraph({
         {/* Nodes */}
         {layout.nodes.map(({ entry, x, y }) => {
           const isSelected = entry.symbolId === selectedId;
-          const palette = getNodePalette(entry, isSelected);
+          const isHovered = entry.symbolId === hoveredId;
+          const palette = getNodePalette(entry, isSelected, isHovered);
           const executionBadge = entry.executionKind === 'static' ? 'SERVER' : 'CLIENT';
           const roleBadge = formatRoleBadge(entry.role);
 
@@ -423,54 +447,87 @@ export function FullGraph({
                 left: x, top: y,
                 width: NODE_W, height: NODE_H,
                 background: palette.bg,
-                border: `${isSelected ? 2 : 1}px solid ${isSelected ? '#3b82f6' : palette.border}`,
+                border: `${isSelected ? 2 : 1}px solid ${palette.border}`,
                 borderRadius: 8,
-                display: 'flex', alignItems: 'center',
-                padding: '0 10px',
-                gap: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                padding: '8px 10px',
+                gap: 5,
                 cursor: 'pointer',
-                boxShadow: isSelected ? '0 0 0 3px rgba(59,130,246,0.15)' : '0 1px 3px rgba(0,0,0,0.06)',
-                transition: 'border-color 80ms, box-shadow 80ms',
+                boxShadow: isSelected
+                  ? '0 0 0 3px rgba(59,130,246,0.16), 0 6px 16px rgba(15,23,42,0.08)'
+                  : isHovered
+                    ? '0 4px 12px rgba(15,23,42,0.08)'
+                    : '0 1px 3px rgba(15,23,42,0.05)',
+                transform: isHovered && !isSelected ? 'translateY(-1px)' : 'translateY(0)',
+                transition: 'border-color 100ms, box-shadow 100ms, background 100ms, transform 100ms',
               }}
             >
-              {/* category dot */}
               <span style={{
-                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: isSelected ? '#3b82f6' : palette.dot,
-              }} />
-              <span style={{
-                fontSize: 11.5, fontWeight: isSelected ? 600 : 500,
-                color: isSelected ? '#1d4ed8' : palette.text,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                flex: 1, textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                minWidth: 0,
               }}>
-                {entry.name}
-              </span>
-              {roleBadge && (
                 <span style={{
-                  fontSize: 8.5,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  background: isSelected ? '#3b82f6' : palette.dot,
+                }} />
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: isSelected ? 650 : 560,
+                  color: isSelected ? '#1d4ed8' : palette.text,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                  textAlign: 'left',
+                  minWidth: 0,
+                }}>
+                  {entry.name}
+                </span>
+              </span>
+              <span style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                paddingLeft: 13,
+                minWidth: 0,
+              }}>
+                {roleBadge && (
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 650,
+                    color: palette.badgeText,
+                    background: palette.badgeBg,
+                    padding: '2px 5px',
+                    borderRadius: 5,
+                    flexShrink: 0,
+                    maxWidth: 78,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {roleBadge}
+                  </span>
+                )}
+                <span style={{
+                  fontSize: 9,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
+                  letterSpacing: '0.05em',
                   color: palette.badgeText,
                   background: palette.badgeBg,
                   padding: '2px 5px',
-                  borderRadius: 999,
+                  borderRadius: 5,
                   flexShrink: 0,
                 }}>
-                  {roleBadge}
+                  {executionBadge}
                 </span>
-              )}
-              <span style={{
-                fontSize: 8.5,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                color: palette.badgeText,
-                background: palette.badgeBg,
-                padding: '2px 5px',
-                borderRadius: 999,
-                flexShrink: 0,
-              }}>
-                {executionBadge}
               </span>
             </button>
           );

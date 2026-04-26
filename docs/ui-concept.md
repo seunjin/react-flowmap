@@ -7,7 +7,7 @@
 핵심 목표는 다음 순서를 유지하는 것입니다.
 
 - 화면에서 UI 조각을 집는다
-- 선택한 조각의 상세를 먼저 읽는다
+- 선택한 조각의 owning component와 source file을 먼저 읽는다
 - 그 조각이 현재 화면 구조 안에서 어디에 놓여 있는지 본다
 - 필요할 때만 넓은 graph / file tree 문맥으로 확장한다
 
@@ -17,6 +17,29 @@
 - selection은 무엇을 의미하는가
 - 어떤 정보는 어디서 봐야 하는가
 - 어떤 정보는 일부러 보여주지 않는가
+
+---
+
+## Product UX Contract
+
+React Flowmap의 기본 UX는 `screen -> code -> structure` 입니다.
+
+사용자가 처음 얻어야 하는 답은 넓은 그래프가 아니라 다음 세 가지입니다.
+
+- 지금 선택한 UI 조각의 owning component
+- 그 component가 정의된 file path와 source jump
+- 현재 route/layout과 parent-child tree 안에서의 위치
+
+graph와 explorer는 이 답을 확장하는 보조 surface입니다.
+즉, graph가 제품의 시작점이 되지 않고 선택된 UI 조각을 둘러싼 구조 문맥이 됩니다.
+
+주요 사용 시나리오는 다음을 포함합니다.
+
+- 기존 프로젝트 온보딩
+- 큰 화면에서 수정해야 할 파일 찾기
+- component boundary와 분리 상태 확인
+- route/layout context 이해
+- 외부 도구나 자동화가 만든 UI 변경의 구조 확인
 
 ---
 
@@ -105,9 +128,10 @@ Next.js App Router의 route / layout context는 DOM instance가 없으므로 `ro
 React Flowmap의 기본 흐름은 "나무를 보고 숲을 본다" 입니다.
 
 1. 사용자는 화면에서 특정 UI 조각을 pick한다.
-2. inspector는 그 조각의 owning component와 props를 먼저 보여준다.
-3. graph와 explorer는 그 조각이 현재 화면 구조 안에서 어디에 놓여 있는지 보여준다.
-4. 사용자는 그 구조를 보고 컴포넌트화 경계와 추출 가능성을 판단한다.
+2. inspector는 그 조각의 owning component와 file path를 먼저 보여준다.
+3. inspector는 필요한 경우 live props와 type metadata를 보여준다.
+4. graph와 explorer는 그 조각이 현재 화면 구조 안에서 어디에 놓여 있는지 보여준다.
+5. 사용자는 그 구조를 보고 컴포넌트화 경계와 추출 가능성을 판단한다.
 
 즉, graph는 시작점이 아니라 **상세를 둘러싼 문맥 제공 장치**입니다.
 
@@ -138,7 +162,7 @@ popup workspace의 기본 레이아웃은 3패널입니다.
 - route, server, client 노드를 같은 캔버스 안에서 보여준다
 - role과 `SERVER` / `CLIENT` 배지로 node 의미를 구분한다
 
-이 패널은 "무엇과 연결되는가"에 답합니다.
+이 패널은 "현재 화면에서 무엇과 연결되는가"에 답합니다.
 
 기본 scope는 "현재 보고 있는 화면"입니다.
 즉 repo 전체 구조보다 **현재 렌더된 route subtree**를 먼저 보여줍니다.

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { SquareMousePointer, Search, X } from "lucide-react";
+import { ExternalLink, SquareMousePointer, Search, X } from "lucide-react";
 import type { DocEntry, DocRef } from "../doc/build-doc-index";
 import type {
   MainToGraph,
@@ -20,6 +20,7 @@ import {
   getEntryScreenContext,
   getRouteScreenContext,
 } from "./workspace-detail-model";
+import { openInEditor } from "../inspector/utils";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
 import type { RfmServerComponent } from "../inspector/types";
 
@@ -38,13 +39,105 @@ function selectionExists(
   return entries.some((entry) => entry.symbolId === selectedId);
 }
 
-function formatRouteBreadcrumb(
-  currentPath: string,
-  activeRoutes: RfmRoute[],
-): string {
-  if (activeRoutes.length === 0) return currentPath;
-  const chain = [...activeRoutes].reverse().map((route) => route.componentName);
-  return `${currentPath} | ${chain.join(" > ")}`;
+function formatRole(role: DocEntry["role"] | RfmRoute["type"] | undefined): string {
+  if (!role) return "Component";
+  if (role === "not-found") return "Not Found";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function SelectionSummaryContent({
+  entry,
+  route,
+  contextRoute,
+  parentLayout,
+  currentPath,
+}: {
+  entry: DocEntry | null;
+  route: RfmRoute | null;
+  contextRoute: RfmRoute | null;
+  parentLayout: RfmRoute | null;
+  currentPath: string;
+}) {
+  const name = route?.componentName ?? entry?.name ?? "";
+  const filePath = route?.filePath ?? entry?.filePath ?? "";
+  const executionKind = route?.executionKind ?? entry?.executionKind ?? "live";
+  const executionLabel = executionKind === "static" ? "SERVER" : "CLIENT";
+  const roleLabel = route
+    ? formatRole(route.type)
+    : formatRole(entry?.role ?? "component");
+  const routeLabel = contextRoute?.componentName ?? currentPath;
+  const parentLabel = parentLayout?.componentName ?? null;
+  const canOpen = filePath.length > 0;
+
+  const handleOpen = () => {
+    if (!canOpen) return;
+    if (route) {
+      openInEditor(filePath, "", "1");
+      return;
+    }
+    openInEditor(
+      filePath,
+      entry?.source === "static-import" ? "" : entry?.symbolId ?? "",
+      entry?.source === "static-import" ? "1" : null,
+    );
+  };
+
+  return (
+    <>
+      {name ? (
+        <>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] font-bold text-rfm-text-400 uppercase tracking-[0.07em] shrink-0">
+                Selected source
+              </span>
+              <span className="inline-flex items-center rounded-full bg-rfm-blue-light px-2 py-0.5 text-[10px] font-medium text-rfm-blue shrink-0">
+                {roleLabel} · {executionLabel}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center gap-2 min-w-0">
+              <span className="text-[15px] font-semibold text-rfm-text-900 truncate">
+                {name}
+              </span>
+              <span className="text-[10px] text-rfm-text-300 shrink-0">in</span>
+              <span className="text-[11px] text-rfm-text-500 font-mono truncate">
+                {filePath || "—"}
+              </span>
+            </div>
+          </div>
+          <div className="hidden md:flex flex-col items-end gap-1 min-w-0 max-w-[280px]">
+            <span className="text-[10px] text-rfm-text-400 truncate max-w-full">
+              Route {routeLabel}
+            </span>
+            {parentLabel ? (
+              <span className="text-[10px] text-rfm-text-400 truncate max-w-full">
+                Layout {parentLabel}
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={handleOpen}
+            disabled={!canOpen}
+            title={canOpen ? `Open ${filePath}` : "No source file"}
+            className="h-7 shrink-0 flex items-center gap-1.5 rounded-[6px] border border-rfm-border-light bg-transparent px-2.5 text-[11px] font-medium text-rfm-text-500 hover:bg-rfm-bg-100 hover:text-rfm-text-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+          >
+            <ExternalLink size={12} />
+            Open source
+          </button>
+        </>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-semibold text-rfm-text-900">
+            No UI selected
+          </div>
+          <div className="mt-0.5 text-[11px] text-rfm-text-400">
+            Pick an element from the app window or choose a component from Explorer.
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function filterStaticChildren(
@@ -555,13 +648,6 @@ export function GraphWindow() {
   const detailRoute = selectedRoute ?? selectedContext.route;
   const detailParentLayout =
     selectedRouteContext.parentLayout ?? selectedContext.parentLayout;
-  const routeBreadcrumb = useMemo(
-    () => formatRouteBreadcrumb(currentPath, activeRoutes),
-    [activeRoutes, currentPath],
-  );
-  const selectedLabel =
-    selectedRoute?.componentName ?? selectedEntry?.name ?? "No selection";
-
   return (
     <div
       style={{
@@ -575,8 +661,8 @@ export function GraphWindow() {
         background: "#f8fafc",
       }}
     >
-      <div className="h-10 min-h-10 flex items-center gap-2 px-3 border-b border-rfm-border bg-white shrink-0">
-        <div className="flex items-center gap-1.5 mr-1">
+      <div className="min-h-14 flex items-center gap-3 px-3 py-2 border-b border-rfm-border bg-white shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
             <circle
               cx="10"
@@ -618,21 +704,22 @@ export function GraphWindow() {
               strokeLinecap="round"
             />
           </svg>
-          <span className="text-[13px] font-bold text-rfm-text-900">
-            Flowmap Workspace
-          </span>
+          <div className="flex flex-col">
+            <span className="text-[13px] font-bold text-rfm-text-900 leading-none">
+              Flowmap
+            </span>
+          </div>
         </div>
 
-        <div className="w-px h-4 bg-rfm-border" />
-        <span className="text-[11px] text-rfm-text-400">
-          {allEntries.length} mounted symbols
-        </span>
-        {!!activeRoutes.length && (
-          <span className="text-[11px] text-rfm-text-400">
-            {activeRoutes.length} active routes
-          </span>
-        )}
-        <div className="flex-1" />
+        <div className="w-px h-8 bg-rfm-border" />
+
+        <SelectionSummaryContent
+          entry={selectedEntry}
+          route={selectedRoute}
+          contextRoute={detailRoute}
+          parentLayout={detailParentLayout}
+          currentPath={currentPath}
+        />
 
         <button
           type="button"
@@ -656,7 +743,7 @@ export function GraphWindow() {
               Explorer
             </div>
             <div className="mt-1 text-[11px] text-rfm-text-400">
-              {treeEntries.length} symbols across mounted files and routes
+              {treeEntries.length} entries in the current screen structure
             </div>
           </div>
 
@@ -713,29 +800,11 @@ export function GraphWindow() {
         </aside>
 
         <section className="min-w-0 flex-1 flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-rfm-border bg-[rgba(255,255,255,0.88)] shrink-0">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-[12px] font-semibold text-rfm-text-900">
-                  Graph
-                </div>
-                <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
-                  Route {routeBreadcrumb}
-                </div>
-                <div className="text-[11px] text-rfm-text-400 truncate">
-                  Focused on {selectedLabel}
-                </div>
-              </div>
-              <div className="text-[10px] text-rfm-text-400 uppercase tracking-[0.08em]">
-                Unified ownership view
-              </div>
-            </div>
-          </div>
-
           <div className="min-h-0 flex-1 flex">
             <FullGraph
               entries={graphEntries}
               selectedId={selectedId}
+              hoveredId={hoveredId}
               staticJsx={staticJsx}
               fiberRelations={fiberRelations}
               onSelect={handleSelect}
@@ -751,7 +820,7 @@ export function GraphWindow() {
               Inspector
             </div>
             <div className="mt-1 text-[11px] text-rfm-text-400 truncate">
-              Props and source metadata
+              Props, runtime data, and screen context
             </div>
           </div>
 
