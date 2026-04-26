@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.8
+
+### Patch Changes
+
+- Render owner selection with Flowmap overlay boxes only instead of mutating app DOM with selected/hovered outline attributes.
+
 ## 1.0.0-rc.7
 
 ### Patch Changes

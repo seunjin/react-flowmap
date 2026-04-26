@@ -11,15 +11,11 @@ async function getStaticOwnerState(page: Page, ownerId: string) {
     if (!owner) return null;
 
     const rect = owner.getBoundingClientRect();
-    const styles = getComputedStyle(owner);
     return {
       top: rect.top,
       left: rect.left,
       width: rect.width,
       height: rect.height,
-      selected: owner.hasAttribute('data-rfm-static-selected'),
-      hovered: owner.hasAttribute('data-rfm-static-hovered'),
-      outlineStyle: styles.outlineStyle,
     };
   }, ownerId);
 }
@@ -32,15 +28,11 @@ async function getRuntimeOwnerState(page: Page, symbolId: string) {
     if (!owner) return null;
 
     const rect = owner.getBoundingClientRect();
-    const styles = getComputedStyle(owner);
     return {
       top: rect.top,
       left: rect.left,
       width: rect.width,
       height: rect.height,
-      selected: owner.hasAttribute('data-rfm-static-selected'),
-      hovered: owner.hasAttribute('data-rfm-static-hovered'),
-      outlineStyle: styles.outlineStyle,
     };
   }, symbolId);
 }
@@ -58,6 +50,8 @@ async function getOwnerOverlayState(page: Page, symbolId: string, state = 'selec
     const rect = overlay.getBoundingClientRect();
     const styles = getComputedStyle(overlay);
     return {
+      top: rect.top,
+      left: rect.left,
       width: rect.width,
       height: rect.height,
       backgroundColor: styles.backgroundColor,
@@ -161,7 +155,6 @@ test.describe('demos/next', () => {
   });
 
   test('Next route nodes use rendered owner area when available', async ({ page }) => {
-    const homeOwner = 'src/app/page.tsx#DashboardPage';
     const homeRouteId = 'route:src/app/page.tsx';
 
     await page.goto(BASE);
@@ -170,7 +163,6 @@ test.describe('demos/next', () => {
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
 
     await popup.locator('button[title="DashboardPage"]').click();
-    await expect.poll(async () => (await getStaticOwnerState(page, homeOwner))?.selected ?? false).toBe(true);
     const overlay = await getOwnerOverlayState(page, homeRouteId);
     expect(overlay).not.toBeNull();
     expect(overlay!.label).toBe('DashboardPage');
@@ -224,11 +216,10 @@ test.describe('demos/next', () => {
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
 
     await popup.locator('button[title="ServerOverview"]').click();
-    await expect.poll(async () => (await getStaticOwnerState(page, overviewOwner))?.selected ?? false).toBe(true);
+    await expect.poll(async () => await getOwnerOverlayState(page, `static:${overviewOwner}`)).not.toBeNull();
     const overviewRect = await getStaticOwnerState(page, overviewOwner);
     expect(overviewRect).not.toBeNull();
     expect(overviewRect!.height).toBeGreaterThan(120);
-    expect(overviewRect!.outlineStyle).toBe('solid');
     const overviewOverlay = await getOwnerOverlayState(page, `static:${overviewOwner}`);
     expect(overviewOverlay).not.toBeNull();
     expect(overviewOverlay!.label).toBe('ServerOverview');
@@ -236,13 +227,13 @@ test.describe('demos/next', () => {
 
     await page.evaluate(() => window.scrollBy(0, 120));
     await expect.poll(async () => (await getStaticOwnerState(page, overviewOwner))?.top ?? overviewRect!.top).toBeLessThan(overviewRect!.top - 40);
+    await expect.poll(async () => (await getOwnerOverlayState(page, `static:${overviewOwner}`))?.top ?? overviewOverlay!.top).toBeLessThan(overviewOverlay!.top - 40);
 
     await popup.locator('button[title="ServerWorkflow"]').click();
-    await expect.poll(async () => (await getStaticOwnerState(page, workflowOwner))?.selected ?? false).toBe(true);
+    await expect.poll(async () => await getOwnerOverlayState(page, `static:${workflowOwner}`)).not.toBeNull();
     const workflowRect = await getStaticOwnerState(page, workflowOwner);
     expect(workflowRect).not.toBeNull();
     expect(workflowRect!.height).toBeGreaterThan(120);
-    expect(workflowRect!.outlineStyle).toBe('solid');
   });
 
   test('Next picker selects static server component DOM owners from the app screen', async ({ page }) => {
@@ -262,7 +253,7 @@ test.describe('demos/next', () => {
       ownerRect!.top + 24,
     );
 
-    await expect.poll(async () => (await getStaticOwnerState(page, overviewOwner))?.selected ?? false).toBe(true);
+    await expect.poll(async () => await getOwnerOverlayState(page, `static:${overviewOwner}`)).not.toBeNull();
     const inspector = popup.locator('aside').nth(1);
     await expect(inspector.getByText('Static DOM owner. Live props are not available')).toBeVisible();
   });
@@ -276,11 +267,10 @@ test.describe('demos/next', () => {
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
 
     await popup.locator('button[title="ClientMetricCard"]').click();
-    await expect.poll(async () => (await getRuntimeOwnerState(page, metricOwner))?.selected ?? false).toBe(true);
+    await expect.poll(async () => await getOwnerOverlayState(page, metricOwner)).not.toBeNull();
     const metricRect = await getRuntimeOwnerState(page, metricOwner);
     expect(metricRect).not.toBeNull();
     expect(metricRect!.height).toBeGreaterThan(100);
-    expect(metricRect!.outlineStyle).toBe('solid');
     const metricOverlay = await getOwnerOverlayState(page, metricOwner);
     expect(metricOverlay).not.toBeNull();
     expect(metricOverlay!.label).toBe('ClientMetricCard');

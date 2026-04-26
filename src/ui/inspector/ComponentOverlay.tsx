@@ -353,30 +353,6 @@ function ensureOwnerVisible(symbolId: string, onAfterScroll: () => void): void {
   window.requestAnimationFrame(onAfterScroll);
 }
 
-function clearStaticOwnerHighlights(): void {
-  document
-    .querySelectorAll<HTMLElement>(
-      "[data-rfm-static-selected], [data-rfm-static-hovered]",
-    )
-    .forEach((el) => {
-      delete el.dataset.rfmStaticSelected;
-      delete el.dataset.rfmStaticHovered;
-    });
-}
-
-function markStaticOwnerHighlight(
-  symbolId: string,
-  state: "selected" | "hovered",
-): void {
-  for (const el of findOwnerElements(symbolId)) {
-    if (state === "selected") {
-      el.dataset.rfmStaticSelected = "";
-    } else if (!el.dataset.rfmStaticSelected) {
-      el.dataset.rfmStaticHovered = "";
-    }
-  }
-}
-
 function isFullyInViewport(rect: DOMRect): boolean {
   return (
     rect.top >= 0 &&
@@ -656,24 +632,6 @@ export function ComponentOverlay({
     document.head.appendChild(style);
   }
 
-  function syncStaticOwnerHighlightStyles() {
-    if (document.head.querySelector("style[data-rfm-static-owner-highlight]"))
-      return;
-    const style = document.createElement("style");
-    style.setAttribute("data-rfm-static-owner-highlight", "");
-    style.textContent = `
-[data-rfm-static-selected] {
-  outline: 2px solid #3b82f6 !important;
-  outline-offset: -2px !important;
-}
-[data-rfm-static-hovered]:not([data-rfm-static-selected]) {
-  outline: 1.5px dashed #64748b !important;
-  outline-offset: -1.5px !important;
-}
-`;
-    document.head.appendChild(style);
-  }
-
   // Shadow DOM 설정 — 한 번만 실행 (페인트 전에 동기 실행)
   useLayoutEffect(() => {
     const host = document.createElement("div");
@@ -687,7 +645,6 @@ export function ComponentOverlay({
     shadowRootRef.current = shadow;
     syncShadowStyles(shadow);
     syncPropertyRules();
-    syncStaticOwnerHighlightStyles();
 
     const container = document.createElement("div");
     shadow.appendChild(container);
@@ -697,10 +654,6 @@ export function ComponentOverlay({
       host.remove();
       clearRouteSyncTimers();
       document.head.querySelector("style[data-rfm-props]")?.remove();
-      document.head
-        .querySelector("style[data-rfm-static-owner-highlight]")
-        ?.remove();
-      clearStaticOwnerHighlights();
       shadowRootRef.current = null;
       setShadowContainer(null);
     };
@@ -710,7 +663,6 @@ export function ComponentOverlay({
   useEffect(() => {
     if (shadowRootRef.current) syncShadowStyles(shadowRootRef.current);
     syncPropertyRules();
-    syncStaticOwnerHighlightStyles();
   }, [inspectorCss]);
 
   // ── BroadcastChannel (그래프 창 연동) ─────────────────────────────────────
@@ -850,20 +802,6 @@ export function ComponentOverlay({
       if (debounceId) clearTimeout(debounceId);
     };
   }, [active]);
-
-  useEffect(() => {
-    clearStaticOwnerHighlights();
-    if (!active || !graphWindowOpen) return;
-
-    if (selectedId && findOwnerElements(selectedId).length > 0) {
-      markStaticOwnerHighlight(selectedId, "selected");
-    }
-    if (ownerHoverId) {
-      markStaticOwnerHighlight(ownerHoverId, "hovered");
-    }
-
-    return clearStaticOwnerHighlights;
-  }, [active, graphWindowOpen, selectedId, ownerHoverId, domVersion]);
 
   // 그래프에 없지만 DOM에 존재하는 컴포넌트 (App 등 루트 컴포넌트)
   const allEntries = useMemo(() => {
