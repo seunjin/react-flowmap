@@ -1,5 +1,16 @@
 # react-flowmap
 
+## 0.5.0
+
+### Minor Changes
+
+- 프레임워크별 데모와 README 프리뷰를 정리했습니다.
+
+  - Vite React, TanStack Router, Next.js App Router 데모가 같은 Flowmap Ops 화면과 라우팅 흐름을 사용하도록 통일했습니다.
+  - README는 실제 Flowmap workspace 중심의 프리뷰로 정리하고, 재생성 가능한 캡처 스크립트를 추가했습니다.
+  - 그래프 워크스페이스 패널 접힘 UI와 IDE 선택 흐름을 개선했습니다.
+  - Next.js App Router 데모의 server/client graph 검증 범위를 보강했습니다.
+
 ## 0.4.0
 
 ### Minor Changes
