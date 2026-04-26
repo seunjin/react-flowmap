@@ -1,49 +1,87 @@
-'use client';
-
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
+import { Badge } from './Badge';
 
 type HeaderProps = {
-  activeRoute?: 'Home' | 'Reports';
-  repoName?: string;
+  activeRoute?: 'Dashboard' | 'Reports';
+  frameworkLabel?: string;
 };
 
-export function Header({ activeRoute = 'Home', repoName = 'react-flowmap' }: HeaderProps) {
-  const linkBase = {
-    fontSize: 13,
-    fontWeight: 600,
-    textDecoration: 'none',
-    padding: '6px 9px',
-    borderRadius: 6,
-  } satisfies React.CSSProperties;
+const linkBase: CSSProperties = {
+  minHeight: 34,
+  display: 'inline-flex',
+  alignItems: 'center',
+  borderRadius: 7,
+  padding: '0 12px',
+  fontSize: 13,
+  fontWeight: 700,
+  textDecoration: 'none',
+};
 
+export function Header({
+  activeRoute = 'Dashboard',
+  frameworkLabel = 'Next.js App Router',
+}: HeaderProps) {
   return (
-    <header style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '12px 16px' }}>
-      <div style={{ maxWidth: 1040, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
-            {repoName} — Next.js demo
-          </h1>
-          <p style={{ marginTop: 3, fontSize: 12, color: '#6b7280' }}>
-            Server ownership, client runtime boundaries, props, and route context.
-          </p>
+    <header style={{ borderBottom: '1px solid #d9e0ea', background: '#ffffff' }}>
+      <div
+        style={{
+          width: 'min(1120px, calc(100vw - 32px))',
+          minHeight: 68,
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 18,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div
+            aria-hidden="true"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              background: '#111827',
+              color: '#ffffff',
+              display: 'grid',
+              placeItems: 'center',
+              fontWeight: 800,
+              flex: '0 0 auto',
+            }}
+          >
+            R
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: 18, lineHeight: 1.2, fontWeight: 780, color: '#111827' }}>
+              Flowmap Ops
+            </h1>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#667085' }}>
+              Runtime component map demo
+            </p>
+          </div>
         </div>
-        <nav aria-label="Demo routes" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+        <nav aria-label="Demo routes" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Badge label={frameworkLabel} />
           <Link
             href="/"
             style={{
               ...linkBase,
-              background: activeRoute === 'Home' ? '#eff6ff' : 'transparent',
-              color: activeRoute === 'Home' ? '#1d4ed8' : '#4b5563',
+              border: `1px solid ${activeRoute === 'Dashboard' ? '#93bdf8' : '#d9e0ea'}`,
+              background: activeRoute === 'Dashboard' ? '#edf5ff' : '#ffffff',
+              color: activeRoute === 'Dashboard' ? '#1556b7' : '#475569',
             }}
           >
-            Home
+            Dashboard
           </Link>
           <Link
             href="/reports"
             style={{
               ...linkBase,
-              background: activeRoute === 'Reports' ? '#eff6ff' : 'transparent',
-              color: activeRoute === 'Reports' ? '#1d4ed8' : '#4b5563',
+              border: `1px solid ${activeRoute === 'Reports' ? '#93bdf8' : '#d9e0ea'}`,
+              background: activeRoute === 'Reports' ? '#edf5ff' : '#ffffff',
+              color: activeRoute === 'Reports' ? '#1556b7' : '#475569',
             }}
           >
             Reports

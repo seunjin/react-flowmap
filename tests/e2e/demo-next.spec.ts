@@ -104,11 +104,11 @@ test.describe('demos/next', () => {
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup).toHaveURL(/__rfm=graph/);
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
-    await expect(popup.getByRole('heading', { name: 'react-flowmap — Next.js demo' })).toBeHidden();
+    await expect(popup.getByRole('heading', { name: 'Flowmap Ops' })).toBeHidden();
 
     await popup.reload();
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
-    await expect(popup.getByRole('heading', { name: 'react-flowmap — Next.js demo' })).toBeHidden();
+    await expect(popup.getByRole('heading', { name: 'Flowmap Ops' })).toBeHidden();
   });
 
   test('Next workspace shows route nodes in the unified graph', async ({ page }) => {
@@ -126,11 +126,12 @@ test.describe('demos/next', () => {
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
     await expect(popup.locator('button[title="RootLayout"]')).toHaveCount(1);
-    await expect(popup.locator('button[title="HomePage"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="DashboardPage"]')).toHaveCount(1);
     await expect(popup.locator('button[title="Header"]')).toHaveCount(1);
-    await expect(popup.locator('button[title="ComponentA"]')).toHaveCount(1);
-    await expect(popup.locator('button[title="ComponentB"]')).toHaveCount(1);
-    await expect(popup.locator('button[title="Badge"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ServerOverview"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ServerWorkflow"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ClientMetricCard"]')).toHaveCount(1);
+    await expect(popup.locator('button[title="ClientFilterPanel"]')).toHaveCount(1);
   });
 
   test('Next explorer keeps imported components in their own files instead of inlining them under route files', async ({ page }) => {
@@ -140,29 +141,27 @@ test.describe('demos/next', () => {
     const explorer = popup.locator('aside').first();
     await expect(explorer.getByText('FlowmapProvider', { exact: true })).toHaveCount(0);
     await expect(explorer.getByText('Header', { exact: true })).toHaveCount(1);
-    await expect(explorer.getByText('ComponentA', { exact: true })).toHaveCount(1);
-    await expect(explorer.getByText('ComponentB', { exact: true })).toHaveCount(1);
+    await expect(explorer.getByText('ServerOverview', { exact: true })).toHaveCount(1);
+    await expect(explorer.getByText('ServerWorkflow', { exact: true })).toHaveCount(1);
   });
 
   test('Next server route detail shows parent layout and reachable client boundaries', async ({ page }) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
     const popup = await openWorkspaceFromInspector(page);
-    await popup.locator('button[title="HomePage"]').click();
+    await popup.locator('button[title="DashboardPage"]').click();
     const inspector = popup.locator('aside').nth(1);
     await expect(inspector.getByText('Parent Layout')).toBeVisible();
     await expect(inspector.getByText('RootLayout')).toBeVisible();
     await expect(inspector.getByText('Client Boundaries Reached')).toBeVisible();
-    await expect(inspector.getByText('Header')).toBeVisible();
-    await expect(inspector.getByText('ComponentA')).toBeVisible();
-    await expect(inspector.getByText('ComponentB')).toBeVisible();
     await expect(inspector.getByText('ClientMetricCard')).toBeVisible();
     await expect(inspector.getByText('ClientFilterPanel')).toBeVisible();
     await expect(inspector.getByText('ClientInspectorChecklist')).toBeVisible();
+    await expect(inspector.getByText('ClientSyncButton')).toBeVisible();
   });
 
   test('Next route nodes use rendered owner area when available', async ({ page }) => {
-    const homeOwner = 'src/app/page.tsx#HomePage';
+    const homeOwner = 'src/app/page.tsx#DashboardPage';
     const homeRouteId = 'route:src/app/page.tsx';
 
     await page.goto(BASE);
@@ -170,11 +169,11 @@ test.describe('demos/next', () => {
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
 
-    await popup.locator('button[title="HomePage"]').click();
+    await popup.locator('button[title="DashboardPage"]').click();
     await expect.poll(async () => (await getStaticOwnerState(page, homeOwner))?.selected ?? false).toBe(true);
     const overlay = await getOwnerOverlayState(page, homeRouteId);
     expect(overlay).not.toBeNull();
-    expect(overlay!.label).toBe('HomePage');
+    expect(overlay!.label).toBe('DashboardPage');
     expect(overlay!.height).toBeGreaterThan(200);
     expect(overlay!.backgroundColor).toBe('rgba(59, 130, 246, 0.05)');
   });
@@ -209,9 +208,9 @@ test.describe('demos/next', () => {
     await expect(popup.locator('button[title="ReportsPage"]')).toBeVisible();
     await expect(popup.locator('button[title="ClientTimeline"]')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Home' }).click();
+    await page.getByRole('link', { name: 'Dashboard' }).click();
     await expect(page).toHaveURL(BASE);
-    await expect(popup.locator('button[title="HomePage"]')).toBeVisible();
+    await expect(popup.locator('button[title="DashboardPage"]')).toBeVisible();
     await expect(popup.locator('button[title="ServerOverview"]')).toBeVisible();
   });
 

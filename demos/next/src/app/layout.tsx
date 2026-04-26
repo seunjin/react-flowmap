@@ -3,7 +3,7 @@ import { FlowmapProvider } from '@/components/FlowmapProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'react-flowmap — Next.js demo',
+  title: 'react-flowmap demo',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

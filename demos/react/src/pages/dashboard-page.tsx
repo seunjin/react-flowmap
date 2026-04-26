@@ -2,14 +2,14 @@ import {
   checklistItems,
   demoMetrics,
   inspectionSegments,
-} from '@/shared/demo-data';
-import { DashboardOverview, RuntimeWorkflow } from '@/shared/demo-ui';
+} from '../shared/demo-data';
+import { DashboardOverview, RuntimeWorkflow } from '../widgets/demo-ui';
 
 export function DashboardPage() {
   return (
     <div style={{ display: 'grid', gap: 30 }}>
       <DashboardOverview
-        frameworkLabel="TanStack Router"
+        frameworkLabel="Vite React"
         metrics={demoMetrics}
         segments={inspectionSegments}
       />

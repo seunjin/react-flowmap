@@ -1,4 +1,3 @@
-/* global require, module, __dirname, process */
 /* eslint-disable @typescript-eslint/no-require-imports */
 'use strict';
 

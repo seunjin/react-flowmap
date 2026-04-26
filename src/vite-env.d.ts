@@ -9,4 +9,4 @@ declare module '*.css?raw' {
 }
 
 type RfmTypeFieldEntry = { type: string; optional: boolean; resolvedType?: string; fields?: Record<string, RfmTypeFieldEntry> };
-declare var __rfmPropTypes: Record<string, Record<string, RfmTypeFieldEntry>> | undefined;
+declare const __rfmPropTypes: Record<string, Record<string, RfmTypeFieldEntry>> | undefined;

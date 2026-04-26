@@ -39,6 +39,7 @@
   },
   "files": [
     "dist",
+    "docs/assets",
     "README.md"
   ],
   "engines": {
@@ -62,6 +63,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "docs:screenshots": "node scripts/capture-demo-screenshots.mjs",
     "changeset": "changeset",
     "release:version": "changeset version",
     "release:publish": "pnpm build && changeset publish"

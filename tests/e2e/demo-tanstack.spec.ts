@@ -38,6 +38,19 @@ test.describe('demos/tanstack', () => {
 
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.locator('button[title="App"]').first()).toBeVisible();
-    await expect(popup.locator('button[title="HomePage"]').first()).toBeVisible();
+    await expect(popup.locator('button[title="DashboardPage"]').first()).toBeVisible();
+  });
+
+  test('tanstack router 라우팅으로 dashboard와 reports 사이를 이동한다', async ({ page }) => {
+    await page.goto(BASE);
+    const nav = page.getByRole('navigation', { name: 'Demo routes' });
+
+    await nav.getByRole('button', { name: 'Reports' }).click();
+    await expect(page).toHaveURL(/\/reports$/);
+    await expect(page.getByText('Weekly component report')).toBeVisible();
+
+    await nav.getByRole('button', { name: 'Dashboard' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText('Release monitor for component relationships')).toBeVisible();
   });
 });

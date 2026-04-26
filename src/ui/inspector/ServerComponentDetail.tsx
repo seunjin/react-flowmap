@@ -1,6 +1,5 @@
 import type { RfmNextRoute, RfmNextServerComponent } from './types';
 import { openInEditor } from './utils';
-import { DetailSection } from './EntryDetail';
 import { GraphNode, GraphConnector } from './MiniRelationGraph';
 import { PropRow } from './PropRow';
 

@@ -18,6 +18,5 @@ export function __useRfmRecord(parent: string, self: string, file: string): void
     if (recorded.current) return;
     recorded.current = true;
     __rfmSession.recordRender(parent, self, file);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

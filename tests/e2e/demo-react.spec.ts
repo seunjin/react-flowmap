@@ -44,11 +44,11 @@ test.describe('demos/react', () => {
 
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.locator('button[title="App"]').first()).toBeVisible();
-    await expect(popup.locator('button[title="HomePage"]').first()).toBeVisible();
+    await expect(popup.locator('button[title="DashboardPage"]').first()).toBeVisible();
     await popup.reload();
     await popup.waitForLoadState('domcontentloaded');
     await expect(popup.locator('button[title="App"]').first()).toBeVisible();
-    await expect(popup.locator('button[title="HomePage"]').first()).toBeVisible();
+    await expect(popup.locator('button[title="DashboardPage"]').first()).toBeVisible();
   });
 
   test('workspace 창이 react-router route context를 표시한다', async ({ page }) => {
@@ -57,7 +57,7 @@ test.describe('demos/react', () => {
 
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.locator('button[title="App"]').first()).toBeVisible();
-    await expect(popup.locator('button[title="HomePage"]').first()).toBeVisible();
+    await expect(popup.locator('button[title="DashboardPage"]').first()).toBeVisible();
     await expect(popup.locator('button[title*=" - /"]')).toHaveCount(0);
   });
 
@@ -67,19 +67,20 @@ test.describe('demos/react', () => {
 
     const popup = await openWorkspaceFromInspector(page);
     await expect(popup.locator('button[title="App"]').first()).not.toContainText('PAGE');
-    await popup.locator('button[title="HomePage"]').first().click();
+    await popup.locator('button[title="DashboardPage"]').first().click();
     await expect(popup.locator('button[title*=" - /"]')).toHaveCount(0);
   });
 
-  test('react-router-dom 라우팅으로 상품 상세와 목록 사이를 이동한다', async ({ page }) => {
+  test('react-router-dom 라우팅으로 dashboard와 reports 사이를 이동한다', async ({ page }) => {
     await page.goto(BASE);
+    const nav = page.getByRole('navigation', { name: 'Demo routes' });
 
-    await page.getByRole('button', { name: /무선 노이즈캔슬링 헤드폰/i }).click();
-    await expect(page).toHaveURL(/\/product\/1$/);
-    await expect(page.getByRole('button', { name: /목록으로/i })).toBeVisible();
+    await nav.getByRole('button', { name: 'Reports' }).click();
+    await expect(page).toHaveURL(/\/reports$/);
+    await expect(page.getByText('Weekly component report')).toBeVisible();
 
-    await page.getByRole('button', { name: /목록으로/i }).click();
+    await nav.getByRole('button', { name: 'Dashboard' }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText('오늘의 추천 상품')).toBeVisible();
+    await expect(page.getByText('Release monitor for component relationships')).toBeVisible();
   });
 });
