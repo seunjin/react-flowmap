@@ -1,6 +1,6 @@
 {
   "name": "react-flowmap",
-  "version": "1.0.0-rc.8",
+  "version": "1.0.0-rc.9",
   "type": "module",
   "description": "Runtime component inspector for Vite React apps and Next.js App Router.",
   "license": "MIT",
@@ -84,6 +84,7 @@
     "@babel/parser": ">=7",
     "@babel/traverse": ">=7",
     "@babel/types": ">=7",
+    "@floating-ui/dom": "^1.7.6",
     "lucide-react": "^0.577.0",
     "ts-morph": "^27.0.2"
   },

@@ -1,5 +1,11 @@
 # react-flowmap
 
+## 1.0.0-rc.9
+
+### Patch Changes
+
+- Render owner selection boxes and labels through a floating overlay layer that tracks DOM owners during scroll, resize, layout shifts, and fixed or sticky positioning.
+
 ## 1.0.0-rc.8
 
 ### Patch Changes

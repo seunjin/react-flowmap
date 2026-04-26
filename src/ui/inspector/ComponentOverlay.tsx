@@ -1,5 +1,13 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+  type VirtualElement,
+} from "@floating-ui/dom";
 import type { FlowmapGraph } from "../../core/types/graph.js";
 import { buildDocIndex, type DocEntry } from "../doc/build-doc-index";
 import type { FoundComp, RfmRoute } from "./types";
@@ -164,9 +172,39 @@ type OwnerOverlayBox = {
   symbolId: string;
   state: OwnerOverlayState;
   label: string;
-  rect: DOMRect;
+  ownerEl: HTMLElement;
   index: number;
 };
+
+type OverlayRect = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+type FloatingLabelPosition = {
+  top: number;
+  left: number;
+};
+
+function rectToOverlayRect(rect: DOMRect): OverlayRect {
+  return {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function overlayRectChanged(a: OverlayRect, b: OverlayRect): boolean {
+  return (
+    Math.abs(a.top - b.top) > 0.5 ||
+    Math.abs(a.left - b.left) > 0.5 ||
+    Math.abs(a.width - b.width) > 0.5 ||
+    Math.abs(a.height - b.height) > 0.5
+  );
+}
 
 function unionVisibleRects(rects: DOMRect[]): DOMRect | null {
   const visibleRects = rects.filter(isVisible);
@@ -375,7 +413,7 @@ function buildOwnerOverlayBoxes(
             symbolId,
             state,
             label,
-            rect,
+            ownerEl: el,
             index,
           }
         : null;
@@ -386,11 +424,74 @@ function buildOwnerOverlayBoxes(
 function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
   const selected = box.state === "selected";
   const inset = selected ? OWNER_SELECTED_INSET_PX : OWNER_HOVERED_INSET_PX;
-  const labelAbove = box.rect.top > 22 + inset;
-  const left = box.rect.left + inset;
-  const top = box.rect.top + inset;
-  const width = Math.max(0, box.rect.width - inset * 2);
-  const height = Math.max(0, box.rect.height - inset * 2);
+  const floatingElRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<OverlayRect | null>(() => {
+    const ownerRect = getOwnerVisualRect(box.ownerEl);
+    return ownerRect ? rectToOverlayRect(ownerRect) : null;
+  });
+  const [labelPosition, setLabelPosition] =
+    useState<FloatingLabelPosition | null>(null);
+
+  useLayoutEffect(() => {
+    const ownerEl = box.ownerEl;
+    const floatingEl = floatingElRef.current;
+    if (!floatingEl) return;
+
+    let active = true;
+    const update = () => {
+      if (!active || !ownerEl.isConnected) return;
+      const nextRect = getOwnerVisualRect(ownerEl);
+      if (!nextRect) {
+        setRect(null);
+        setLabelPosition(null);
+        return;
+      }
+
+      const nextOverlayRect = rectToOverlayRect(nextRect);
+      setRect((current) =>
+        current && !overlayRectChanged(current, nextOverlayRect)
+          ? current
+          : nextOverlayRect,
+      );
+
+      const virtualOwner: VirtualElement = {
+        getBoundingClientRect: () => nextRect,
+      };
+      void computePosition(virtualOwner, floatingEl, {
+        placement: "top-start",
+        strategy: "fixed",
+        middleware: [offset(0), flip(), shift({ padding: 4 })],
+      }).then(({ x, y }) => {
+        if (!active) return;
+        setLabelPosition((current) =>
+          current &&
+          Math.abs(current.left - x) <= 0.5 &&
+          Math.abs(current.top - y) <= 0.5
+            ? current
+            : { left: x, top: y },
+        );
+      });
+    };
+
+    update();
+    const cleanup = autoUpdate(ownerEl, floatingEl, update, {
+      ancestorResize: true,
+      ancestorScroll: true,
+      elementResize: true,
+      layoutShift: true,
+    });
+    return () => {
+      active = false;
+      cleanup();
+    };
+  }, [box.ownerEl]);
+
+  if (!rect) return null;
+
+  const left = rect.left + inset;
+  const top = rect.top + inset;
+  const width = Math.max(0, rect.width - inset * 2);
+  const height = Math.max(0, rect.height - inset * 2);
 
   return (
     <div
@@ -406,6 +507,7 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
         width,
         height,
         boxSizing: "border-box",
+        border: selected ? "2px solid #3b82f6" : "1.5px solid #64748b",
         background: selected
           ? "rgba(59,130,246,0.05)"
           : "rgba(100,116,139,0.04)",
@@ -415,12 +517,12 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
     >
       <div
         data-rfm-owner-overlay-label
+        ref={floatingElRef}
         style={{
-          position: "absolute",
-          top: labelAbove ? 0 : 3,
-          left: labelAbove ? 0 : 3,
-          transform: labelAbove ? "translateY(-100%)" : undefined,
-          borderRadius: labelAbove ? "4px 4px 0 0" : 4,
+          position: "fixed",
+          top: labelPosition?.top ?? top,
+          left: labelPosition?.left ?? left,
+          borderRadius: "4px 4px 0 0",
           background: selected ? "#3b82f6" : "#94a3b8",
           color: "#ffffff",
           fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',

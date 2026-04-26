@@ -20,6 +20,9 @@ importers:
       '@babel/types':
         specifier: '>=7'
         version: 7.29.0
+      '@floating-ui/dom':
+        specifier: ^1.7.6
+        version: 1.7.6
       lucide-react:
         specifier: ^0.577.0
         version: 0.577.0(react@19.1.1)
