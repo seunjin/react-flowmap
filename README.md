@@ -91,6 +91,8 @@ In the inspector:
 
 The provider alone cannot recover SSR/RSC source ownership. Server Components do not leave live React component instances in the browser, so `<ReactFlowMap />` can only inspect live client boundaries by itself. `withFlowmap()` adds the dev-only build transform that injects static DOM owner markers and the route manifest used for source ownership. Regular production builds do not include those markers or the runtime inspector.
 
+Flowmap does **not** require adding a Next.js API route. Source jump/editor open is handled by the dev-only sidecar started from `withFlowmap()`.
+
 **1. Wrap your Next.js config** (`next.config.ts`):
 
 ```ts
