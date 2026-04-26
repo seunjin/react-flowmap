@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ExternalLink,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   Search,
@@ -491,6 +493,7 @@ export function GraphWindow() {
   const [picking, setPicking] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredId, setHoveredId] = useState("");
+  const [explorerPanelOpen, setExplorerPanelOpen] = useState(true);
   const [detailPanelOpen, setDetailPanelOpen] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const selectedIdRef = useRef("");
@@ -773,64 +776,87 @@ export function GraphWindow() {
         <EditorSelect />
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-[320px] border-r border-rfm-border bg-white flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-rfm-border shrink-0">
-            <div className="text-[12px] font-semibold text-rfm-text-900">
-              Explorer
+      <div className="relative flex flex-1 overflow-hidden">
+        {explorerPanelOpen ? (
+          <aside className="w-[320px] border-r border-rfm-border bg-white flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-rfm-border shrink-0 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[12px] font-semibold text-rfm-text-900">
+                  Explorer
+                </div>
+                <div className="mt-1 text-[11px] text-rfm-text-400">
+                  {treeEntries.length} entries in the current screen structure
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExplorerPanelOpen(false)}
+                title="Collapse explorer"
+                className="h-7 w-7 shrink-0 flex items-center justify-center rounded-md border border-rfm-border-light bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
+              >
+                <PanelLeftClose size={14} />
+              </button>
             </div>
-            <div className="mt-1 text-[11px] text-rfm-text-400">
-              {treeEntries.length} entries in the current screen structure
-            </div>
-          </div>
 
-          <div className="px-3 py-2.5 border-b border-rfm-border shrink-0">
-            <div className="relative">
-              <Search
-                size={12}
-                className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-rfm-text-400"
-              />
-              <input
-                type="text"
-                placeholder="Search name or file..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full box-border rounded-md border border-rfm-border-light bg-[rgba(249,250,251,0.7)] text-[11px] text-rfm-text-900 outline-none font-[inherit] focus:border-rfm-text-400 focus:bg-white"
-                style={{ height: 28, paddingLeft: 28, paddingRight: 24 }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-none bg-rfm-text-300 text-white cursor-pointer flex items-center justify-center p-0"
-                >
-                  <X size={10} />
-                </button>
-              )}
+            <div className="px-3 py-2.5 border-b border-rfm-border shrink-0">
+              <div className="relative">
+                <Search
+                  size={12}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-rfm-text-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search name or file..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="w-full box-border rounded-md border border-rfm-border-light bg-[rgba(249,250,251,0.7)] text-[11px] text-rfm-text-900 outline-none font-[inherit] focus:border-rfm-text-400 focus:bg-white"
+                  style={{ height: 28, paddingLeft: 28, paddingRight: 24 }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-none bg-rfm-text-300 text-white cursor-pointer flex items-center justify-center p-0"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto pt-1 pb-4">
-            <UnifiedTreeView
-              tree={unifiedTree}
-              selectedId={selectedId}
-              focusedSymbolId=""
-              hoveredIds={hoveredIds}
-              treeHoveredId={hoveredId}
-              selectedRouteFilePath={selectedRoute?.filePath ?? ""}
-              showDetailButton={false}
-              onSelect={handleSelect}
-              onDetail={() => {}}
-              onActivateRoute={(route) => handleSelectRoute(route)}
-              onSelectRoute={(route) => handleSelectRoute(route)}
-              onHoverRoute={handleHoverRoute}
-              onHoverRouteEnd={handleHoverEnd}
-              onHover={handleHover}
-              onHoverEnd={handleHoverEnd}
-              selectedRef={selectedTreeRef}
-            />
+            <div className="flex-1 overflow-y-auto pt-1 pb-4">
+              <UnifiedTreeView
+                tree={unifiedTree}
+                selectedId={selectedId}
+                focusedSymbolId=""
+                hoveredIds={hoveredIds}
+                treeHoveredId={hoveredId}
+                selectedRouteFilePath={selectedRoute?.filePath ?? ""}
+                showDetailButton={false}
+                onSelect={handleSelect}
+                onDetail={() => {}}
+                onActivateRoute={(route) => handleSelectRoute(route)}
+                onSelectRoute={(route) => handleSelectRoute(route)}
+                onHoverRoute={handleHoverRoute}
+                onHoverRouteEnd={handleHoverEnd}
+                onHover={handleHover}
+                onHoverEnd={handleHoverEnd}
+                selectedRef={selectedTreeRef}
+              />
+            </div>
+          </aside>
+        ) : (
+          <div className="absolute left-4 top-3 z-10">
+            <button
+              type="button"
+              onClick={() => setExplorerPanelOpen(true)}
+              title="Open explorer"
+              className="h-7 w-7 flex items-center justify-center rounded-md border border-rfm-border-light bg-white text-rfm-text-400 shadow-[0_8px_24px_rgba(15,23,42,0.12)] hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
+            >
+              <PanelLeftOpen size={14} />
+            </button>
           </div>
-        </aside>
+        )}
 
         <section className="min-w-0 flex-1 flex flex-col overflow-hidden">
           <div className="min-h-0 flex-1 flex">
@@ -880,16 +906,16 @@ export function GraphWindow() {
             </div>
           </aside>
         ) : (
-          <aside className="border-l border-rfm-border bg-white flex flex-col items-center py-3 shrink-0">
+          <div className="absolute right-4 top-3 z-10">
             <button
               type="button"
               onClick={() => setDetailPanelOpen(true)}
               title="Open inspector"
-              className="h-7 w-7 flex items-center justify-center rounded-md border border-rfm-border-light bg-transparent text-rfm-text-400 hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
+              className="h-7 w-7 flex items-center justify-center rounded-md border border-rfm-border-light bg-white text-rfm-text-400 shadow-[0_8px_24px_rgba(15,23,42,0.12)] hover:bg-rfm-bg-100 hover:text-rfm-text-900 cursor-pointer transition-all"
             >
               <PanelRightOpen size={14} />
             </button>
-          </aside>
+          </div>
         )}
       </div>
     </div>
