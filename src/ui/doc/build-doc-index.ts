@@ -25,6 +25,7 @@ export type DocEntry = {
   filePath: string;
   category: 'page' | 'component' | 'hook' | 'function';
   executionKind?: 'static' | 'live';
+  ownershipKind?: 'LIVE' | 'STATIC-DOM' | 'STATIC-DECLARED';
   graphNodeKind?: 'route' | 'component';
   role?: 'layout' | 'page' | 'loading' | 'error' | 'not-found' | 'template' | 'component';
   source?: 'runtime' | 'route' | 'static-import';
@@ -165,6 +166,7 @@ export function buildDocIndex(graph: FlowmapGraph): DocIndex {
       filePath,
       category: categorize(sym.id),
       executionKind: 'live',
+      ownershipKind: 'LIVE',
       graphNodeKind: 'component',
       role: 'component',
       source: 'runtime',

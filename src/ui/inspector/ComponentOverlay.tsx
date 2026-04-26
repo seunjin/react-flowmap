@@ -187,6 +187,87 @@ function unionVisibleRects(rects: DOMRect[]): DOMRect | null {
   return new DOMRect(left, top, right - left, bottom - top);
 }
 
+const OWNER_ANCHOR_SELECTOR = "[data-rfm-owner-anchor]";
+const OWNER_IGNORE_SELECTOR = "[data-rfm-owner-ignore]";
+
+function isElementVisuallyHidden(el: Element): boolean {
+  const style = window.getComputedStyle(el);
+  return (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.opacity === "0" ||
+    style.getPropertyValue("content-visibility") === "hidden"
+  );
+}
+
+function isIgnoredWithinOwner(el: HTMLElement, ownerEl: HTMLElement): boolean {
+  if (el === ownerEl) return false;
+  return Boolean(el.closest(OWNER_IGNORE_SELECTOR));
+}
+
+function shouldSkipOwnerVisualElement(
+  el: HTMLElement,
+  ownerEl: HTMLElement,
+): boolean {
+  return (
+    Boolean(el.closest("[data-rfm-overlay]")) ||
+    isIgnoredWithinOwner(el, ownerEl) ||
+    isElementVisuallyHidden(el)
+  );
+}
+
+function getVisibleElementRect(el: HTMLElement): DOMRect | null {
+  const rect = el.getBoundingClientRect();
+  return isVisible(rect) ? rect : null;
+}
+
+function getVisibleDescendantRects(
+  scopeEl: HTMLElement,
+  ownerEl: HTMLElement,
+): DOMRect[] {
+  const rects: DOMRect[] = [];
+  for (const el of Array.from(scopeEl.querySelectorAll<HTMLElement>("*"))) {
+    if (shouldSkipOwnerVisualElement(el, ownerEl)) continue;
+    const rect = getVisibleElementRect(el);
+    if (rect) rects.push(rect);
+  }
+  return rects;
+}
+
+function getOwnerAnchorElements(ownerEl: HTMLElement): HTMLElement[] {
+  const anchors = Array.from(
+    ownerEl.querySelectorAll<HTMLElement>(OWNER_ANCHOR_SELECTOR),
+  );
+  if (ownerEl.matches(OWNER_ANCHOR_SELECTOR)) anchors.unshift(ownerEl);
+  return anchors.filter((el) => !shouldSkipOwnerVisualElement(el, ownerEl));
+}
+
+export function getOwnerVisualRect(ownerEl: HTMLElement): DOMRect | null {
+  const anchors = getOwnerAnchorElements(ownerEl);
+  if (anchors.length > 0) {
+    return unionVisibleRects(
+      anchors.flatMap((anchor) => {
+        const anchorRect = getVisibleElementRect(anchor);
+        return anchorRect
+          ? [anchorRect]
+          : getVisibleDescendantRects(anchor, ownerEl);
+      }),
+    );
+  }
+
+  if (shouldSkipOwnerVisualElement(ownerEl, ownerEl)) return null;
+
+  const ownerRect = getVisibleElementRect(ownerEl);
+  if (ownerRect) return ownerRect;
+
+  const ownerStyle = window.getComputedStyle(ownerEl);
+  if (ownerStyle.display === "contents") {
+    return unionVisibleRects(getVisibleDescendantRects(ownerEl, ownerEl));
+  }
+
+  return null;
+}
+
 function staticOwnerKeyFromSymbolId(symbolId: string): string | null {
   if (symbolId.startsWith(STATIC_PREFIX)) {
     const key = symbolId.slice(STATIC_PREFIX.length);
@@ -250,7 +331,9 @@ function findOwnerRect(
 ): { rect: DOMRect; label: string } | null {
   const elements = findOwnerElements(symbolId);
   const rect = unionVisibleRects(
-    elements.map((el) => el.getBoundingClientRect()),
+    elements
+      .map(getOwnerVisualRect)
+      .filter((rect): rect is DOMRect => rect !== null),
   );
   return rect ? { rect, label: labelFromSymbolId(symbolId) } : null;
 }
@@ -309,22 +392,27 @@ function buildOwnerOverlayBoxes(
 ): OwnerOverlayBox[] {
   const label = labelFromSymbolId(symbolId);
   return findOwnerElements(symbolId)
-    .map((el, index) => ({
-      symbolId,
-      state,
-      label,
-      rect: el.getBoundingClientRect(),
-      index,
-    }))
-    .filter((box) => isVisible(box.rect));
+    .map((el, index) => {
+      const rect = getOwnerVisualRect(el);
+      return rect
+        ? {
+            symbolId,
+            state,
+            label,
+            rect,
+            index,
+          }
+        : null;
+    })
+    .filter((box): box is OwnerOverlayBox => box !== null);
 }
 
 function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
   const selected = box.state === "selected";
   const inset = selected ? OWNER_SELECTED_INSET_PX : OWNER_HOVERED_INSET_PX;
   const labelAbove = box.rect.top > 22 + inset;
-  const left = box.rect.left + window.scrollX + inset;
-  const top = box.rect.top + window.scrollY + inset;
+  const left = box.rect.left + inset;
+  const top = box.rect.top + inset;
   const width = Math.max(0, box.rect.width - inset * 2);
   const height = Math.max(0, box.rect.height - inset * 2);
 
@@ -336,7 +424,7 @@ function OwnerDomOverlayBox({ box }: { box: OwnerOverlayBox }) {
       data-rfm-owner-overlay-state={box.state}
       className="rfm-owner-overlay-box"
       style={{
-        position: "absolute",
+        position: "fixed",
         left,
         top,
         width,
@@ -407,6 +495,13 @@ function broadcastToGraph(
   const staticJsx = (
     globalThis as unknown as { __rfmStaticJsx?: Record<string, string[]> }
   ).__rfmStaticJsx;
+  const observedStaticOwnerKeys = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      "[data-rfm-static-owner], [data-rfm-static]",
+    ),
+  )
+    .map((el) => el.dataset.rfmStaticOwner ?? el.dataset.rfmStatic ?? "")
+    .filter((key) => key.includes("#"));
   if (staticJsx)
     mountedEntries = applyStaticEdges(
       mountedEntries,
@@ -421,6 +516,7 @@ function broadcastToGraph(
     ...(staticJsx ? { staticJsx } : {}),
     fiberRelations,
     routes: routes ?? null,
+    observedStaticOwnerKeys,
     currentPath: window.location.pathname,
   } satisfies MainToGraph);
   if (selectedId) {
@@ -887,22 +983,19 @@ export function ComponentOverlay({
     setGraphWindowOpen(true);
     onGraphWindowOpen?.();
     setTimeout(() => {
-      const propTypesMap =
-        (globalThis as unknown as { __rfmPropTypes?: PropTypesMap })
-          .__rfmPropTypes ?? {};
       const {
         mountedEntries,
         selectedId: currentSelectedId,
         routes: currentRoutes,
       } = currentDataRef.current;
-      channelRef.current?.postMessage({
-        type: "graph-update",
-        allEntries: mountedEntries,
-        selectedId: currentSelectedId,
-        propTypesMap,
-        routes: currentRoutes,
-        currentPath: window.location.pathname,
-      } satisfies MainToGraph);
+      if (channelRef.current) {
+        broadcastToGraph(
+          channelRef.current,
+          mountedEntries,
+          currentSelectedId,
+          currentRoutes,
+        );
+      }
     }, 600);
     return true;
   }

@@ -514,13 +514,53 @@ export function getPropsForSymbolId(symbolId: string): Record<string, unknown> |
   return null;
 }
 
-// ─── Component finder (Fiber-based) ──────────────────────────────────────────
+// ─── Component finder (Fiber/static owner-based) ─────────────────────────────
+
+const STATIC_OWNER_SELECTOR = '[data-rfm-static-owner], [data-rfm-static]';
+
+function getStaticOwnerKey(el: HTMLElement): string | null {
+  return el.dataset.rfmStaticOwner ?? el.dataset.rfmStatic ?? null;
+}
+
+function findStaticOwnerCandidate(domEl: Element): HTMLElement | null {
+  if (!(domEl instanceof HTMLElement)) return null;
+  return domEl.closest<HTMLElement>(STATIC_OWNER_SELECTOR);
+}
+
+function staticOwnerFoundComp(ownerEl: HTMLElement): FoundComp | null {
+  const ownerKey = getStaticOwnerKey(ownerEl);
+  if (!ownerKey || !ownerKey.includes('#')) return null;
+
+  const rect = ownerEl.getBoundingClientRect();
+  if (!isVisible(rect)) return null;
+
+  return {
+    symbolId: `static:${ownerKey}`,
+    el: ownerEl,
+    rect,
+    depth: getDomDepth(ownerEl),
+    loc: null,
+  };
+}
 
 export function findComponentsAt(x: number, y: number): FoundComp[] {
   const found: FoundComp[] = [];
   const seen = new Set<string>();
 
   for (const domEl of document.elementsFromPoint(x, y)) {
+    if (domEl instanceof HTMLElement && domEl.closest('[data-rfm-overlay]')) {
+      continue;
+    }
+
+    const staticOwner = findStaticOwnerCandidate(domEl);
+    if (staticOwner) {
+      const staticComp = staticOwnerFoundComp(staticOwner);
+      if (staticComp && !seen.has(staticComp.symbolId)) {
+        seen.add(staticComp.symbolId);
+        found.push(staticComp);
+      }
+    }
+
     let f: FiberNode | null = getFiberFromEl(domEl);
     while (f) {
       const fn = getRfmFn(f.type);

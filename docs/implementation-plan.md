@@ -1,176 +1,355 @@
-# React Flowmap Implementation Plan
+# React Flowmap 1.0 Release Plan
 
 ## Purpose
 
-이 문서는 React Flowmap을 실제로 구현하기 위한 단계별 실행 계획을 정의합니다.
-완료된 단계와 앞으로 남은 단계를 함께 관리합니다.
+이 문서는 React Flowmap을 `1.0.0`으로 올리기 전까지의 실행 계획을 정의합니다.
+
+이전 구현 계획은 초기 PoC phase를 기준으로 작성되어 있었고, 현재 코드베이스는 이미 Vite, React Router, TanStack Router, Next.js App Router 데모와 popup workspace, server/client graph 검증을 상당 부분 갖춘 상태입니다.
+
+1.0 제품 정의는 "React runtime graph를 완벽히 재현하는 도구"가 아니라 "현재 화면의 DOM 조각이 어떤 source file / component / route context에서 왔는지 찾아주는 screen-to-source ownership tool"입니다. Next.js App Router, SSR, RSC에서는 server component의 live React instance가 브라우저에 없기 때문에 runtime fiber graph처럼 취급하지 않습니다. 대신 build-time manifest, SSR/CSR DOM owner marker, CSR runtime fiber supplement를 합쳐 현재 화면 ownership map을 만듭니다.
+
+따라서 지금의 계획은 "무엇을 새로 만들 것인가"보다 다음 질문에 답하는 데 집중합니다.
+
+- 1.0에서 어떤 경험과 API를 안정 계약으로 약속할 것인가
+- 현재 구현과 문서가 어긋난 지점은 무엇인가
+- 릴리즈 전에 반드시 고정해야 할 회귀 검증은 무엇인가
+- Next.js, packaging, editor sidecar처럼 깨지기 쉬운 부분을 어떻게 hardening할 것인가
 
 ---
 
-## Current Status (2026-03-17 기준)
+## Current Baseline
 
-| 영역 | 상태 |
-|------|------|
-| 코어 데이터 모델 & 그래프 엔진 | ✅ 완료 |
-| 런타임 이벤트 수집 & 세션 추적 | ✅ 완료 |
-| Component Overlay Inspector (UI) | ✅ 완료 |
-| Vite 플러그인 (Babel AST 변환) | ✅ 완료 |
-| Babel 변환 패키지 분리 (`@react-flowmap/babel-plugin`) | ✅ 완료 |
-| Next.js 플러그인 코드 작성 (`@react-flowmap/next-plugin`) | ✅ 완료 |
-| 서브패스 exports (`react-flowmap/vite`, `react-flowmap/next`) | ✅ 완료 |
-| Next.js App Router 실제 동작 검증 | 🔄 다음 단계 |
-| 빌드 시스템 정비 (dist 빌드 + 타입 선언) | ⬜ 예정 |
-| 데모 라우터 추가 | ⬜ 예정 |
-| npm 배포 | ⬜ 예정 |
+기준일: 2026-04-26
 
----
+| 영역 | 현재 상태 | 1.0 판단 |
+| --- | --- | --- |
+| 패키지 버전 | `1.0.0-rc.4` | Next client boundary merge, debug snapshot, owner marker rect 보정을 포함한 release candidate 준비됨 |
+| Vite React 지원 | 구현됨 | 1.0 핵심 지원 대상 |
+| React Router 데모 | 구현됨 | Vite routing 검증 대상 |
+| TanStack Router 데모 | 구현됨 | Vite routing 검증 대상 |
+| Next.js App Router 지원 | 제한 있는 지원으로 검증됨 | `next dev --webpack` 범위에서 1.0 지원 |
+| Turbopack | 미지원 | 1.0 범위 밖, README에 명시 |
+| Popup workspace | 구현됨 | 1.0 기본 UX |
+| In-app overlay | 구현됨 | workspace 진입점 및 highlight bridge |
+| Props/type metadata | 구현됨 | 1.0 핵심 기능 |
+| Source jump/editor select | root-boundary guard 구현됨 | editor command 정책 검토 필요 |
+| Build/export 설정 | 구현 및 tarball smoke 검증됨 | `pnpm verify:package`로 반복 검증 |
+| Changesets | 설정됨 | 1.0 versioning flow에 사용 |
 
-## Completed Phases
+최근 확인 결과:
 
-### ✅ Phase 0. Repository Foundation
-
-프로젝트 구조, TypeScript, pnpm, Vite, ESLint, Vitest 기본 환경 구성 완료.
-
----
-
-### ✅ Phase 1–4. Core Engine
-
-- `FlowmapGraph` 타입, `GraphStore`, `GraphBuilder` 구현
-- `RuntimeEvent` → `FlowmapNode/Edge` 변환 파이프라인 완료
-- file/symbol/api ID 규칙 확정
+- `pnpm lint`: 통과
+- `pnpm typecheck`: 통과
+- `pnpm test`: 통과
+- `pnpm build`: 통과
+- `pnpm verify:package`: 통과, `react-flowmap-1.0.0-rc.4.tgz` 299.4 KB / source maps 10개
+- `pnpm test:e2e`: 통과, 28 tests
 
 ---
 
-### ✅ Phase 5–6. Projection & Selection
+## 1.0 Product Contract
 
-- `projectToFileLevelView()` — symbol graph → file-level view 축약
-- `FileEdge` 생성 및 supporting edge 집계
-- `both | outgoing | incoming` 선택 모드 구현
+1.0에서 React Flowmap이 안정적으로 보장해야 하는 기본 계약은 다음입니다.
 
----
+1. 사용자는 앱 화면에서 UI 조각을 선택할 수 있다.
+2. 선택한 UI 조각의 owning component와 source file을 확인할 수 있다.
+3. source jump로 바로 편집기에서 해당 파일을 열 수 있다.
+4. mounted client component는 live props와 TypeScript props type을 보여준다.
+5. 현재 화면의 route subtree 기준 graph와 explorer가 같은 selection을 공유한다.
+6. Vite React, React Router, TanStack Router, Next.js App Router에서 핵심 흐름이 일관된다.
+7. Next.js App Router에서는 static/server node와 live/client node를 혼동시키지 않는다.
+8. production build에는 dev inspector 계측이 들어가지 않는다.
+9. SSR/RSC source ownership에는 `withFlowmap()` build transform이 필요하며 provider-only 설치가 가능하다고 문서화하지 않는다.
 
-### ✅ Phase 7. Inspector Model
+1.0에서 약속하지 않는 것은 다음입니다.
 
-- `buildInspectorPayload()` — 선택된 파일/심볼 상세 데이터 생성
-- relation summary 구현
-
----
-
-### ✅ Phase 8. Component Overlay Inspector
-
-Vite 플러그인 기반의 런타임 인스펙터 UI 완료:
-
-- **Babel AST 변환**: `data-rfm-id`, Context 훅, Provider 래핑 자동 주입
-- **ts-morph prop 타입 추출**: 인스펙터 사이드바에서 TypeScript 타입 표시
-- **Pick Mode**: 크로스헤어로 화면에서 직접 컴포넌트 선택
-- **FloatingSidebar**: 드래그 가능한 컴포넌트 트리 + Inspector
-- **에디터 열기**: `/__rfm-open` → Cursor / VS Code / Windsurf / Zed 지원
-- **Tailwind CSS v4** 기반 UI
+- Turbopack 지원
+- DOM marker가 없는 pure server markup의 정확한 component ownership 보장
+- 네트워크 요청 분석을 중심으로 한 DevTools 대체 기능
+- 함수 호출/훅/API까지 포함한 범용 dependency graph
+- repo 전체 소스 브라우저
+- multi-instance switching
 
 ---
 
-### ✅ Phase 9. Multi-Bundler Architecture
+## Release Gates
 
-Babel 변환 로직을 번들러 독립 패키지로 분리:
+`1.0.0` 태그 전에는 아래 gate가 모두 통과해야 합니다.
 
-- `packages/babel-plugin/` — `@react-flowmap/babel-plugin`
-  - `transformFlowmap(code, fileId, opts)` — 핵심 변환 함수
-  - `contextImport` 옵션으로 import 경로 커스텀 가능
-- `packages/next-plugin/` — `@react-flowmap/next-plugin`
-  - `withFlowmap(nextConfig)` — Next.js config 래퍼
-  - webpack 로더로 dev 빌드에 변환 주입
-- App Router용 에디터 열기 흐름 포함
-- `react-flowmap/vite`, `react-flowmap/next` 서브패스 exports 추가
-- 프로젝트명 **gori → react-flowmap** 전면 리네이밍 완료
-- 브랜드 심볼 SVG 아이콘 (컴포넌트 트리 형태) 적용
+### Gate 1. Core Quality
 
----
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- core/runtime/ui model 테스트가 현재 제품 계약을 설명하는 이름과 fixture를 가진다.
 
-## Upcoming Phases
+### Gate 2. Demo E2E
 
-### 🔄 Phase 10. Next.js App Router 실제 검증
+- `pnpm test:e2e`
+- Vite React demo:
+  - inspector button mount
+  - workspace open
+  - graph data reload 유지
+  - React Router route transition 후 현재 화면 graph 유지
+- TanStack Router demo:
+  - inspector button mount
+  - workspace open
+  - route transition 후 현재 화면 graph 유지
+- Next demo:
+  - route/layout/page/server component node 표시
+  - client boundary 중복 없음
+  - route transition 반영
+  - server node detail에서 parent layout과 client boundaries 표시
+  - static owner highlight와 client runtime highlight 동작
 
-**목표**: 코드로만 작성된 next-plugin이 실제 앱에서 동작하는지 검증합니다.
+### Gate 3. Package Contract
 
-**범위**: Next.js App Router 기반으로 확정.
+- `pnpm build`
+- `pnpm verify:package`
+- `dist/`에 공개 subpath별 JS와 `.d.ts`가 생성된다.
+- `package.json` `exports`와 실제 build output이 일치한다.
+- fresh Vite app에서 `react-flowmap` 설치 후 `react-flowmap/vite`가 동작한다.
+- fresh Next App Router app에서 `react-flowmap/next`가 `next dev --webpack` 기준으로 동작한다.
+- Next-only 사용자의 `vite` peer warning 처리 방침을 결정하고 README에 반영한다.
 
-**Tasks**:
-- Next.js 테스트 앱 생성 (App Router)
-- `withFlowmap()` webpack 로더가 JSX를 올바르게 변환하는지 확인
-- `react-flowmap/context` import 해석 (webpack alias) 동작 확인
-- `app/api/__rfm-open/route.ts` 에디터 열기 동작 확인
-- ComponentOverlay UI가 Next.js 환경에서 올바르게 렌더되는지 확인
-- 발견된 버그 수정
+### Gate 4. Dev-Only Safety
 
-**Exit Criteria**:
-- Next.js App Router 앱에서 Pick Mode, 컴포넌트 트리, 에디터 열기가 동작함
-- Vite 환경과 동일한 핵심 기능이 Next.js에서 작동함
+- dev server에서만 instrumentation이 동작한다.
+- production build에는 runtime owner marker, static owner marker, graph window guard, sidecar define 값이 들어가지 않는다.
+- editor open endpoint/sidecar는 project root 밖 파일을 열지 못한다.
+- editor parameter는 알려진 editor 또는 명시적인 custom command 정책으로 제한/문서화한다.
+- sidecar port 충돌 시 사용자가 이해할 수 있는 warning이 남는다.
 
----
+### Gate 5. Documentation
 
-### ⬜ Phase 11. 빌드 시스템 정비
-
-**목표**: npm 배포를 위해 TypeScript 소스를 JS + 타입 선언으로 빌드합니다.
-
-**Tasks**:
-- `vite build --mode library` 또는 `tsc` 기반으로 `dist/` 빌드 구성
-- `react-flowmap`, `@react-flowmap/babel-plugin`, `@react-flowmap/next-plugin` 각각 빌드
-- `package.json` exports를 `./src/*` → `./dist/*` 경로로 변경
-- TypeScript 선언 파일(`.d.ts`) 생성 확인
-- prod 빌드에서 인스펙터 코드가 완전히 제거되는지 검증
-
-**Exit Criteria**:
-- `dist/` 빌드 후 외부 프로젝트에서 `react-flowmap` 설치·사용 가능
-
----
-
-### ⬜ Phase 12. 데모 라우터 추가
-
-**목표**: 라우터가 있는 실제 앱 환경에서 Inspector 동작을 검증합니다.
-
-**Tasks**:
-- 데모에 TanStack Router 또는 react-router-dom 추가
-- 페이지 전환 시 컴포넌트 트리가 올바르게 갱신되는지 확인
-- 다중 페이지(홈/상품/장바구니) 환경에서 Inspector 동작 확인
-- 페이지 unmount 시 세션 데이터 처리 방식 결정
-
-**Exit Criteria**:
-- 페이지 전환 후에도 Inspector가 현재 페이지의 컴포넌트 트리를 올바르게 표시함
+- README가 1.0 지원 범위와 제한을 정확히 말한다.
+- `docs/product-direction.md`와 실제 UX가 모순되지 않는다.
+- `docs/architecture.md`가 current screen, ownership, static/live boundary를 현재 구현 기준으로 설명한다.
+- `docs/data-schema.md`가 Next/static route metadata와 현재 DocIndex/graph model의 차이를 숨기지 않는다.
+- CHANGELOG에 1.0 변경 범위와 breaking/non-breaking 판단이 남는다.
 
 ---
 
-### ⬜ Phase 13. npm 배포 준비 및 배포
+## Workstreams
 
-**목표**: 공개 사용 가능한 패키지로 npm에 배포합니다.
+### P0. Documentation Sync
 
-**Tasks**:
-- README 작성
-  - 한 줄 소개
-  - Vite 설치/사용법
-  - Next.js App Router 설치/사용법
-  - 스크린샷
-- `package.json` 정비 (`peerDependencies`, `files`, `repository`, `keywords`)
-- npm publish 스크립트 구성
-- `react-flowmap` / `@react-flowmap/babel-plugin` / `@react-flowmap/next-plugin` 배포
+목표: 오래된 phase 문서를 현재 코드 상태와 맞춘다.
 
-**Exit Criteria**:
-- `npm install react-flowmap` 후 Vite + Next.js 양쪽에서 동작함
+Tasks:
+
+- 이 문서를 1.0 release plan으로 갱신한다.
+- README의 "Partial" Next 지원 문구를 1.0 목표 문구와 맞춘다.
+- `docs/data-schema.md`가 초기 file-level graph 중심 설명에 머무는 부분을 현재 workspace model과 비교해 갱신한다.
+- `docs/glossary.md`에 `static`, `live`, `server component`, `client boundary`, `route node`를 추가한다.
+- `docs/architecture.md`의 package responsibilities와 open questions를 현재 구현 기준으로 정리한다.
+
+Exit criteria:
+
+- 새 contributor가 문서만 읽어도 1.0에서 무엇을 지원하고 무엇을 지원하지 않는지 알 수 있다.
+
+### P1. Public API Freeze
+
+목표: 1.0 이후 semver로 보호할 public surface를 확정한다.
+
+Status: completed in the current 1.0 preparation branch. The package export map is now treated as the public contract and covered by `tests/public-api/public-api.test.ts`.
+
+Public surface:
+
+- `react-flowmap`
+  - `ReactFlowMap`
+  - config types
+  - advanced graph/runtime/doc helpers
+- `react-flowmap/vite`
+  - `flowmapInspect`
+  - `FlowmapInspectOptions`
+- `react-flowmap/next`
+  - `withFlowmap`
+  - `WithFlowmapOptions`
+  - `openInEditor` compatibility helper
+- `react-flowmap/rfm-context`
+  - instrumentation runtime bridge for custom integrations
+- `react-flowmap/graph-window`
+  - standalone workspace window entry for custom tooling
+
+Internal implementation details:
+
+- Babel transform bundle
+- Next webpack loader
+- editor sidecar helpers
+- inspector implementation components such as `ComponentOverlay`, `InspectButton`, `EntryDetail`
+
+Tasks:
+
+- [x] `src/index.ts` re-export 범위를 검토한다.
+- [x] `package.json` `exports`를 public contract로 확정한다.
+- [x] `packages/babel-plugin`은 private workspace package / internal build artifact로 유지한다.
+- [x] README의 Advanced exports 섹션을 package export map과 맞춘다.
+- [x] public export map과 root package API를 테스트로 고정한다.
+
+Exit criteria:
+
+- README의 "Advanced exports"와 `package.json` exports가 같은 계약을 말한다.
+
+### P2. Ownership Graph Semantics
+
+목표: 기본 graph를 current screen ownership 중심으로 유지한다.
+
+Status: in progress for the screen-to-source 1.0 direction. Graph projection now distinguishes `LIVE`, `STATIC-DOM`, and `STATIC-DECLARED` so the UI can prefer currently observed DOM owners while still showing route/import candidates as lower-confidence context.
+
+Tasks:
+
+- [x] 기본 graph layout 입력에서 ownership edge와 declaration fallback의 의미를 테스트로 고정한다.
+- [x] `staticJsx`는 fallback/hint로만 쓰고, runtime/fiber ownership과 경쟁하지 않도록 테스트를 보강한다.
+- [x] React Router route declaration이 route island처럼 보이지 않는지 e2e와 unit test로 고정한다.
+- [x] TanStack Router `Outlet` mediated ownership이 fiber relation으로 유지되는지 테스트한다.
+- [x] node category를 global `page/component`보다 current route role badge 중심으로 설명한다.
+- [x] `LIVE`, `STATIC-DOM`, `STATIC-DECLARED` projection 상태를 schema와 graph entry에 반영한다.
+- [x] static DOM marker로 관측된 owner를 `STATIC-DOM`으로 표시하고, import tree에만 있는 후보를 `STATIC-DECLARED`로 표시한다.
+
+Exit criteria:
+
+- 사용자가 graph를 봤을 때 "실제 화면 ownership"과 "route declaration"을 혼동하지 않는다.
+
+### P3. Next App Router Hardening
+
+목표: Next 지원을 "부분 구현"이 아니라 명시적 제한을 가진 안정 기능으로 만든다.
+
+Status: in progress for the screen-to-source 1.0 direction. Route scanner behavior, production stripping, server/static detail behavior, client boundary de-duplication, route transitions, static DOM owner pick, and nested static owner marker behavior are covered by unit/e2e tests.
+
+1.0 지원 범위:
+
+- App Router
+- `next dev --webpack`
+- route/layout/page/template/loading/error/not-found static route node
+- server-only component static ownership node
+- `'use client'` boundary와 live runtime subtree
+- source jump, static prop types, parent layout, reachable client boundaries
+
+1.0 제외 범위:
+
+- Turbopack
+- 모든 parallel/intercepting route edge case
+- pure server markup의 exact component pick
+- server component live props
+
+Tasks:
+
+- [x] `scanAppDirectory()`가 route groups, dynamic segments, ignored folders를 문서화된 방식으로 처리하는지 fixture test를 추가한다.
+- [x] `transformStaticOwnerMarks()`가 production build에서 실행되지 않는지 검증한다.
+- [x] server/static node detail에서 live props UI가 노출되지 않는지 테스트한다.
+- [x] client boundary node 중복 제거 규칙을 unit/e2e로 고정한다.
+- [x] route transition 후 popup workspace가 stale route를 보여주지 않는지 e2e를 유지한다.
+- [x] `findComponentsAt()`이 live fiber가 없는 static DOM owner marker를 `static:<filePath>#<componentName>` selection으로 반환한다.
+- [x] `transformStaticOwnerMarks()`가 route/page root뿐 아니라 nested server component host root에도 marker를 붙이는지 테스트한다.
+
+Exit criteria:
+
+- README의 Next 설명이 실제 구현과 정확히 일치한다.
+
+### P4. Dev-Only Safety And Editor Open
+
+목표: dev tool이라도 local machine에서 과하게 열려 있지 않게 한다.
+
+Tasks:
+
+- Vite `/__rfm-open`에서 `file` query가 project root 밖으로 resolve되지 않도록 막는다.
+- Next sidecar open route도 같은 root-boundary check를 적용한다.
+- `editor` query parameter 정책을 정한다.
+- editor availability endpoint가 필요한 최소 정보만 반환하는지 확인한다.
+- sidecar listen host를 `127.0.0.1`로 유지하고 README에 이유를 짧게 문서화한다.
+
+Exit criteria:
+
+- source jump가 편하지만, arbitrary local file opener처럼 동작하지 않는다.
+
+### P5. Packaging And Install Verification
+
+목표: npm 설치 사용자가 문서대로 따라 했을 때 동작한다.
+
+Status: completed for the local 1.0 preparation branch. `pnpm verify:package` builds on top of the generated `dist/`, creates an npm tarball with `pnpm pack`, validates packed files/source maps/package size, and smoke-loads the tarball from temporary Vite and Next-style apps.
+
+Tasks:
+
+- [x] `pnpm build` output을 확인한다.
+- [x] `npm pack` 또는 임시 fixture app 설치 방식으로 루트 패키지를 검증한다.
+- [x] fresh Vite app fixture에서 `flowmapInspect()`와 `<ReactFlowMap />`가 동작하는지 확인한다.
+- [x] fresh Next app fixture에서 `withFlowmap()`과 client wrapper가 동작하는지 확인한다.
+- [x] `files` 필드에 필요한 runtime assets만 포함되는지 확인한다.
+- [x] source map 포함 여부와 package size를 확인한다.
+
+Exit criteria:
+
+- registry publish 전 로컬 tarball로 Vite/Next 양쪽이 재현 가능하게 동작한다.
+
+### P6. Release Candidate Flow
+
+목표: 바로 `1.0.0`을 찍지 않고 beta/rc에서 설치 검증을 거친다.
+
+Status: in progress. `1.0.0-rc.0` was published and verified from a registry-installed temporary project. `1.0.0-rc.4` is prepared locally with the Next config loader fix, client boundary merge fix, debug snapshot copy action, and owner marker rect alignment; publish and verify it before collecting the next round of rc feedback.
+
+Tasks:
+
+- [x] `1.0.0-rc.0` changeset prerelease를 만든다.
+- [x] npm `rc` tag로 publish한다.
+- [x] 실제 외부 fixture에서 설치 검증한다.
+- [x] `1.0.0-rc.1` Next config loader 호환성 패치를 만든다.
+- [x] `1.0.0-rc.2` Next client boundary merge와 debug snapshot 패치를 만든다.
+- [x] `1.0.0-rc.3` owner visual rect 패치를 만든다.
+- [x] `1.0.0-rc.4` owner marker rect alignment 패치를 만든다.
+- npm `rc` tag로 `1.0.0-rc.4`를 publish한다.
+- 실제 외부 fixture에서 `1.0.0-rc.4`를 설치 검증한다.
+- 문제를 patch한 뒤 `rc`를 반복한다.
+- 마지막 rc와 main 문서가 일치하면 `1.0.0`으로 version/publish한다.
+
+Exit criteria:
+
+- 1.0.0 publish 전에 package install, type import, dev server, e2e smoke가 한 번 이상 registry artifact로 검증된다.
 
 ---
 
-### ⬜ Phase 14. 문서 사이트 (미래)
+## Suggested Execution Order
 
-Vitepress 기반 문서 사이트. npm 배포 이후 우선순위 결정.
+1. P0 Documentation Sync
+2. P1 Public API Freeze
+3. P4 Dev-Only Safety And Editor Open
+4. P2 Ownership Graph Semantics
+5. P3 Next App Router Hardening
+6. P5 Packaging And Install Verification
+7. P6 Release Candidate Flow
+
+이 순서를 권장하는 이유:
+
+- 먼저 문서와 public API를 맞춰야 이후 변경이 1.0 계약을 흔들지 않는다.
+- editor open safety는 기능 추가보다 릴리즈 리스크가 크므로 초반에 막는다.
+- graph semantics와 Next hardening은 UX 품질을 고정하는 작업이다.
+- packaging 검증은 코드와 문서가 안정된 뒤 해야 의미가 있다.
 
 ---
 
-## Recommended Execution Order
+## Immediate Next Checklist
 
-```
-Next.js 실제 검증 → 빌드 시스템 → 라우터 테스트 → README → npm 배포
-```
+가장 먼저 처리할 작업은 다음입니다.
 
-이 순서의 이유:
-- Next.js 검증을 먼저 해야 코드가 실제로 동작하는지 알 수 있음
-- 동작이 확인된 코드를 빌드하고, 빌드된 걸 배포함
-- 문서는 동작하는 것을 기준으로 써야 정확함
+- [x] `docs/glossary.md`에 static/live/route/client boundary 용어 추가
+- [x] `docs/data-schema.md`를 현재 workspace/Next hybrid graph 모델과 맞추기
+- [x] editor open root-boundary guard 추가
+- [x] editor query command 제한 추가
+- [x] editor open guard 테스트 추가
+- [x] `pnpm lint && pnpm typecheck && pnpm test`
+- [x] 권한 있는 로컬 환경에서 `pnpm test:e2e`
+- [x] `pnpm build`
+
+---
+
+## Release Decision Rule
+
+다음 중 하나라도 남아 있으면 `1.0.0` 대신 beta/rc로만 배포합니다.
+
+- e2e가 권한 있는 환경에서 통과하지 않았다.
+- production build에서 dev marker 제거를 검증하지 않았다.
+- Next 지원 범위와 README 설명이 다르다.
+- public exports 중 내부 구현으로 남겨야 할 항목이 정리되지 않았다.
+- source jump가 project root 밖 파일을 열 수 있다.
+
+1.0은 기능 수의 문제가 아니라, 사용자가 README대로 설치했을 때 같은 경험을 안정적으로 얻는지의 문제입니다.

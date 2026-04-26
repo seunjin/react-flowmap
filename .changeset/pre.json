@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "rc",
+  "initialVersions": {
+    "react-flowmap": "0.5.0",
+    "react-flowmap-demo-react": "0.1.11",
+    "react-flowmap-demo-tanstack": "0.0.4",
+    "@react-flowmap/babel-plugin": "0.1.0"
+  },
+  "changesets": [
+    "quiet-markers-align",
+    "static-screen-ownership"
+  ]
+}

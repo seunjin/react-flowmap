@@ -245,6 +245,28 @@ test.describe('demos/next', () => {
     expect(workflowRect!.outlineStyle).toBe('solid');
   });
 
+  test('Next picker selects static server component DOM owners from the app screen', async ({ page }) => {
+    const overviewOwner = 'src/app/_components/ServerOverview.tsx#ServerOverview';
+
+    await page.goto(BASE);
+    await page.waitForSelector('[data-rfm-shadow-host]', { state: 'attached', timeout: 8000 });
+    const popup = await openWorkspaceFromInspector(page);
+    await expect(popup.getByText('Flowmap', { exact: true })).toBeVisible();
+
+    await popup.getByRole('button', { name: 'Pick element' }).click();
+    await expect(popup.getByRole('button', { name: 'Picking…' })).toBeVisible();
+    const ownerRect = await getStaticOwnerState(page, overviewOwner);
+    expect(ownerRect).not.toBeNull();
+    await page.mouse.click(
+      ownerRect!.left + 24,
+      ownerRect!.top + 24,
+    );
+
+    await expect.poll(async () => (await getStaticOwnerState(page, overviewOwner))?.selected ?? false).toBe(true);
+    const inspector = popup.locator('aside').nth(1);
+    await expect(inspector.getByText('Static DOM owner. Live props are not available')).toBeVisible();
+  });
+
   test('Next live client component nodes highlight their rendered owner area', async ({ page }) => {
     const metricOwner = 'symbol:src/components/ClientMetricCard.tsx#ClientMetricCard';
 

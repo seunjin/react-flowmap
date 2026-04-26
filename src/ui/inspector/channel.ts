@@ -21,6 +21,8 @@ export type MainToGraph =
       fiberRelations?: Record<string, string[]>;
       /** 현재 화면 route manifest */
       routes?: RfmRoute[] | null;
+      /** DOM에서 현재 관측된 static owner key 목록: filePath#componentName */
+      observedStaticOwnerKeys?: string[];
       /** 메인 앱의 현재 pathname */
       currentPath?: string;
     }

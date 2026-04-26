@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
+  ClipboardCheck,
+  ClipboardCopy,
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
@@ -33,8 +35,10 @@ import { openInEditor } from "../inspector/utils";
 import { EditorSelect } from "../inspector/EditorSelect";
 import inspectorCss from "../inspector/inspector.compiled.css?raw";
 import type { RfmServerComponent } from "../inspector/types";
+import packageJson from "../../../package.json";
 
 const STATIC_PREFIX = "static:";
+const GRAPH_WINDOW_SNAPSHOT_KEY = "rfm-graph-window-snapshot";
 const RFM_STATIC_NAMES = new Set([
   "ReactFlowMap",
   "FlowmapProvider",
@@ -70,7 +74,9 @@ function SelectionSummaryContent({
   const name = route?.componentName ?? entry?.name ?? "";
   const filePath = route?.filePath ?? entry?.filePath ?? "";
   const executionKind = route?.executionKind ?? entry?.executionKind ?? "live";
-  const executionLabel = executionKind === "static" ? "SERVER" : "CLIENT";
+  const ownershipLabel =
+    entry?.ownershipKind ??
+    (executionKind === "static" ? "STATIC-DECLARED" : "LIVE");
   const roleLabel = route
     ? formatRole(route.type)
     : formatRole(entry?.role ?? "component");
@@ -87,7 +93,7 @@ function SelectionSummaryContent({
                 Selected source
               </span>
               <span className="inline-flex items-center rounded-full bg-rfm-blue-light px-2 py-0.5 text-[10px] font-medium text-rfm-blue shrink-0">
-                {roleLabel} · {executionLabel}
+                {roleLabel} · {ownershipLabel}
               </span>
             </div>
             <div className="mt-1 flex items-center gap-2 min-w-0">
@@ -192,6 +198,9 @@ function cloneEntry(entry: DocEntry): DocEntry {
   return {
     ...entry,
     executionKind: entry.executionKind ?? "live",
+    ownershipKind:
+      entry.ownershipKind ??
+      (entry.executionKind === "static" ? "STATIC-DECLARED" : "LIVE"),
     graphNodeKind: entry.graphNodeKind ?? "component",
     role: entry.role ?? "component",
     source: entry.source ?? "runtime",
@@ -212,6 +221,21 @@ function findEntryByFileAndName(
     if (entry.filePath === filePath && entry.name === name) return entry;
   }
   return null;
+}
+
+function findSingleLiveEntryByFile(
+  entries: Iterable<DocEntry>,
+  filePath: string,
+): DocEntry | null {
+  let match: DocEntry | null = null;
+  for (const entry of entries) {
+    if (entry.filePath !== filePath || entry.executionKind === "static") {
+      continue;
+    }
+    if (match) return null;
+    match = entry;
+  }
+  return match;
 }
 
 function attachRenderEdge(
@@ -269,6 +293,9 @@ function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
 
     const hasRoute = group.some((entry) => entry.graphNodeKind === "route");
     const hasLive = group.some((entry) => entry.executionKind === "live");
+    const hasStaticDom = group.some(
+      (entry) => entry.ownershipKind === "STATIC-DOM",
+    );
     const role =
       group.find((entry) => entry.role && entry.role !== "component")?.role ??
       canonical.role ??
@@ -283,6 +310,11 @@ function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
     const merged: DocEntry = {
       ...canonical,
       executionKind: hasLive ? "live" : "static",
+      ownershipKind: hasLive
+        ? "LIVE"
+        : hasStaticDom
+        ? "STATIC-DOM"
+        : "STATIC-DECLARED",
       graphNodeKind: hasRoute
         ? "route"
         : canonical.graphNodeKind ?? "component",
@@ -349,10 +381,12 @@ function mergeGraphEntries(entries: DocEntry[]): DocEntry[] {
   return [...mergedById.values()];
 }
 
-function buildHybridGraphEntries(
+export function buildHybridGraphEntries(
   runtimeEntries: DocEntry[],
   activeRoutes: RfmRoute[],
+  observedStaticOwnerKeys: Iterable<string> = [],
 ): DocEntry[] {
+  const observedStaticOwners = new Set(observedStaticOwnerKeys);
   const entryById = new Map<string, DocEntry>(
     runtimeEntries.map((entry) => [entry.symbolId, cloneEntry(entry)]),
   );
@@ -379,6 +413,7 @@ function buildHybridGraphEntries(
       runtimeMatch.role = route.type;
       runtimeMatch.source = "route";
       runtimeMatch.executionKind = "live";
+      runtimeMatch.ownershipKind = "LIVE";
       return runtimeMatch;
     }
 
@@ -388,6 +423,12 @@ function buildHybridGraphEntries(
       filePath: route.filePath,
       category: "component",
       executionKind: route.executionKind,
+      ownershipKind:
+        route.executionKind === "live"
+          ? "LIVE"
+          : observedStaticOwners.has(`${route.filePath}#${route.componentName}`)
+          ? "STATIC-DOM"
+          : "STATIC-DECLARED",
       graphNodeKind: "route",
       role: route.type,
       source: "route",
@@ -406,21 +447,29 @@ function buildHybridGraphEntries(
             entryById.values(),
             node.filePath,
             node.componentName,
-          )
+          ) ?? findSingleLiveEntryByFile(entryById.values(), node.filePath)
         : null;
 
     if (runtimeMatch) {
       runtimeMatch.executionKind = "live";
+      runtimeMatch.ownershipKind = "LIVE";
       runtimeMatch.role = runtimeMatch.role ?? "component";
       return runtimeMatch;
     }
 
+    const ownerKey = `${node.filePath}#${node.componentName}`;
     return ensureSyntheticEntry({
-      symbolId: `${STATIC_PREFIX}${node.filePath}#${node.componentName}`,
+      symbolId: `${STATIC_PREFIX}${ownerKey}`,
       name: node.componentName,
       filePath: node.filePath,
       category: "component",
       executionKind: node.executionKind,
+      ownershipKind:
+        node.executionKind === "live"
+          ? "LIVE"
+          : observedStaticOwners.has(ownerKey)
+          ? "STATIC-DOM"
+          : "STATIC-DECLARED",
       graphNodeKind: "component",
       role: "component",
       source: "static-import",
@@ -465,6 +514,148 @@ function buildHybridGraphEntries(
   return mergeGraphEntries([...entryById.values()]);
 }
 
+function summarizeEntry(entry: DocEntry) {
+  return {
+    symbolId: entry.symbolId,
+    name: entry.name,
+    filePath: entry.filePath,
+    category: entry.category,
+    executionKind: entry.executionKind ?? "live",
+    ownershipKind:
+      entry.ownershipKind ??
+      (entry.executionKind === "static" ? "STATIC-DECLARED" : "LIVE"),
+    graphNodeKind: entry.graphNodeKind ?? "component",
+    role: entry.role ?? "component",
+    source: entry.source ?? "runtime",
+    renders: entry.renders.map((ref) => ref.symbolId),
+    renderedBy: entry.renderedBy.map((ref) => ref.symbolId),
+    uses: entry.uses.map((ref) => ref.symbolId),
+    usedBy: entry.usedBy.map((ref) => ref.symbolId),
+    apiCalls: entry.apiCalls.map((api) => api.apiId),
+  };
+}
+
+function summarizeImportTree(
+  children: RfmServerComponent[] | undefined,
+): unknown[] {
+  return (children ?? []).map((child) => ({
+    filePath: child.filePath,
+    componentName: child.componentName,
+    nodeKind: child.nodeKind,
+    executionKind: child.executionKind,
+    isServer: child.isServer,
+    children: summarizeImportTree(child.children),
+  }));
+}
+
+function summarizeRoute(route: RfmRoute) {
+  return {
+    router: route.router ?? "next",
+    urlPath: route.urlPath,
+    filePath: route.filePath,
+    type: route.type,
+    componentName: route.componentName,
+    executionKind: route.executionKind,
+    isServer: route.isServer,
+    propTypes: route.propTypes ?? {},
+    children: summarizeImportTree(route.children),
+  };
+}
+
+function collectClientBoundaryDiagnostics(
+  runtimeEntries: DocEntry[],
+  routes: RfmRoute[],
+) {
+  const diagnostics: Array<Record<string, unknown>> = [];
+  const runtimeByFile = new Map<string, DocEntry[]>();
+
+  for (const entry of runtimeEntries) {
+    if (entry.executionKind === "static") continue;
+    runtimeByFile.set(entry.filePath, [
+      ...(runtimeByFile.get(entry.filePath) ?? []),
+      entry,
+    ]);
+  }
+
+  const visit = (node: RfmServerComponent, route: RfmRoute) => {
+    if (node.nodeKind === "client-boundary") {
+      const matches = runtimeByFile.get(node.filePath) ?? [];
+      const exactMatch = matches.some(
+        (entry) => entry.name === node.componentName,
+      );
+      if (matches.length > 0 && !exactMatch) {
+        diagnostics.push({
+          type: "client-boundary-name-mismatch",
+          route: route.urlPath,
+          filePath: node.filePath,
+          staticName: node.componentName,
+          liveNames: matches.map((entry) => entry.name),
+        });
+      }
+    }
+
+    for (const child of node.children ?? []) {
+      visit(child, route);
+    }
+  };
+
+  for (const route of routes) {
+    for (const child of route.children ?? []) {
+      visit(child, route);
+    }
+  }
+
+  return diagnostics;
+}
+
+export function buildDebugSnapshot({
+  allEntries,
+  graphEntries,
+  selectedId,
+  currentPath,
+  routes,
+  activeRoutes,
+  staticJsx,
+  fiberRelations,
+  propTypesMap,
+}: {
+  allEntries: DocEntry[];
+  graphEntries: DocEntry[];
+  selectedId: string;
+  currentPath: string;
+  routes: RfmRoute[] | null;
+  activeRoutes: RfmRoute[];
+  staticJsx: Record<string, string[]>;
+  fiberRelations: Record<string, string[]>;
+  propTypesMap: PropTypesMap;
+}) {
+  return {
+    type: "react-flowmap-debug-snapshot",
+    schemaVersion: 1,
+    packageVersion: packageJson.version,
+    generatedAt: new Date().toISOString(),
+    currentPath,
+    selectedId,
+    counts: {
+      runtimeEntries: allEntries.length,
+      graphEntries: graphEntries.length,
+      routes: routes?.length ?? 0,
+      activeRoutes: activeRoutes.length,
+      staticJsxParents: Object.keys(staticJsx).length,
+      fiberRelationParents: Object.keys(fiberRelations).length,
+      propTypeEntries: Object.keys(propTypesMap).length,
+    },
+    diagnostics: collectClientBoundaryDiagnostics(allEntries, activeRoutes),
+    routes: routes?.map(summarizeRoute) ?? null,
+    activeRoutes: activeRoutes.map(summarizeRoute),
+    runtimeEntries: allEntries.map(summarizeEntry),
+    graphEntries: graphEntries.map(summarizeEntry),
+    staticJsx,
+    fiberRelations,
+    propTypeKeys: Object.keys(propTypesMap),
+  };
+}
+
 function getGraphIdForRoute(route: RfmRoute, entries: DocEntry[]): string {
   return (
     entries.find(
@@ -476,16 +667,75 @@ function getGraphIdForRoute(route: RfmRoute, entries: DocEntry[]): string {
   );
 }
 
+type GraphWindowSnapshot = {
+  allEntries: DocEntry[];
+  selectedId: string;
+  propTypesMap: PropTypesMap;
+  staticJsx: Record<string, string[]>;
+  fiberRelations: Record<string, string[]>;
+  routes: RfmRoute[] | null;
+  observedStaticOwnerKeys: string[];
+  currentPath: string;
+};
+
+function loadGraphWindowSnapshot(): GraphWindowSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(GRAPH_WINDOW_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<GraphWindowSnapshot>;
+    if (!Array.isArray(parsed.allEntries)) return null;
+    return {
+      allEntries: parsed.allEntries,
+      selectedId: typeof parsed.selectedId === "string" ? parsed.selectedId : "",
+      propTypesMap: parsed.propTypesMap ?? {},
+      staticJsx: parsed.staticJsx ?? {},
+      fiberRelations: parsed.fiberRelations ?? {},
+      routes: parsed.routes ?? null,
+      observedStaticOwnerKeys: parsed.observedStaticOwnerKeys ?? [],
+      currentPath:
+        typeof parsed.currentPath === "string"
+          ? parsed.currentPath
+          : window.location.pathname,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveGraphWindowSnapshot(snapshot: GraphWindowSnapshot): void {
+  try {
+    sessionStorage.setItem(GRAPH_WINDOW_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch {
+    // noop
+  }
+}
+
 export function GraphWindow() {
-  const [allEntries, setAllEntries] = useState<DocEntry[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [propTypesMap, setPropTypesMap] = useState<PropTypesMap>({});
-  const [staticJsx, setStaticJsx] = useState<Record<string, string[]>>({});
+  const initialSnapshot = useMemo(loadGraphWindowSnapshot, []);
+  const [allEntries, setAllEntries] = useState<DocEntry[]>(
+    () => initialSnapshot?.allEntries ?? [],
+  );
+  const [selectedId, setSelectedId] = useState(
+    () => initialSnapshot?.selectedId ?? "",
+  );
+  const [propTypesMap, setPropTypesMap] = useState<PropTypesMap>(
+    () => initialSnapshot?.propTypesMap ?? {},
+  );
+  const [staticJsx, setStaticJsx] = useState<Record<string, string[]>>(
+    () => initialSnapshot?.staticJsx ?? {},
+  );
   const [fiberRelations, setFiberRelations] = useState<
     Record<string, string[]>
-  >({});
-  const [routes, setRoutes] = useState<RfmRoute[] | null>(null);
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  >(() => initialSnapshot?.fiberRelations ?? {});
+  const [routes, setRoutes] = useState<RfmRoute[] | null>(
+    () => initialSnapshot?.routes ?? null,
+  );
+  const [observedStaticOwnerKeys, setObservedStaticOwnerKeys] = useState<
+    string[]
+  >(() => initialSnapshot?.observedStaticOwnerKeys ?? []);
+  const [currentPath, setCurrentPath] = useState(
+    () => initialSnapshot?.currentPath ?? window.location.pathname,
+  );
   const [currentProps, setCurrentProps] = useState<Record<
     string,
     unknown
@@ -495,8 +745,11 @@ export function GraphWindow() {
   const [hoveredId, setHoveredId] = useState("");
   const [explorerPanelOpen, setExplorerPanelOpen] = useState(true);
   const [detailPanelOpen, setDetailPanelOpen] = useState(true);
+  const [debugCopyState, setDebugCopyState] = useState<
+    "idle" | "copied" | "failed"
+  >("idle");
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const selectedIdRef = useRef("");
+  const selectedIdRef = useRef(initialSnapshot?.selectedId ?? "");
   const selectedTreeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -520,6 +773,7 @@ export function GraphWindow() {
         setStaticJsx(msg.staticJsx ?? {});
         setFiberRelations(msg.fiberRelations ?? {});
         setRoutes(msg.routes ?? null);
+        setObservedStaticOwnerKeys(msg.observedStaticOwnerKeys ?? []);
         setCurrentPath(msg.currentPath ?? window.location.pathname);
         if (msg.selectedId !== selectedIdRef.current) {
           setSelectedId(msg.selectedId);
@@ -549,9 +803,61 @@ export function GraphWindow() {
     [routes, currentPath],
   );
   const graphEntries = useMemo(
-    () => buildHybridGraphEntries(allEntries, activeRoutes),
-    [activeRoutes, allEntries],
+    () =>
+      buildHybridGraphEntries(
+        allEntries,
+        activeRoutes,
+        observedStaticOwnerKeys,
+      ),
+    [activeRoutes, allEntries, observedStaticOwnerKeys],
   );
+  const debugSnapshot = useMemo(
+    () =>
+      buildDebugSnapshot({
+        allEntries,
+        graphEntries,
+        selectedId,
+        currentPath,
+        routes,
+        activeRoutes,
+        staticJsx,
+        fiberRelations,
+        propTypesMap,
+      }),
+    [
+      activeRoutes,
+      allEntries,
+      currentPath,
+      fiberRelations,
+      graphEntries,
+      propTypesMap,
+      routes,
+      selectedId,
+      staticJsx,
+    ],
+  );
+
+  useEffect(() => {
+    saveGraphWindowSnapshot({
+      allEntries,
+      selectedId,
+      propTypesMap,
+      staticJsx,
+      fiberRelations,
+      routes,
+      observedStaticOwnerKeys,
+      currentPath,
+    });
+  }, [
+    allEntries,
+    currentPath,
+    fiberRelations,
+    observedStaticOwnerKeys,
+    propTypesMap,
+    routes,
+    selectedId,
+    staticJsx,
+  ]);
 
   useEffect(() => {
     if (!selectionExists(selectedId, graphEntries)) {
@@ -625,6 +931,23 @@ export function GraphWindow() {
       sendToMain({ type: "pick-start" });
     }
   }, [picking, sendToMain]);
+
+  const handleCopyDebugSnapshot = useCallback(async () => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API is unavailable.");
+      }
+      await navigator.clipboard.writeText(
+        JSON.stringify(debugSnapshot, null, 2),
+      );
+      setDebugCopyState("copied");
+    } catch (error) {
+      console.warn("[react-flowmap] failed to copy debug snapshot", error);
+      setDebugCopyState("failed");
+    } finally {
+      window.setTimeout(() => setDebugCopyState("idle"), 1800);
+    }
+  }, [debugSnapshot]);
 
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -772,6 +1095,30 @@ export function GraphWindow() {
         </button>
 
         <OpenSourceButton entry={selectedEntry} route={selectedRoute} />
+
+        <button
+          type="button"
+          onClick={handleCopyDebugSnapshot}
+          title="Copy debug snapshot"
+          className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[11px] font-medium transition-all cursor-pointer ${
+            debugCopyState === "copied"
+              ? "bg-rfm-blue-light text-rfm-blue border-rfm-blue-border"
+              : debugCopyState === "failed"
+                ? "bg-red-50 text-red-700 border-red-200"
+                : "bg-transparent text-rfm-text-500 border-rfm-border-light hover:bg-rfm-bg-100 hover:text-rfm-text-900"
+          }`}
+        >
+          {debugCopyState === "copied" ? (
+            <ClipboardCheck size={12} />
+          ) : (
+            <ClipboardCopy size={12} />
+          )}
+          {debugCopyState === "copied"
+            ? "Copied"
+            : debugCopyState === "failed"
+              ? "Copy failed"
+              : "Copy debug"}
+        </button>
 
         <EditorSelect />
       </div>

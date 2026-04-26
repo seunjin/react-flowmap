@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { Project, TypeFormatFlags, ts } from 'ts-morph';
+import type { ImportDeclaration, SourceFile } from 'ts-morph';
 import type { RfmNextRoute, RfmNextServerComponent, PropTypeEntry } from '../ui/inspector/types.js';
 
 // Next.js App Router에서 라우트로 인식되는 파일 타입
@@ -26,6 +27,76 @@ function extractComponentName(filePath: string): string {
     if (match?.[1] && match[1] !== 'function' && match[1] !== 'class') return match[1];
   } catch { /* ignore */ }
   return '';
+}
+
+function isComponentLikeName(name: string): boolean {
+  return /^[A-Z]/.test(name);
+}
+
+function getDefaultImportComponentName(importDecl: ImportDeclaration, importedAbs: string): string | null {
+  const defaultImport = importDecl.getDefaultImport();
+  if (!defaultImport) return null;
+  return extractComponentName(importedAbs) || defaultImport.getText();
+}
+
+function getNamedImportComponentNames(importDecl: ImportDeclaration): string[] {
+  const names: string[] = [];
+  for (const namedImport of importDecl.getNamedImports()) {
+    if (namedImport.isTypeOnly()) continue;
+
+    const exportedName = namedImport.getNameNode().getText();
+    const localName = namedImport.getAliasNode()?.getText() ?? exportedName;
+    const componentName = isComponentLikeName(exportedName)
+      ? exportedName
+      : isComponentLikeName(localName)
+        ? localName
+        : null;
+
+    if (componentName) names.push(componentName);
+  }
+  return names;
+}
+
+function getNamespaceImportComponentName(importDecl: ImportDeclaration, importedAbs: string): string | null {
+  const namespaceImport = importDecl.getNamespaceImport();
+  if (!namespaceImport) return null;
+  return extractComponentName(importedAbs) || null;
+}
+
+function getImportedComponentNames(
+  importDecl: ImportDeclaration,
+  resolvedSf: SourceFile,
+  importedAbs: string,
+): string[] {
+  const names = [
+    getDefaultImportComponentName(importDecl, importedAbs),
+    ...getNamedImportComponentNames(importDecl),
+    getNamespaceImportComponentName(importDecl, importedAbs),
+  ].filter(Boolean) as string[];
+
+  const fallbackName =
+    extractComponentName(importedAbs) ||
+    basename(importedAbs).replace(/\.[jt]sx?$/, '');
+
+  const candidates = names.length > 0 ? names : [fallbackName];
+  const deduped = new Set<string>();
+
+  for (const name of candidates) {
+    if (!name || name === 'type') continue;
+    const hasDeclaration =
+      resolvedSf.getFunction(name) ||
+      resolvedSf.getVariableDeclaration(name) ||
+      resolvedSf.getClass(name);
+
+    // Named imports often already are the exported component name. If the
+    // declaration cannot be found because of re-export patterns, keep the
+    // uppercase imported name and fall back only for lowercase file names.
+    if (hasDeclaration || isComponentLikeName(name) || candidates.length === 1) {
+      deduped.add(name);
+    }
+  }
+
+  return [...deduped];
 }
 
 /** 파일 상단에 'use client' 지시어가 있는지 확인 */
@@ -125,8 +196,11 @@ function buildImportTree(
   newAncestors.add(absFilePath);
 
   const children: RfmNextServerComponent[] = [];
+  const seenChildren = new Set<string>();
 
   for (const importDecl of sf.getImportDeclarations()) {
+    if (importDecl.isTypeOnly()) continue;
+
     const resolvedSf = importDecl.getModuleSpecifierSourceFile();
     if (!resolvedSf) continue;
 
@@ -139,23 +213,27 @@ function buildImportTree(
 
     const client = isClientComponent(importedAbs);
     const relPath = relative(projectRoot, importedAbs).replace(/\\/g, '/');
-    const componentName =
-      extractComponentName(importedAbs) ||
-      basename(importedAbs).replace(/\.[jt]sx?$/, '');
+    const componentNames = getImportedComponentNames(importDecl, resolvedSf, importedAbs);
 
     // 클라이언트 컴포넌트 경계: 자신은 표시하되 그 아래로는 재귀하지 않음
     const grandChildren = client
       ? []
       : buildImportTree(importedAbs, project, projectRoot, newAncestors, depth + 1);
 
-    children.push({
-      filePath: relPath,
-      componentName,
-      nodeKind: client ? 'client-boundary' : 'server-component',
-      executionKind: client ? 'live' : 'static',
-      isServer: !client,
-      ...(grandChildren.length > 0 ? { children: grandChildren } : {}),
-    });
+    for (const componentName of componentNames) {
+      const childKey = `${relPath}#${componentName}`;
+      if (seenChildren.has(childKey)) continue;
+      seenChildren.add(childKey);
+
+      children.push({
+        filePath: relPath,
+        componentName,
+        nodeKind: client ? 'client-boundary' : 'server-component',
+        executionKind: client ? 'live' : 'static',
+        isServer: !client,
+        ...(grandChildren.length > 0 ? { children: grandChildren } : {}),
+      });
+    }
   }
 
   return children;

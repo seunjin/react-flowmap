@@ -14,6 +14,7 @@ import {
   normalizeKnownEditorId,
   type KnownEditorId,
 } from '../editor.js';
+import { resolveEditorCommandFromRequest, resolveProjectFile } from '../editor-server.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -164,11 +165,6 @@ function getEditorAvailability(editorCmd: string) {
   };
 }
 
-function resolveEditorCommand(editorParam: string | null, editorCmd: string): string {
-  const selected = normalizeKnownEditorId(editorParam);
-  return selected ? getEditorCommand(selected) : editorParam ?? editorCmd;
-}
-
 function openInEditor(absPath: string, line: number, editor: string): void {
   const target = `${absPath}:${line}`;
 
@@ -274,17 +270,17 @@ export function flowmapInspect(options: FlowmapInspectOptions = {}): Plugin {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Content-Type', 'application/json');
 
-        if (!file) {
+        const resolvedFile = resolveProjectFile(root, file);
+        if (!resolvedFile.ok) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ ok: false, error: 'missing file' }));
+          res.end(JSON.stringify({ ok: false, error: resolvedFile.error }));
           return;
         }
 
-        const absPath = resolve(root, file);
-        const resolvedEditor = resolveEditorCommand(editorParam, editorCmd);
-        openInEditor(absPath, line, resolvedEditor);
+        const resolvedEditor = resolveEditorCommandFromRequest(editorParam, editorCmd);
+        openInEditor(resolvedFile.absPath, line, resolvedEditor);
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, file: absPath, line, editor: resolvedEditor }));
+        res.end(JSON.stringify({ ok: true, file: resolvedFile.absPath, line, editor: resolvedEditor }));
       });
     },
 

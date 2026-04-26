@@ -431,7 +431,9 @@ export function FullGraph({
           const isSelected = entry.symbolId === selectedId;
           const isHovered = entry.symbolId === hoveredId;
           const palette = getNodePalette(entry, isSelected, isHovered);
-          const executionBadge = entry.executionKind === 'static' ? 'SERVER' : 'CLIENT';
+          const ownershipBadge =
+            entry.ownershipKind ??
+            (entry.executionKind === 'static' ? 'STATIC-DECLARED' : 'LIVE');
           const roleBadge = formatRoleBadge(entry.role);
 
           return (
@@ -525,8 +527,12 @@ export function FullGraph({
                   padding: '2px 5px',
                   borderRadius: 5,
                   flexShrink: 0,
+                  maxWidth: 112,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}>
-                  {executionBadge}
+                  {ownershipBadge}
                 </span>
               </span>
             </button>

@@ -27,7 +27,7 @@ It is **not** trying to replace Chrome DevTools or become a general runtime anal
 | Target | Status | What's tracked |
 |---|---|---|
 | Vite + React apps | ✅ Full | All components, including route pages in common client-side routers such as TanStack Router and React Router |
-| Next.js App Router | ⚠️ Partial | Active route/layout/page ownership plus live client runtime graph in one canvas. `SERVER` nodes show structure and static types, not live props. |
+| Next.js App Router | ✅ Supported with limits | Active route/layout/page ownership plus live client runtime graph in one canvas. `SERVER` nodes show structure and static types, not live props. Run with `next dev --webpack`; Turbopack is not supported yet. |
 
 ## Preview
 
@@ -84,9 +84,12 @@ Works the same way with common client-side routers such as TanStack Router or Re
 
 In the inspector:
 
-- `CLIENT` nodes behave like normal React runtime nodes: live props, type hints, source jump
-- `SERVER` nodes show structure metadata: role, parent layout, reachable client boundaries, static prop types
-- `SERVER` nodes do **not** expose live prop values in the browser
+- `LIVE` nodes behave like normal React runtime nodes: live props, type hints, source jump
+- `STATIC-DOM` nodes come from SSR/RSC DOM owner markers: screen pick, source jump, route context, static type metadata
+- `STATIC-DECLARED` nodes come from the route/import graph only and may not be directly pickable on screen
+- Static nodes do **not** expose live prop values in the browser
+
+The provider alone cannot recover SSR/RSC source ownership. Server Components do not leave live React component instances in the browser, so `<ReactFlowMap />` can only inspect live client boundaries by itself. `withFlowmap()` adds the dev-only build transform that injects static DOM owner markers and the route manifest used for source ownership. Regular production builds do not include those markers or the runtime inspector.
 
 **1. Wrap your Next.js config** (`next.config.ts`):
 
@@ -166,6 +169,7 @@ export default withFlowmap(nextConfig, { editor: 'cursor' });
 ```
 
 Each editor name is fully autocompleted in TypeScript. You can also pass any custom binary name or absolute path through the Vite / Next plugin option.
+For safety, browser-side editor selection only accepts known editor IDs; custom commands must be configured in the project plugin option, not passed through the `editor` query string.
 For shared repo config, prefer the Vite / Next plugin option. `config.editor` on `<ReactFlowMap />` is available as a local UI-side default when needed, but the workspace IDE select wins once a user chooses an editor.
 
 ## Options
@@ -210,13 +214,17 @@ Most app integrations only need:
 - `flowmapInspect` from `react-flowmap/vite`
 - `withFlowmap` from `react-flowmap/next`
 
-The package also exports lower-level building blocks for custom tooling:
+The 1.0 public surface is intentionally small:
 
-- `react-flowmap/rfm-context`
-- `react-flowmap/graph-window`
-- root-level graph / runtime / doc helpers re-exported from `react-flowmap`
+| Import path | Public API |
+|---|---|
+| `react-flowmap` | `ReactFlowMap`, config types, and advanced graph/runtime/doc helpers |
+| `react-flowmap/vite` | `flowmapInspect()` and Vite option types |
+| `react-flowmap/next` | `withFlowmap()`, `openInEditor()` compatibility helper, and Next option types |
+| `react-flowmap/rfm-context` | instrumentation runtime bridge for custom integrations |
+| `react-flowmap/graph-window` | standalone workspace window entry for custom tooling |
 
-These advanced exports are public, but they are not the primary setup surface described in this README. Prefer the main integration APIs unless you are building custom inspector workflows on top of Flowmap itself.
+The Babel transform, webpack loader, editor sidecar helpers, and inspector implementation components are internal implementation details. Prefer the main integration APIs unless you are building custom inspector workflows on top of Flowmap itself.
 
 ## Props display
 
@@ -227,6 +235,21 @@ These advanced exports are public, but they are not the primary setup surface de
 | `object`, `array` | formatted JSON block |
 
 TypeScript type names are shown next to each prop. Click the `↗` icon in the Props section header to jump to the type definition in your editor.
+
+## Highlight accuracy
+
+Flowmap highlights the DOM owner marker for the selected component, matching the element box you would see in browser DevTools. If that marker is only a layout spacer and the visible UI is rendered by a `fixed`, `sticky`, or `absolute` child, mark the visual child as the owner anchor.
+
+For unusual layouts, you can add lightweight DOM hints:
+
+```tsx
+<header>
+  <div data-rfm-owner-anchor className="fixed top-0 left-0 right-0">
+    ...
+  </div>
+  <div data-rfm-owner-ignore>{/* dropdown or portal-like content */}</div>
+</header>
+```
 
 ## How it works
 

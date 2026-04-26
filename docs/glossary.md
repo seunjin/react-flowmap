@@ -202,11 +202,140 @@ React Flowmap v1 기준 주요 node 타입:
 - `File Node`
 - `Symbol Node`
 - `API Node`
+- `Route Node`
 
 주의:
 
 - 문맥 없이 `노드`라고만 말하면 file node인지 symbol node인지 모호해질 수 있다.
 - 가능하면 타입을 함께 명시한다.
+
+---
+
+### Route Node
+
+현재 화면의 route/layout/page context를 설명하는 synthetic node입니다.
+
+예:
+
+- `route:src/app/layout.tsx`
+- `route:src/app/products/page.tsx`
+
+의미:
+
+- 현재 화면이 어떤 route/layout/page 구조에서 시작되는지 보여준다.
+- Next.js App Router의 server route file처럼 DOM instance가 없는 대상을 graph 안에서 선택 가능하게 만든다.
+- source jump와 static metadata를 가질 수 있지만, live props를 갖는다는 뜻은 아니다.
+
+권장 표기:
+
+- 문서: `Route Node`
+- 구현: `route`
+- UI: route, layout, page role badge
+
+주의:
+
+- `Route Node`는 일반 component runtime node와 같은 의미가 아니다.
+- route declaration 관계를 component ownership 관계처럼 보여주면 안 된다.
+
+---
+
+### Server Component Node
+
+Next.js App Router에서 static ownership layer에 속하는 server-side component node입니다.
+
+의미:
+
+- route file 또는 server-only component file의 구조적 소유 관계를 보여준다.
+- 브라우저에 mounted runtime instance가 없을 수 있다.
+- source jump, static prop type, parent layout, reachable client boundary 같은 정적 정보를 보여준다.
+
+권장 표기:
+
+- 문서: `Server Component Node`
+- 구현: `server-component`
+- UI: `SERVER` badge
+
+주의:
+
+- server component node에는 live props를 약속하지 않는다.
+- server component node의 highlight는 exact runtime ownership이 아니라 static owner marker 또는 context feedback이다.
+
+---
+
+### Client Boundary
+
+Next.js App Router의 static ownership graph가 `'use client'` 파일을 만나는 경계입니다.
+
+의미:
+
+- server/static 구조에서 live client runtime graph로 넘어가는 지점이다.
+- 파일 기준으로는 static import tree 안에 나타날 수 있고, 브라우저에서는 mounted client component로도 나타날 수 있다.
+- 같은 component가 static boundary와 live runtime 양쪽에 중복 표시되지 않도록 정규화가 필요하다.
+
+권장 표기:
+
+- 문서: `Client Boundary`
+- 구현: `client-boundary`
+- UI: `CLIENT` badge 또는 client boundary role
+
+주의:
+
+- client boundary는 "CSR 전용"이라는 뜻이 아니다.
+- Next.js의 client component도 초기 HTML 생성에 서버가 관여할 수 있으므로 `CSR`보다 `CLIENT`/`live` 표현을 우선한다.
+
+---
+
+### LIVE
+
+브라우저에서 실제로 mounted 되어 runtime relation, DOM highlight, live props lookup에 참여할 수 있는 component node입니다.
+
+의미:
+
+- picker와 overlay highlight의 주 대상이다.
+- props와 TypeScript type metadata를 함께 보여줄 수 있다.
+- 현재 화면 ownership graph의 기본 단위다.
+
+권장 표기:
+
+- 문서: `LIVE`
+- 구현: `ownershipKind: 'LIVE'`, `executionKind: 'live'`
+- UI: `LIVE` badge
+
+---
+
+### STATIC-DOM
+
+SSR/RSC/server/static HTML 안의 DOM owner marker에서 현재 화면 소유자가 직접 관측된 상태입니다.
+
+의미:
+
+- 화면 클릭과 DOM highlight가 가능하다.
+- source file, component name, route context, static prop type/source metadata를 보여줄 수 있다.
+- 브라우저에 live React component instance가 없으므로 live props와 fiber relation은 제공하지 않는다.
+
+권장 표기:
+
+- 문서: `STATIC-DOM`
+- 구현: `ownershipKind: 'STATIC-DOM'`
+- UI: `STATIC-DOM` badge
+
+---
+
+### STATIC-DECLARED
+
+route/import graph에는 존재하지만 현재 DOM owner marker에서 직접 관측되지 않은 static 후보입니다.
+
+의미:
+
+- 현재 화면의 route context 또는 source 참고용이다.
+- 화면 pick 대상이 아닐 수 있다.
+- live props와 exact runtime ownership을 약속하지 않는다.
+
+권장 표기:
+
+- 문서: `STATIC-DECLARED`
+- 구현: `ownershipKind: 'STATIC-DECLARED'`
+- UI: `STATIC-DECLARED` badge
 
 ---
 
@@ -339,6 +468,73 @@ React Flowmap v1 기준 주요 node 타입:
 
 ---
 
+### Ownership Edge
+
+현재 화면에서 parent component가 child component를 실제로 렌더하거나 소유한다고 해석할 수 있는 연결입니다.
+
+주요 근거:
+
+- runtime `render` event
+- React fiber parent-child relation
+- runtime에서 놓친 관계를 보완하는 제한적인 fallback
+
+의미:
+
+- 기본 graph에서 가장 중요한 edge다.
+- 사용자가 "현재 화면이 어떤 component 구조로 조립되었는가"를 읽는 기준이다.
+
+주의:
+
+- route declaration이나 static JSX reference가 곧 ownership edge라는 뜻은 아니다.
+- declaration/hint edge가 ownership edge와 경쟁하면 기본 UX가 흐려진다.
+
+---
+
+### Route Context Edge
+
+현재 location에서 활성화된 route/layout/page chain을 설명하는 연결입니다.
+
+의미:
+
+- component ownership graph의 주인공이 아니라 현재 화면의 상위 문맥이다.
+- graph, explorer, inspector에서 role badge 또는 route context로 보조 노출된다.
+
+주의:
+
+- `Route -> Component` 선언 관계를 runtime parent-child처럼 표현하지 않는다.
+
+---
+
+### Declaration Edge
+
+소스 코드에서 어떤 component나 route definition이 다른 symbol을 참조한다는 정적 선언 관계입니다.
+
+의미:
+
+- 정적 분석이나 advanced/debug view에서 유용하다.
+- 기본 graph에서는 숨기거나 fallback/hint로만 사용한다.
+
+주의:
+
+- declaration edge는 현재 화면에 실제로 mounted 되었음을 보장하지 않는다.
+
+---
+
+### Hint Edge
+
+runtime 수집이 놓친 ownership을 보정하기 위한 낮은 확신도의 연결입니다.
+
+의미:
+
+- layout 계산이나 누락 보정에 도움을 줄 수 있다.
+- 기본 UX에서는 ownership edge와 시각적으로 같은 의미로 보여주지 않는다.
+
+주의:
+
+- hint edge가 source-of-truth가 되면 graph semantics가 흐려진다.
+
+---
+
 ## Runtime Terms
 
 ### Runtime Event
@@ -355,6 +551,46 @@ React Flowmap v1 기준 주요 node 타입:
 의미:
 
 - 아직 그래프로 정규화되기 전의 관측 데이터
+
+---
+
+### Static
+
+소스 파일, route manifest, import tree, prop type extraction처럼 실행 중 mounted instance 없이 알 수 있는 정보입니다.
+
+의미:
+
+- Next.js App Router의 route/layout/page/server component 구조를 설명하는 데 필요하다.
+- source jump와 static type metadata의 근거가 된다.
+- current screen context를 보완하지만 live props를 제공하지 않는다.
+
+권장 표기:
+
+- 문서: `static`
+- 구현: `executionKind: 'static'`
+- UI: 보통 `SERVER` badge
+
+---
+
+### Live
+
+브라우저에서 현재 mounted 된 runtime instance를 통해 관측되는 정보입니다.
+
+의미:
+
+- DOM highlight, pick, live props, runtime render relation의 근거가 된다.
+- Vite React component와 Next.js `'use client'` component가 이 범위에 들어간다.
+
+권장 표기:
+
+- 문서: `live`
+- 구현: `executionKind: 'live'`
+- UI: 보통 `CLIENT` badge
+
+주의:
+
+- `live`는 "client-only rendering"을 뜻하지 않는다.
+- Next.js client component도 초기 렌더 과정에서는 서버와 관련될 수 있다.
 
 ---
 

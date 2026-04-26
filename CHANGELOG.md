@@ -1,5 +1,48 @@
 # react-flowmap
 
+## 1.0.0-rc.5
+
+### Patch Changes
+
+- Reframe Next.js App Router support around screen-to-source ownership: static DOM owner markers are pickable from the app screen, graph entries distinguish LIVE, STATIC-DOM, and STATIC-DECLARED ownership states, and the graph window restores the latest snapshot after refresh.
+
+## 1.0.0-rc.4
+
+### Patch Changes
+
+- Align owner highlights with the actual owner marker rect by default and keep visual child targeting behind explicit owner anchors.
+
+## 1.0.0-rc.3
+
+### Patch Changes
+
+- Improve owner highlight boxes for fixed/sticky/absolute visual children and add `data-rfm-owner-anchor` / `data-rfm-owner-ignore` rect hints.
+
+## 1.0.0-rc.2
+
+### Patch Changes
+
+- Improve Next.js client boundary naming and merge static client boundary metadata into matching live runtime nodes.
+
+  Also add a workspace debug snapshot copy action for sharing graph state without live prop values.
+
+## 1.0.0-rc.1
+
+### Patch Changes
+
+- Add default export conditions for package subpaths so Next.js config loaders can resolve `react-flowmap/next`.
+
+## 1.0.0-rc.0
+
+### Major Changes
+
+- Prepare the 1.0 release candidate.
+
+  - Freeze the public package surface around `react-flowmap`, `react-flowmap/vite`, `react-flowmap/next`, `react-flowmap/rfm-context`, and `react-flowmap/graph-window`.
+  - Harden dev-only safety for editor open endpoints and production instrumentation stripping.
+  - Stabilize current-screen ownership semantics across Vite React, React Router, TanStack Router, and Next.js App Router.
+  - Add local package verification with tarball contents and Vite/Next import smoke checks.
+
 ## 0.5.0
 
 ### Minor Changes

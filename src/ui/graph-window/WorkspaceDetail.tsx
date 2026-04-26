@@ -312,9 +312,12 @@ function StaticComponentDetail({
   parentLayout: RfmRoute | null;
 }) {
   const isServerNode = entry.executionKind === "static";
-  const noticeBody = isServerNode
-    ? "Static-only node. Live props are not available in the browser runtime."
-    : "Static boundary node. Select the mounted CLIENT node to inspect live props.";
+  const noticeBody =
+    entry.ownershipKind === "STATIC-DECLARED"
+      ? "Static declaration candidate. It is present in the route/import graph but was not directly observed in the current DOM."
+      : isServerNode
+      ? "Static DOM owner. Live props are not available in the browser runtime."
+      : "Static boundary node. Select the mounted CLIENT node to inspect live props.";
   const clientBoundaries = getClientBoundariesForEntry(entry, contextRoute);
 
   return (

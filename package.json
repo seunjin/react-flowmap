@@ -1,6 +1,6 @@
 {
   "name": "react-flowmap",
-  "version": "0.5.0",
+  "version": "1.0.0-rc.5",
   "type": "module",
   "description": "Runtime component inspector for Vite React apps and Next.js App Router.",
   "license": "MIT",
@@ -18,23 +18,28 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./vite": {
       "import": "./dist/vite-plugin.js",
-      "types": "./dist/vite-plugin.d.ts"
+      "types": "./dist/vite-plugin.d.ts",
+      "default": "./dist/vite-plugin.js"
     },
     "./next": {
       "import": "./dist/next-plugin.js",
-      "types": "./dist/next-plugin.d.ts"
+      "types": "./dist/next-plugin.d.ts",
+      "default": "./dist/next-plugin.js"
     },
     "./rfm-context": {
       "import": "./dist/rfm-context.js",
-      "types": "./dist/rfm-context.d.ts"
+      "types": "./dist/rfm-context.d.ts",
+      "default": "./dist/rfm-context.js"
     },
     "./graph-window": {
       "import": "./dist/graph-window.js",
-      "types": "./dist/graph-window.d.ts"
+      "types": "./dist/graph-window.d.ts",
+      "default": "./dist/graph-window.js"
     }
   },
   "files": [
@@ -63,6 +68,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "verify:package": "node scripts/verify-package.mjs",
     "docs:screenshots": "node scripts/capture-demo-screenshots.mjs",
     "changeset": "changeset",
     "release:version": "changeset version",

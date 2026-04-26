@@ -11,6 +11,7 @@ import {
   getEditorLabel,
   normalizeKnownEditorId,
 } from '../editor.js';
+import { resolveEditorCommandFromRequest, resolveProjectFile } from '../editor-server.js';
 import { existsSync } from 'node:fs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,11 +56,6 @@ function getEditorAvailability(editorCmd: string) {
           (option.macAppPaths ?? []).some((appPath) => existsSync(appPath))),
     })),
   };
-}
-
-function resolveEditorCommand(editorParam: string | null, editorCmd: string): string {
-  const selected = normalizeKnownEditorId(editorParam);
-  return selected ? getEditorCommand(selected) : editorParam ?? editorCmd;
 }
 
 function openInEditor(absPath: string, line: number, editor: string): void {
@@ -123,15 +119,16 @@ function startSidecar(port: number, root: string, editorCmd: string): void {
       return;
     }
 
-    if (!file) {
+    const resolvedFile = resolveProjectFile(root, file);
+    if (!resolvedFile.ok) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ ok: false, error: 'missing file' }));
+      res.end(JSON.stringify({ ok: false, error: resolvedFile.error }));
       return;
     }
 
-    const resolvedEditor = resolveEditorCommand(editorParam, editorCmd);
+    const resolvedEditor = resolveEditorCommandFromRequest(editorParam, editorCmd);
     console.log(`[react-flowmap] open: ${file} (editor: ${resolvedEditor})`);
-    openInEditor(resolve(root, file), line, resolvedEditor);
+    openInEditor(resolvedFile.absPath, line, resolvedEditor);
     res.end(JSON.stringify({ ok: true }));
   });
 

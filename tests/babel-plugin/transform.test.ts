@@ -268,6 +268,33 @@ export const ServerWorkflow = () => <section>Workflow</section>;
     );
   });
 
+  it('adds static owner markers to nested server component roots in the same file', () => {
+    const code = `
+export function PostCard() {
+  return <article>Post</article>;
+}
+
+export function PostList() {
+  return (
+    <section>
+      <PostCard />
+    </section>
+  );
+}
+`.trim();
+    const result = transformStaticOwnerMarks(code, 'src/app/_components/posts.tsx', {
+      relPath: 'src/app/_components/posts.tsx',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain(
+      'data-rfm-static-owner="src/app/_components/posts.tsx#PostCard"',
+    );
+    expect(result!.code).toContain(
+      'data-rfm-static-owner="src/app/_components/posts.tsx#PostList"',
+    );
+  });
+
   it('does not mark component-only roots because they do not own a host DOM box', () => {
     const code = `
 import { ClientCard } from './ClientCard';
